@@ -90,11 +90,8 @@ export class IngestionConsumer {
     public readonly promiseScheduler = new PromiseScheduler()
     private topHog!: TopHog
 
-    private joinedPipeline!: BatchPipeline<
-        JoinedIngestionPipelineInput,
-        void,
-        JoinedIngestionPipelineContext,
-        JoinedIngestionPipelineContext
+    private joinedPipeline!: ReturnType<
+        typeof createJoinedIngestionPipeline<JoinedIngestionPipelineInput, JoinedIngestionPipelineContext>
     >
 
     constructor(
@@ -265,11 +262,7 @@ export class IngestionConsumer {
             groupTypeManager: this.deps.groupTypeManager,
             topHog: this.topHog!,
         }
-        this.joinedPipeline = createJoinedIngestionPipeline(
-            newBatchPipelineBuilder<JoinedIngestionPipelineInput, JoinedIngestionPipelineContext>(),
-            joinedPipelineConfig,
-            joinedPipelineDeps
-        ).build()
+        this.joinedPipeline = createJoinedIngestionPipeline(joinedPipelineConfig, joinedPipelineDeps)
 
         await this.kafkaConsumer.connect(async (messages) => {
             return await instrumentFn(
@@ -363,14 +356,22 @@ export class IngestionConsumer {
     private async runIngestionPipeline(messages: Message[]): Promise<void> {
         const batch = messages.map((message) => createContext(ok({ message }), { message }))
 
-        const feedResult = this.joinedPipeline.feed(batch)
+        const feedResult = this.joinedPipeline.feed(batch, {
+            personsStore: this.personsStore,
+            groupStore: this.groupStore,
+            kafkaProducer: this.kafkaProducer!,
+        })
         if (!feedResult.ok) {
             throw new Error(`Pipeline rejected batch: ${feedResult.reason}`)
         }
 
-        // Drain the pipeline
-        while ((await this.joinedPipeline.next()) !== null) {
-            // Continue until all results are processed
+        // Drain the pipeline, scheduling batch-level side effects
+        let result = await this.joinedPipeline.next()
+        while (result !== null) {
+            for (const sideEffect of result.sideEffects ?? []) {
+                void this.promiseScheduler.schedule(sideEffect)
+            }
+            result = await this.joinedPipeline.next()
         }
     }
 
