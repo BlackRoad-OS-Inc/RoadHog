@@ -3,6 +3,7 @@ import { DateTime } from 'luxon'
 import { PipelineResultType, isDlqResult, isOkResult, isRedirectResult } from '~/ingestion/pipelines/results'
 import { PluginEvent } from '~/plugin-scaffold'
 import { BatchWritingPersonsStore } from '~/worker/ingestion/persons/batch-writing-person-store'
+import { PersonsStore } from '~/worker/ingestion/persons/persons-store'
 import { PostgresPersonRepository } from '~/worker/ingestion/persons/repositories/postgres-person-repository'
 
 import {
@@ -71,10 +72,12 @@ describe('createProcessPersonsStep', () => {
         await closeHub(hub)
     })
 
-    const createInput = (overrides: Partial<ProcessPersonsInput> = {}): ProcessPersonsInput => ({
+    const createInput = (overrides: Partial<ProcessPersonsInput> = {}) => ({
         normalizedEvent: pluginEvent,
         team,
         timestamp,
+        kafkaProducer: hub.kafkaProducer,
+        personsStore: personsStore as PersonsStore,
         ...overrides,
     })
 
@@ -100,7 +103,7 @@ describe('createProcessPersonsStep', () => {
     }
 
     it('creates person with $set properties', async () => {
-        const step = createProcessPersonsStep(options, hub.kafkaProducer, personsStore)
+        const step = createProcessPersonsStep(options)
         const result = await step(createInput())
 
         expect(result.type).toBe(PipelineResultType.OK)
@@ -137,7 +140,7 @@ describe('createProcessPersonsStep', () => {
         const normalizedEvent = normalizeProcessPerson(normalizeEvent(event), processPerson)
         const normalizedTimestamp = parseEventTimestamp(normalizedEvent)
 
-        const step = createProcessPersonsStep(options, hub.kafkaProducer, personsStore)
+        const step = createProcessPersonsStep(options)
         const result = await step(createInput({ normalizedEvent, timestamp: normalizedTimestamp }))
 
         expect(result.type).toBe(PipelineResultType.OK)
@@ -184,7 +187,7 @@ describe('createProcessPersonsStep', () => {
             created_at: DateTime.fromISO('1970-01-01T00:00:05.000Z'),
         }
 
-        const step = createProcessPersonsStep(options, hub.kafkaProducer, personsStore)
+        const step = createProcessPersonsStep(options)
         const result = await step(createInput({ personlessPerson }))
 
         expect(result.type).toBe(PipelineResultType.OK)
@@ -206,7 +209,7 @@ describe('createProcessPersonsStep', () => {
             force_upgrade: true,
         }
 
-        const step = createProcessPersonsStep(options, hub.kafkaProducer, personsStore)
+        const step = createProcessPersonsStep(options)
         const result = await step(createInput({ personlessPerson }))
 
         expect(result.type).toBe(PipelineResultType.OK)
@@ -221,7 +224,7 @@ describe('createProcessPersonsStep', () => {
     })
 
     it('preserves additional input fields in the output', async () => {
-        const step = createProcessPersonsStep(options, hub.kafkaProducer, personsStore)
+        const step = createProcessPersonsStep(options)
         const input = { ...createInput(), extraField: 'preserved' }
 
         const result = await step(input)
@@ -252,7 +255,7 @@ describe('createProcessPersonsStep', () => {
             PERSON_MERGE_MOVE_DISTINCT_ID_LIMIT: 2,
         }
 
-        const step = createProcessPersonsStep(limitOptions, hub.kafkaProducer, personsStore)
+        const step = createProcessPersonsStep(limitOptions)
         const result = await step(
             createInput({
                 normalizedEvent: identifyEvent,
@@ -280,7 +283,7 @@ describe('createProcessPersonsStep', () => {
             uuid: new UUIDT().toString(),
         }
 
-        const step = createProcessPersonsStep(options, hub.kafkaProducer, personsStore)
+        const step = createProcessPersonsStep(options)
         const result = await step(
             createInput({
                 normalizedEvent: laterEvent,
@@ -323,7 +326,7 @@ describe('createProcessPersonsStep', () => {
             uuid: new UUIDT().toString(),
         }
 
-        const step = createProcessPersonsStep(options, hub.kafkaProducer, personsStore)
+        const step = createProcessPersonsStep(options)
         const result = await step(
             createInput({
                 normalizedEvent: laterEvent,
@@ -359,7 +362,7 @@ describe('createProcessPersonsStep', () => {
             PERSON_MERGE_ASYNC_TOPIC: 'async-merge-topic',
         }
 
-        const step = createProcessPersonsStep(asyncOptions, hub.kafkaProducer, personsStore)
+        const step = createProcessPersonsStep(asyncOptions)
         const result = await step(
             createInput({
                 normalizedEvent: identifyEvent,

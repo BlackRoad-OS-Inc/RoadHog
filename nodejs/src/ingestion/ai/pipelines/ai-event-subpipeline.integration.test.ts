@@ -9,6 +9,7 @@ import { createTestTeam } from '../../../../tests/helpers/team'
 import { InternalPerson, PropertyUpdateOperation } from '../../../types'
 import { parseJSON } from '../../../utils/json-parse'
 import { AI_EVENTS_OUTPUT, EVENTS_OUTPUT, IngestionOutputs } from '../../event-processing/ingestion-outputs'
+import { BatchStores } from '../../event-processing/flush-batch-stores-step'
 import { newPipelineBuilder } from '../../pipelines/builders'
 import { createContext } from '../../pipelines/helpers'
 import { PipelineResultType, ok } from '../../pipelines/results'
@@ -60,6 +61,19 @@ function createAiEvent(overrides: Partial<PluginEvent> = {}): PluginEvent {
     })
 }
 
+const mockPersonsStore = {
+    fetchForChecking: jest.fn().mockResolvedValue(null),
+    getPersonlessBatchResult: jest.fn().mockReturnValue(false),
+    fetchForUpdate: jest.fn().mockResolvedValue(existingPerson),
+    updatePersonWithPropertiesDiffForUpdate: jest.fn().mockResolvedValue([existingPerson, [], false]),
+} as any
+
+const mockGroupStore = {} as any
+
+const mockKafkaProducer = {
+    queueMessages: jest.fn().mockResolvedValue(undefined),
+} as any
+
 function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) {
     const mockProduce = jest.fn().mockResolvedValue(undefined)
 
@@ -92,16 +106,6 @@ function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) 
         hogTransformer: {
             transformEventAndProduceMessages: (event: PluginEvent) => Promise.resolve({ event, invocationResults: [] }),
         } as any,
-        personsStore: {
-            fetchForChecking: jest.fn().mockResolvedValue(null),
-            getPersonlessBatchResult: jest.fn().mockReturnValue(false),
-            fetchForUpdate: jest.fn().mockResolvedValue(existingPerson),
-            updatePersonWithPropertiesDiffForUpdate: jest.fn().mockResolvedValue([existingPerson, [], false]),
-        } as any,
-        groupStore: {} as any,
-        kafkaProducer: {
-            queueMessages: jest.fn().mockResolvedValue(undefined),
-        } as any,
         splitAiEventsConfig: { enabled: false, enabledTeams: '*' },
         groupId: 'test-group',
         topHog: (step) => step,
@@ -109,14 +113,25 @@ function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) 
     }
 
     return {
-        pipeline: createAiEventSubpipeline(newPipelineBuilder<AiEventSubpipelineInput>(), config).build(),
+        pipeline: createAiEventSubpipeline(
+            newPipelineBuilder<AiEventSubpipelineInput & BatchStores>(),
+            config
+        ).build(),
         mockProduce,
         config,
     }
 }
 
-function createInput(event: PluginEvent): AiEventSubpipelineInput {
-    return { message, event, team, headers }
+function createInput(event: PluginEvent): AiEventSubpipelineInput & BatchStores {
+    return {
+        message,
+        event,
+        team,
+        headers,
+        personsStore: mockPersonsStore,
+        groupStore: mockGroupStore,
+        kafkaProducer: mockKafkaProducer,
+    }
 }
 
 function getProduceCall(mockProduce: jest.Mock) {

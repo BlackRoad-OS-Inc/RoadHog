@@ -24,6 +24,7 @@ type TestInput = {
     preparedEvent: PreIngestionEvent
     team: Team
     processPerson: boolean
+    groupStore: BatchWritingGroupStore
 }
 
 describe('createProcessGroupsStep', () => {
@@ -43,6 +44,7 @@ describe('createProcessGroupsStep', () => {
         preparedEvent: createTestPreIngestionEvent(),
         team: createTestTeam(),
         processPerson: true,
+        groupStore: mockGroupStore as unknown as BatchWritingGroupStore,
         ...overrides,
     })
 
@@ -50,7 +52,6 @@ describe('createProcessGroupsStep', () => {
         createProcessGroupsStep<TestInput>(
             mockTeamManager as unknown as TeamManager,
             mockGroupTypeManager as unknown as GroupTypeManager,
-            mockGroupStore as unknown as BatchWritingGroupStore,
             { SKIP_UPDATE_EVENT_AND_PROPERTIES_STEP: skipUpdate }
         )
 

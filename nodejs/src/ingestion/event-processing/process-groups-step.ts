@@ -23,14 +23,15 @@ export interface ProcessGroupsStepInput {
 
 export type ProcessGroupsStepResult<TInput> = TInput
 
-export function createProcessGroupsStep<TInput extends ProcessGroupsStepInput>(
+export function createProcessGroupsStep<
+    TInput extends ProcessGroupsStepInput & { groupStore: BatchWritingGroupStore },
+>(
     teamManager: TeamManager,
     groupTypeManager: GroupTypeManager,
-    groupStore: BatchWritingGroupStore,
     options: Pick<EventPipelineRunnerOptions, 'SKIP_UPDATE_EVENT_AND_PROPERTIES_STEP'>
 ): ProcessingStep<TInput, ProcessGroupsStepResult<TInput>> {
     return async function processGroupsStep(input: TInput) {
-        const { preparedEvent, team, processPerson } = input
+        const { preparedEvent, team, processPerson, groupStore } = input
 
         if (!options.SKIP_UPDATE_EVENT_AND_PROPERTIES_STEP) {
             try {

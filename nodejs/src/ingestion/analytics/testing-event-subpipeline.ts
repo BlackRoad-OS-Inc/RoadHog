@@ -18,6 +18,7 @@ export interface TestingEventSubpipelineInput {
     event: PluginEvent
     team: Team
     headers: EventHeaders
+    kafkaProducer: KafkaProducerWrapper
 }
 
 export interface TestingEventSubpipelineConfig {
@@ -25,7 +26,6 @@ export interface TestingEventSubpipelineConfig {
         CLICKHOUSE_HEATMAPS_KAFKA_TOPIC: string
     }
     outputs: IngestionOutputs<EventOutput>
-    kafkaProducer: KafkaProducerWrapper
     groupId: string
 }
 
@@ -33,7 +33,7 @@ export function createTestingEventSubpipeline<TInput extends TestingEventSubpipe
     builder: StartPipelineBuilder<TInput, TContext>,
     config: TestingEventSubpipelineConfig
 ): PipelineBuilder<TInput, void, TContext> {
-    const { options, outputs, kafkaProducer, groupId } = config
+    const { options, outputs, groupId } = config
 
     // Compared to event-subpipeline.ts:
     // CHANGED: createNormalizeProcessPersonFlagStep → createDisablePersonProcessingWithFakePersonStep
@@ -49,7 +49,6 @@ export function createTestingEventSubpipeline<TInput extends TestingEventSubpipe
         .pipe(createPrepareEventStep())
         .pipe(
             createExtractHeatmapDataStep({
-                kafkaProducer,
                 CLICKHOUSE_HEATMAPS_KAFKA_TOPIC: options.CLICKHOUSE_HEATMAPS_KAFKA_TOPIC,
             })
         )
