@@ -179,10 +179,10 @@ export function createJoinedIngestionPipeline<
         topHog: topHogWrapper,
     }
 
-    return newBatchingPipeline<TInput, void, TContext, FlushBatchStoresStepConfig, TContext>(
-        (_batchContext, elements) => ({ elements }),
-        (builder) =>
-            builder
+    return newBatchingPipeline<TInput, void, TContext>(
+        (beforeBatch) => beforeBatch.pipe(({ elements }) => Promise.resolve(ok({ elements, batchContext: {} }))),
+        (batch) =>
+            batch
                 .messageAware((b) =>
                     b
                         .sequentially((b) =>
@@ -216,7 +216,7 @@ export function createJoinedIngestionPipeline<
                 )
                 .handleResults(pipelineConfig)
                 .handleSideEffects(promiseScheduler, { await: false }),
-        (batchContext, _elements, _batchId) => flushBatchStores(batchContext),
+        (afterBatch) => afterBatch.pipe(createFlushBatchStoresStep({ personsStore, groupStore, kafkaProducer })),
         { concurrentBatches: 1 }
     )
 }
