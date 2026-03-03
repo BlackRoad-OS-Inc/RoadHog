@@ -16253,11 +16253,12 @@ export namespace Schemas {
     * `firebase` - Firebase
     * `jira` - Jira
     * `pinterest-ads` - Pinterest Ads
+    * `stripe` - Stripe
      */
-    export type KindBfbEnum = typeof KindBfbEnum[keyof typeof KindBfbEnum];
+    export type Kind5bcEnum = typeof Kind5bcEnum[keyof typeof Kind5bcEnum];
 
 
-    export const KindBfbEnum = {
+    export const Kind5bcEnum = {
       Slack: 'slack',
       SlackPosthogCode: 'slack-posthog-code',
       Salesforce: 'salesforce',
@@ -16285,6 +16286,7 @@ export namespace Schemas {
       Firebase: 'firebase',
       Jira: 'jira',
       PinterestAds: 'pinterest-ads',
+      Stripe: 'stripe',
     } as const;
 
     /**
@@ -16292,7 +16294,7 @@ export namespace Schemas {
      */
     export interface Integration {
       readonly id: number;
-      kind: KindBfbEnum;
+      kind: Kind5bcEnum;
       config?: unknown;
       readonly created_at: string;
       readonly created_by: UserBasic;
@@ -21995,7 +21997,7 @@ export namespace Schemas {
      */
     export interface PatchedIntegration {
       readonly id?: number;
-      kind?: KindBfbEnum;
+      kind?: Kind5bcEnum;
       config?: unknown;
       readonly created_at?: string;
       readonly created_by?: UserBasic;
@@ -22771,7 +22773,7 @@ export namespace Schemas {
      */
     export interface SessionRecordingExternalReferenceIntegration {
       readonly id: number;
-      readonly kind: KindBfbEnum;
+      readonly kind: Kind5bcEnum;
       readonly display_name: string;
     }
 
