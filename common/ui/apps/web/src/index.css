@@ -1,1 +1,4 @@
-@import '@posthog/ui-primitives/index.css';
+@import 'tailwindcss';
+@import '@posthog/ui-tokens/color-system.css';
+@import '@posthog/ui-tokens/tailwind.css';
+@import '@fontsource-variable/inter';

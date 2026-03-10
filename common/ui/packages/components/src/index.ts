@@ -1,2 +1,2 @@
 // @posthog/ui-components
-// Combination of primitives in easy-to-use APIs.
+// Composed primitives with easy-to-use APIs. This is the primary import for apps.

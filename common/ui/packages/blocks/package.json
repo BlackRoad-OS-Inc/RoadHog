@@ -1,5 +1,5 @@
 {
-    "name": "@posthog/ui-elements",
+    "name": "@posthog/ui-blocks",
     "version": "0.0.1",
     "private": true,
     "files": [
@@ -13,6 +13,7 @@
         }
     },
     "dependencies": {
+        "@posthog/ui-components": "workspace:*",
         "@posthog/ui-primitives": "workspace:*",
         "@posthog/ui-tokens": "workspace:*"
     },

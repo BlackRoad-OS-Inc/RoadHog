@@ -6,6 +6,9 @@ packages:
     - common/storybook
     - common/mosaic
     - common/tailwind
+    - common/ui
+    - common/ui/apps/*
+    - common/ui/packages/*
     - frontend
     - playwright
     - nodejs

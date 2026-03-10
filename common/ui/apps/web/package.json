@@ -10,8 +10,8 @@
     },
     "dependencies": {
         "@fontsource-variable/inter": "^5.2.8",
+        "@posthog/ui-blocks": "workspace:*",
         "@posthog/ui-components": "workspace:*",
-        "@posthog/ui-elements": "workspace:*",
         "@posthog/ui-primitives": "workspace:*",
         "@posthog/ui-tokens": "workspace:*",
         "react": "^19.2.0",
