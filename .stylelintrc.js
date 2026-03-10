@@ -28,12 +28,6 @@ module.exports = {
                 message: 'Expected id selector to match Block__Element--Modifier or plain kebak-case',
             },
         ],
-        'keyframes-name-pattern': [
-            '^[A-Za-z0-9_-]+__[A-Za-z0-9_-]+$',
-            {
-                message: 'Expected keyframe name to match Block__Animation',
-            },
-        ],
         'scss/dollar-variable-pattern': [
             '^[A-Za-z_]+[A-Za-z0-9_-]+$',
             {
@@ -43,7 +37,7 @@ module.exports = {
         'scss/at-rule-no-unknown': [
             true,
             {
-                ignoreAtRules: ['tailwind', 'config', 'theme', 'starting-style'],
+                ignoreAtRules: ['tailwind', 'config', 'theme', 'starting-style', 'custom-variant'],
             },
         ],
         'custom-property-pattern': null,
