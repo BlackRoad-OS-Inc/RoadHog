@@ -104,6 +104,7 @@ export enum NodeKind {
     LogsQuery = 'LogsQuery',
     LogAttributesQuery = 'LogAttributesQuery',
     LogValuesQuery = 'LogValuesQuery',
+    TraceSpansQuery = 'TraceSpansQuery',
     SessionBatchEventsQuery = 'SessionBatchEventsQuery',
 
     // Interface nodes
@@ -224,6 +225,7 @@ export type AnyDataNode =
     | LogsQuery
     | LogAttributesQuery
     | LogValuesQuery
+    | TraceSpansQuery
     | ExperimentFunnelsQuery
     | ExperimentTrendsQuery
     | CalendarHeatmapQuery
@@ -315,6 +317,9 @@ export type QuerySchema =
     | LogAttributesQuery
     | LogValuesQuery
 
+    // Tracing
+    | TraceSpansQuery
+
     // AI
     | SuggestedQuestionsQuery
     | TeamTaxonomyQuery
@@ -371,6 +376,7 @@ export type AnyResponseType =
     | LogsQueryResponse
     | LogAttributesQueryResponse
     | LogValuesQueryResponse
+    | TraceSpansQueryResponse
 
 /** Tags that will be added to the Query log comment  **/
 export interface QueryLogTags {
@@ -2858,6 +2864,31 @@ export type CachedSessionBatchEventsQueryResponse = CachedEventsQueryResponse & 
     timings?: QueryTiming[]
 }
 export type CachedLogsQueryResponse = CachedQueryResponse<LogsQueryResponse>
+
+export interface TraceSpansQuery extends DataNode<TraceSpansQueryResponse> {
+    kind: NodeKind.TraceSpansQuery
+    dateRange: DateRange
+    limit?: integer
+    offset?: integer
+    orderBy?: 'latest' | 'earliest'
+    searchTerm?: string
+    serviceNames?: string[]
+    statusCodes?: integer[]
+    traceId?: string
+    /** Cursor for fetching the next page of results */
+    after?: string
+}
+
+export interface TraceSpansQueryResponse extends AnalyticsQueryResponseBase {
+    results: unknown
+    hasMore?: boolean
+    limit?: integer
+    offset?: integer
+    /** Cursor for fetching the next page of results */
+    nextCursor?: string
+}
+
+export type CachedTraceSpansQueryResponse = CachedQueryResponse<TraceSpansQueryResponse>
 
 export interface FileSystemCount {
     count: number
