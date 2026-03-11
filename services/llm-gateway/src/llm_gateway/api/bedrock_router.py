@@ -49,12 +49,19 @@ async def _handle_bedrock_messages(
     user: RateLimitedUser,
     product: str = "llm_gateway",
 ) -> dict[str, Any] | StreamingResponse:
+    logger.info("inside _handle_bedrock_messages")
     settings = get_settings()
+    settings.bedrock_region_name = "us-east-1"
+    logger.info(f"settings: {settings}")
     ensure_bedrock_configured(settings)
 
+    logger.info("inside _handle_bedrock_messages after ensure_bedrock_configured")
     data = body.model_dump(exclude_none=True)
-    data["model"] = map_anthropic_model_to_bedrock(body.model)
+    # logger.info(f"data: {data}")
+    data["model"] = map_anthropic_model_to_bedrock(body.model, settings.bedrock_region_name)
+    # logger.info(f"model: {data['model']}")
     data["aws_region_name"] = settings.bedrock_region_name
+    # logger.info(f"aws_region_name: {data['aws_region_name']}")
 
     return await handle_llm_request(
         request_data=data,
@@ -78,7 +85,7 @@ async def _handle_count_tokens(
     start_time = time.monotonic()
     status_code = "200"
     data = body.model_dump(exclude_none=True)
-    mapped_model = map_anthropic_model_to_bedrock(body.model)
+    mapped_model = map_anthropic_model_to_bedrock(body.model, settings.bedrock_region_name)
 
     try:
         input_tokens = count_tokens_with_bedrock(data["messages"], body.model, settings.bedrock_region_name)
@@ -152,9 +159,13 @@ async def bedrock_messages_with_product(
 ) -> dict[str, Any] | StreamingResponse:
     validate_product(product)
     properties = _extract_posthog_properties_from_headers(request)
+    logger.info(f"properties: {properties}")
     if properties:
         set_posthog_properties(properties)
     flags = _extract_posthog_flags_from_headers(request)
+    logger.info(f"flags: {flags}")
     if flags:
         set_posthog_flags(flags)
+
+    logger.info("inside bedrock_messages_with_product")
     return await _handle_bedrock_messages(body, user, product=product)
