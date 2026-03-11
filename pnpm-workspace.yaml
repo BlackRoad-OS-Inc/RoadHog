@@ -75,3 +75,6 @@ minimumReleaseAgeExclude:
     - '@oxfmt/*'
     - bloommx@1.0.3
     - kea-typegen@3.6.1
+    - shiki
+    - shadcn
+    - '@shikijs/*'
