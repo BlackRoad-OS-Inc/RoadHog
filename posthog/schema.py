@@ -3019,6 +3019,7 @@ class NodeKind(StrEnum):
     LOG_ATTRIBUTES_QUERY = "LogAttributesQuery"
     LOG_VALUES_QUERY = "LogValuesQuery"
     SESSION_BATCH_EVENTS_QUERY = "SessionBatchEventsQuery"
+    AI_EVENTS_QUERY = "AiEventsQuery"
     DATA_TABLE_NODE = "DataTableNode"
     DATA_VISUALIZATION_NODE = "DataVisualizationNode"
     SAVED_INSIGHT_NODE = "SavedInsightNode"
@@ -19080,6 +19081,84 @@ class ActorsQuery(BaseModel):
     version: float | None = Field(default=None, description="version of the node, used for schema migrations")
 
 
+class AiEventsQuery(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    actionId: int | None = Field(default=None, description="Show events matching a given action")
+    after: str | None = Field(default=None, description="Only fetch events that happened after this timestamp")
+    before: str | None = Field(
+        default=None,
+        description="Only fetch events that happened before this timestamp",
+    )
+    event: str | None = Field(default=None, description="Limit to events matching this string")
+    events: list[str] | None = Field(default=None, description="Filter to events matching any of these event names")
+    filterTestAccounts: bool | None = Field(default=None, description="Filter test accounts")
+    fixedProperties: (
+        list[
+            PropertyGroupFilter
+            | PropertyGroupFilterValue
+            | EventPropertyFilter
+            | PersonPropertyFilter
+            | ElementPropertyFilter
+            | EventMetadataPropertyFilter
+            | SessionPropertyFilter
+            | CohortPropertyFilter
+            | RecordingPropertyFilter
+            | LogEntryPropertyFilter
+            | GroupPropertyFilter
+            | FeaturePropertyFilter
+            | FlagPropertyFilter
+            | HogQLPropertyFilter
+            | EmptyPropertyFilter
+            | DataWarehousePropertyFilter
+            | DataWarehousePersonPropertyFilter
+            | ErrorTrackingIssueFilter
+            | LogPropertyFilter
+            | RevenueAnalyticsPropertyFilter
+        ]
+        | None
+    ) = Field(
+        default=None,
+        description=("Fixed properties in the query, can't be edited in the interface (e.g. scoping down by person)"),
+    )
+    kind: Literal["AiEventsQuery"] = "AiEventsQuery"
+    limit: int | None = Field(default=None, description="Number of rows to return")
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    offset: int | None = Field(default=None, description="Number of rows to skip before returning rows")
+    orderBy: list[str] | None = Field(default=None, description="Columns to order by")
+    personId: str | None = Field(default=None, description="Show events for a given person")
+    properties: (
+        list[
+            EventPropertyFilter
+            | PersonPropertyFilter
+            | ElementPropertyFilter
+            | EventMetadataPropertyFilter
+            | SessionPropertyFilter
+            | CohortPropertyFilter
+            | RecordingPropertyFilter
+            | LogEntryPropertyFilter
+            | GroupPropertyFilter
+            | FeaturePropertyFilter
+            | FlagPropertyFilter
+            | HogQLPropertyFilter
+            | EmptyPropertyFilter
+            | DataWarehousePropertyFilter
+            | DataWarehousePersonPropertyFilter
+            | ErrorTrackingIssueFilter
+            | LogPropertyFilter
+            | RevenueAnalyticsPropertyFilter
+        ]
+        | None
+    ) = Field(default=None, description="Properties configurable in the interface")
+    response: EventsQueryResponse | None = None
+    select: list[str] = Field(..., description="Return a limited set of data. Required.")
+    source: InsightActorsQuery | None = Field(default=None, description="source for querying events for insights")
+    tags: QueryLogTags | None = None
+    version: float | None = Field(default=None, description="version of the node, used for schema migrations")
+    where: list[str] | None = Field(default=None, description="HogQL filters to apply on returned data")
+
+
 class EventsQuery(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -19286,6 +19365,7 @@ class DataTableNode(BaseModel):
     source: (
         EventsNode
         | EventsQuery
+        | AiEventsQuery
         | PersonsNode
         | ActorsQuery
         | GroupsQuery
@@ -19400,6 +19480,7 @@ class HogQLAutocomplete(BaseModel):
         | TracesQuery
         | TraceQuery
         | TraceNeighborsQuery
+        | AiEventsQuery
         | VectorSearchQuery
         | UsageMetricsQuery
         | EndpointsUsageOverviewQuery
@@ -19480,6 +19561,7 @@ class HogQLMetadata(BaseModel):
         | TracesQuery
         | TraceQuery
         | TraceNeighborsQuery
+        | AiEventsQuery
         | VectorSearchQuery
         | UsageMetricsQuery
         | EndpointsUsageOverviewQuery
@@ -19596,6 +19678,7 @@ class MaxInsightContext(BaseModel):
         | TracesQuery
         | TraceQuery
         | TraceNeighborsQuery
+        | AiEventsQuery
         | VectorSearchQuery
         | UsageMetricsQuery
         | EndpointsUsageOverviewQuery
@@ -19709,6 +19792,7 @@ class QueryRequest(BaseModel):
         | TracesQuery
         | TraceQuery
         | TraceNeighborsQuery
+        | AiEventsQuery
         | VectorSearchQuery
         | UsageMetricsQuery
         | EndpointsUsageOverviewQuery
@@ -19814,6 +19898,7 @@ class QuerySchemaRoot(
         | TracesQuery
         | TraceQuery
         | TraceNeighborsQuery
+        | AiEventsQuery
         | VectorSearchQuery
         | UsageMetricsQuery
         | EndpointsUsageOverviewQuery
@@ -19889,6 +19974,7 @@ class QuerySchemaRoot(
         | TracesQuery
         | TraceQuery
         | TraceNeighborsQuery
+        | AiEventsQuery
         | VectorSearchQuery
         | UsageMetricsQuery
         | EndpointsUsageOverviewQuery
@@ -19969,6 +20055,7 @@ class QueryUpgradeRequest(BaseModel):
         | TracesQuery
         | TraceQuery
         | TraceNeighborsQuery
+        | AiEventsQuery
         | VectorSearchQuery
         | UsageMetricsQuery
         | EndpointsUsageOverviewQuery
@@ -20049,6 +20136,7 @@ class QueryUpgradeResponse(BaseModel):
         | TracesQuery
         | TraceQuery
         | TraceNeighborsQuery
+        | AiEventsQuery
         | VectorSearchQuery
         | UsageMetricsQuery
         | EndpointsUsageOverviewQuery
@@ -20255,6 +20343,7 @@ class VisualizationArtifactContent(BaseModel):
         | TracesQuery
         | TraceQuery
         | TraceNeighborsQuery
+        | AiEventsQuery
         | VectorSearchQuery
         | UsageMetricsQuery
         | EndpointsUsageOverviewQuery

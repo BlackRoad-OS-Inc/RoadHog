@@ -233,6 +233,14 @@
             ],
             "label": "AI Evaluation Result (LLM)"
         },
+        "$ai_evaluation_runtime": {
+            "description": "The runtime used to execute the evaluation (e.g., llm_judge for LLM-based, hog for code-based).",
+            "examples": [
+                "llm_judge",
+                "hog"
+            ],
+            "label": "AI Evaluation Runtime (LLM)"
+        },
         "$ai_evaluation_start_time": {
             "description": "The timestamp when the evaluation started executing.",
             "examples": [
@@ -268,6 +276,10 @@
                 0.0017
             ],
             "label": "AI input cost USD (LLM)"
+        },
+        "$ai_input_preview": {
+            "description": "A short preview of the prompt sent to the LLM, useful for scanning generations at a glance.",
+            "label": "AI input preview (LLM)"
         },
         "$ai_input_state": {
             "description": "Input state of the LLM agent.",
@@ -330,6 +342,10 @@
                 "{\"choices\": [{\"text\": \"Quantum computing is a type of computing that harnesses the power of quantum mechanics to perform operations on data.\"}]}"
             ],
             "label": "AI output (LLM)"
+        },
+        "$ai_output_choices_preview": {
+            "description": "A short preview of the LLM response, useful for scanning generations at a glance.",
+            "label": "AI output preview (LLM)"
         },
         "$ai_output_cost_usd": {
             "description": "The cost in USD of the output tokens received from the LLM API.",
@@ -2899,6 +2915,14 @@
             ],
             "label": "AI Evaluation Result (LLM)"
         },
+        "$ai_evaluation_runtime": {
+            "description": "The runtime used to execute the evaluation (e.g., llm_judge for LLM-based, hog for code-based).",
+            "examples": [
+                "llm_judge",
+                "hog"
+            ],
+            "label": "AI Evaluation Runtime (LLM)"
+        },
         "$ai_evaluation_start_time": {
             "description": "The timestamp when the evaluation started executing.",
             "examples": [
@@ -2934,6 +2958,10 @@
                 0.0017
             ],
             "label": "AI input cost USD (LLM)"
+        },
+        "$ai_input_preview": {
+            "description": "A short preview of the prompt sent to the LLM, useful for scanning generations at a glance.",
+            "label": "AI input preview (LLM)"
         },
         "$ai_input_state": {
             "description": "Input state of the LLM agent.",
@@ -2996,6 +3024,10 @@
                 "{\"choices\": [{\"text\": \"Quantum computing is a type of computing that harnesses the power of quantum mechanics to perform operations on data.\"}]}"
             ],
             "label": "AI output (LLM)"
+        },
+        "$ai_output_choices_preview": {
+            "description": "A short preview of the LLM response, useful for scanning generations at a glance.",
+            "label": "AI output preview (LLM)"
         },
         "$ai_output_cost_usd": {
             "description": "The cost in USD of the output tokens received from the LLM API.",
