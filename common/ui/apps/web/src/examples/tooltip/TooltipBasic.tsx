@@ -5,19 +5,19 @@ export default function TooltipBasic(): React.ReactElement {
         <TooltipProvider>
             <div className="flex gap-4">
                 <Tooltip>
-                    <TooltipTrigger render={<Button variant="outline" />}>Top</TooltipTrigger>
+                    <TooltipTrigger render={<Button variant="outline">Top</Button>} />
                     <TooltipContent side="top">Tooltip on top</TooltipContent>
                 </Tooltip>
                 <Tooltip>
-                    <TooltipTrigger render={<Button variant="outline" />}>Bottom</TooltipTrigger>
+                    <TooltipTrigger render={<Button variant="outline">Bottom</Button>} />
                     <TooltipContent side="bottom">Tooltip on bottom</TooltipContent>
                 </Tooltip>
                 <Tooltip>
-                    <TooltipTrigger render={<Button variant="outline" />}>Left</TooltipTrigger>
+                    <TooltipTrigger render={<Button variant="outline">Left</Button>} />
                     <TooltipContent side="left">Tooltip on left</TooltipContent>
                 </Tooltip>
                 <Tooltip>
-                    <TooltipTrigger render={<Button variant="outline" />}>Right</TooltipTrigger>
+                    <TooltipTrigger render={<Button variant="outline">Right</Button>} />
                     <TooltipContent side="right">Tooltip on right</TooltipContent>
                 </Tooltip>
             </div>
