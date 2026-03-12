@@ -8,13 +8,23 @@ import ButtonSizesCode from '../examples/button/ButtonSizes.tsx?raw'
 import ButtonVariantsCode from '../examples/button/ButtonVariants.tsx?raw'
 import CardBasicCode from '../examples/card/CardBasic.tsx?raw'
 import CheckboxBasicCode from '../examples/checkbox/CheckboxBasic.tsx?raw'
+import DialogBasicCode from '../examples/dialog/DialogBasic.tsx?raw'
 import InputBasicCode from '../examples/input/InputBasic.tsx?raw'
+import LabelBasicCode from '../examples/label/LabelBasic.tsx?raw'
+import PopoverBasicCode from '../examples/popover/PopoverBasic.tsx?raw'
+import ProgressBasicCode from '../examples/progress/ProgressBasic.tsx?raw'
+import RadioGroupBasicCode from '../examples/radio-group/RadioGroupBasic.tsx?raw'
+import SelectBasicCode from '../examples/select/SelectBasic.tsx?raw'
 import SeparatorBasicCode from '../examples/separator/SeparatorBasic.tsx?raw'
 import SkeletonBasicCode from '../examples/skeleton/SkeletonBasic.tsx?raw'
 import SliderBasicCode from '../examples/slider/SliderBasic.tsx?raw'
+import SpinnerBasicCode from '../examples/spinner/SpinnerBasic.tsx?raw'
 import SwitchBasicCode from '../examples/switch/SwitchBasic.tsx?raw'
 import TabsBasicCode from '../examples/tabs/TabsBasic.tsx?raw'
+import TextareaBasicCode from '../examples/textarea/TextareaBasic.tsx?raw'
+import ToggleGroupBasicCode from '../examples/toggle-group/ToggleGroupBasic.tsx?raw'
 import ToggleBasicCode from '../examples/toggle/ToggleBasic.tsx?raw'
+import TooltipBasicCode from '../examples/tooltip/TooltipBasic.tsx?raw'
 import type { ComponentEntry } from './types'
 
 export const registry: ComponentEntry[] = [
@@ -164,6 +174,40 @@ export const registry: ComponentEntry[] = [
         ],
     },
     {
+        slug: 'dialog',
+        name: 'Dialog',
+        description: 'A modal dialog overlay for focused interactions.',
+        category: 'Overlays',
+        anatomy: `<Dialog>
+  <DialogTrigger>Open</DialogTrigger>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Title</DialogTitle>
+      <DialogDescription>Description</DialogDescription>
+    </DialogHeader>
+    <DialogFooter>
+      <DialogClose>Cancel</DialogClose>
+      <Button>Confirm</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>`,
+        props: [
+            {
+                name: 'showCloseButton',
+                type: 'boolean',
+                default: 'true',
+                description: 'Whether to show the close button in the dialog content.',
+            },
+        ],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/dialog/DialogBasic')),
+                code: DialogBasicCode,
+            },
+        ],
+    },
+    {
         slug: 'input',
         name: 'Input',
         description: 'A text input field for collecting user data.',
@@ -179,6 +223,124 @@ export const registry: ComponentEntry[] = [
                 name: 'Basic',
                 component: lazy(() => import('../examples/input/InputBasic')),
                 code: InputBasicCode,
+            },
+        ],
+    },
+    {
+        slug: 'label',
+        name: 'Label',
+        description: 'A label for form controls.',
+        category: 'Inputs',
+        anatomy: `<Label htmlFor="input-id">Label text</Label>`,
+        props: [{ name: 'htmlFor', type: 'string', description: 'The ID of the form element this label is for.' }],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/label/LabelBasic')),
+                code: LabelBasicCode,
+            },
+        ],
+    },
+    {
+        slug: 'popover',
+        name: 'Popover',
+        description: 'A floating panel anchored to a trigger element.',
+        category: 'Overlays',
+        anatomy: `<Popover>
+  <PopoverTrigger>Open</PopoverTrigger>
+  <PopoverContent>Content</PopoverContent>
+</Popover>`,
+        props: [
+            {
+                name: 'side',
+                type: '"top" | "bottom" | "left" | "right"',
+                default: '"bottom"',
+                description: 'Side of the trigger to position the popover.',
+            },
+            { name: 'sideOffset', type: 'number', default: '4', description: 'Distance from the trigger.' },
+            {
+                name: 'align',
+                type: '"start" | "center" | "end"',
+                default: '"center"',
+                description: 'Alignment along the side.',
+            },
+        ],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/popover/PopoverBasic')),
+                code: PopoverBasicCode,
+            },
+        ],
+    },
+    {
+        slug: 'progress',
+        name: 'Progress',
+        description: 'A bar indicating progress toward completion.',
+        category: 'Display',
+        anatomy: `<Progress value={50} />`,
+        props: [{ name: 'value', type: 'number', description: 'Progress percentage (0-100).' }],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/progress/ProgressBasic')),
+                code: ProgressBasicCode,
+            },
+        ],
+    },
+    {
+        slug: 'radio-group',
+        name: 'RadioGroup',
+        description: 'A set of mutually exclusive radio options.',
+        category: 'Inputs',
+        anatomy: `<RadioGroup defaultValue="option-1">
+  <RadioGroupItem value="option-1" id="opt-1" />
+  <Label htmlFor="opt-1">Option 1</Label>
+</RadioGroup>`,
+        props: [
+            { name: 'defaultValue', type: 'string', description: 'The default selected value.' },
+            { name: 'value', type: 'string', description: 'Controlled selected value.' },
+            {
+                name: 'onValueChange',
+                type: '(value: string) => void',
+                description: 'Callback when selection changes.',
+            },
+        ],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/radio-group/RadioGroupBasic')),
+                code: RadioGroupBasicCode,
+            },
+        ],
+    },
+    {
+        slug: 'select',
+        name: 'Select',
+        description: 'A dropdown for selecting from a list of options.',
+        category: 'Inputs',
+        anatomy: `<Select>
+  <SelectTrigger>
+    <SelectValue placeholder="Select..." />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="opt1">Option 1</SelectItem>
+  </SelectContent>
+</Select>`,
+        props: [
+            { name: 'defaultValue', type: 'string', description: 'The default selected value.' },
+            { name: 'value', type: 'string', description: 'Controlled selected value.' },
+            {
+                name: 'onValueChange',
+                type: '(value: string) => void',
+                description: 'Callback when selection changes.',
+            },
+        ],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/select/SelectBasic')),
+                code: SelectBasicCode,
             },
         ],
     },
@@ -239,6 +401,21 @@ export const registry: ComponentEntry[] = [
         ],
     },
     {
+        slug: 'spinner',
+        name: 'Spinner',
+        description: 'A loading spinner indicator.',
+        category: 'Display',
+        anatomy: `<Spinner />`,
+        props: [],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/spinner/SpinnerBasic')),
+                code: SpinnerBasicCode,
+            },
+        ],
+    },
+    {
         slug: 'switch',
         name: 'Switch',
         description: 'A toggle control for binary on/off states.',
@@ -288,6 +465,24 @@ export const registry: ComponentEntry[] = [
         ],
     },
     {
+        slug: 'textarea',
+        name: 'Textarea',
+        description: 'A multi-line text input.',
+        category: 'Inputs',
+        anatomy: `<Textarea placeholder="Enter text..." />`,
+        props: [
+            { name: 'placeholder', type: 'string', description: 'Placeholder text.' },
+            { name: 'disabled', type: 'boolean', default: 'false', description: 'Whether the textarea is disabled.' },
+        ],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/textarea/TextareaBasic')),
+                code: TextareaBasicCode,
+            },
+        ],
+    },
+    {
         slug: 'toggle',
         name: 'Toggle',
         description: 'A button that can be toggled on or off.',
@@ -308,6 +503,71 @@ export const registry: ComponentEntry[] = [
                 name: 'Basic',
                 component: lazy(() => import('../examples/toggle/ToggleBasic')),
                 code: ToggleBasicCode,
+            },
+        ],
+    },
+    {
+        slug: 'toggle-group',
+        name: 'ToggleGroup',
+        description: 'A group of toggle buttons where one or more can be active.',
+        category: 'Inputs',
+        anatomy: `<ToggleGroup type="single" defaultValue="center">
+  <ToggleGroupItem value="left">Left</ToggleGroupItem>
+  <ToggleGroupItem value="center">Center</ToggleGroupItem>
+  <ToggleGroupItem value="right">Right</ToggleGroupItem>
+</ToggleGroup>`,
+        props: [
+            {
+                name: 'type',
+                type: '"single" | "multiple"',
+                description: 'Whether one or multiple items can be active.',
+            },
+            {
+                name: 'variant',
+                type: '"default" | "outline" | "ghost"',
+                default: '"default"',
+                description: 'Visual style variant.',
+            },
+            {
+                name: 'size',
+                type: '"default" | "sm"',
+                default: '"default"',
+                description: 'Toggle group size.',
+            },
+        ],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/toggle-group/ToggleGroupBasic')),
+                code: ToggleGroupBasicCode,
+            },
+        ],
+    },
+    {
+        slug: 'tooltip',
+        name: 'Tooltip',
+        description: 'A popup that displays information on hover.',
+        category: 'Overlays',
+        anatomy: `<TooltipProvider>
+  <Tooltip>
+    <TooltipTrigger>Hover me</TooltipTrigger>
+    <TooltipContent>Tooltip text</TooltipContent>
+  </Tooltip>
+</TooltipProvider>`,
+        props: [
+            {
+                name: 'side',
+                type: '"top" | "bottom" | "left" | "right"',
+                default: '"top"',
+                description: 'Side of the trigger to position the tooltip.',
+            },
+            { name: 'sideOffset', type: 'number', default: '4', description: 'Distance from the trigger.' },
+        ],
+        examples: [
+            {
+                name: 'Basic',
+                component: lazy(() => import('../examples/tooltip/TooltipBasic')),
+                code: TooltipBasicCode,
             },
         ],
     },

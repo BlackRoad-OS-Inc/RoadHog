@@ -25,7 +25,7 @@ export {
     SelectContent,
     SelectGroup,
     SelectItem,
-    SelectLabel,
+    SelectGroupLabel,
     SelectSeparator,
     SelectTrigger,
     SelectValue,

@@ -1,12 +1,41 @@
+import type { Theme } from 'node_modules/@posthog/ui-primitives/src/components/theme-provider'
 import * as React from 'react'
 import { NavLink } from 'react-router'
 
-import { cn } from '@posthog/ui-primitives'
+import {
+    cn,
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+    useTheme,
+} from '@posthog/ui-primitives'
 
 function navLinkClass({ isActive }: { isActive: boolean }): string {
     return cn(
         'block rounded-md px-2 py-1 text-sm',
         isActive ? 'bg-accent font-medium text-accent-foreground' : 'text-muted-foreground hover:text-foreground'
+    )
+}
+
+function ThemeSwitcher(): React.ReactElement {
+    const { theme, setTheme } = useTheme()
+
+    return (
+        <Select value={theme} onValueChange={(value) => setTheme(value as Theme)}>
+            <SelectTrigger className="w-full">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectGroup>
+                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="dark">Dark</SelectItem>
+                    <SelectItem value="system">System</SelectItem>
+                </SelectGroup>
+            </SelectContent>
+        </Select>
     )
 }
 
@@ -48,6 +77,10 @@ export function Sidebar(): React.ReactElement {
                     </NavLink>
                 </div>
             </nav>
+
+            <div className="mt-auto pt-4">
+                <ThemeSwitcher />
+            </div>
         </aside>
     )
 }

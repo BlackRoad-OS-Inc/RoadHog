@@ -90,7 +90,7 @@ function SelectContent({
     )
 }
 
-function SelectLabel({ className, ...props }: SelectPrimitive.GroupLabel.Props): React.ReactElement {
+function SelectGroupLabel({ className, ...props }: SelectPrimitive.GroupLabel.Props): React.ReactElement {
     return (
         <SelectPrimitive.GroupLabel
             data-slot="select-label"
@@ -172,8 +172,8 @@ export {
     Select,
     SelectContent,
     SelectGroup,
+    SelectGroupLabel,
     SelectItem,
-    SelectLabel,
     SelectScrollDownButton,
     SelectScrollUpButton,
     SelectSeparator,
