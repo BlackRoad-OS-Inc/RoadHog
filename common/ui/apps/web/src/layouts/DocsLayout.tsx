@@ -2,7 +2,6 @@ import * as React from 'react'
 import { Outlet } from 'react-router'
 
 import { Sidebar } from './Sidebar'
-import { TableOfContents } from './TableOfContents'
 
 export function DocsLayout(): React.ReactElement {
     return (
@@ -13,7 +12,6 @@ export function DocsLayout(): React.ReactElement {
                     <Outlet />
                 </div>
             </main>
-            <TableOfContents />
         </div>
     )
 }

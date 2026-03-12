@@ -2,7 +2,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@p
 
 export default function AccordionBasic(): React.ReactElement {
     return (
-        <Accordion type="single" collapsible className="w-full">
+        <Accordion multiple className="w-full">
             <AccordionItem value="item-1">
                 <AccordionTrigger>What is Base UI?</AccordionTrigger>
                 <AccordionContent>

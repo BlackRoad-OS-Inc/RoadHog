@@ -1,7 +1,28 @@
 import * as React from 'react'
 import { Link } from 'react-router'
 
-import { registry } from '../registry/registry'
+const sections = [
+    {
+        title: 'Tokens',
+        description: 'Design tokens for colors, spacing, typography, and other foundational values.',
+        to: '/tokens',
+    },
+    {
+        title: 'Primitives',
+        description: 'Low-level UI building blocks like buttons, toggles, inputs, and other base components.',
+        to: '/primitives',
+    },
+    {
+        title: 'Components',
+        description: 'Higher-level components built on top of primitives for easier, more opinionated use.',
+        to: '/components',
+    },
+    {
+        title: 'Blocks',
+        description: 'Composite patterns combining tokens, primitives, and components into ready-to-use sections.',
+        to: '/blocks',
+    },
+]
 
 export function HomePage(): React.ReactElement {
     return (
@@ -14,14 +35,14 @@ export function HomePage(): React.ReactElement {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-                {registry.map((entry) => (
+                {sections.map((section) => (
                     <Link
-                        key={entry.slug}
-                        to={`/components/${entry.slug}`}
-                        className="rounded-lg border border-border p-4 transition-colors hover:bg-accent"
+                        key={section.title}
+                        to={section.to}
+                        className="rounded-lg border border-border p-6 transition-colors hover:bg-accent shadow-elevate"
                     >
-                        <h3 className="font-medium">{entry.name}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">{entry.description}</p>
+                        <h3 className="text-lg font-medium">{section.title}</h3>
+                        <p className="mt-2 text-sm text-muted-foreground">{section.description}</p>
                     </Link>
                 ))}
             </div>
