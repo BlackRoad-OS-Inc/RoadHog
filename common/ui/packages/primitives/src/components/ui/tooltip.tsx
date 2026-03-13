@@ -1,7 +1,7 @@
 import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip'
 import * as React from 'react'
 
-import { cn } from '@/lib/utils'
+import { cn } from '../../lib/utils'
 
 function TooltipProvider({ delay = 250, ...props }: TooltipPrimitive.Provider.Props): React.ReactElement {
     return <TooltipPrimitive.Provider data-slot="tooltip-provider" delay={delay} {...props} />
