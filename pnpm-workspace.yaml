@@ -5,6 +5,7 @@ packages:
     - common/plugin_transpiler
     - common/storybook
     - common/mosaic
+    - common/replay-shared
     - common/tailwind
     - common/ui
     - common/ui/apps/*
@@ -18,6 +19,7 @@ packages:
     - services/oauth-proxy
     - services/mcp
     - services/stripe-app
+    - tools/*
     - rust/cyclotron-node
 
 catalog:

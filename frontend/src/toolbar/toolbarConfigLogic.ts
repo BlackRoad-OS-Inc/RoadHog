@@ -8,7 +8,14 @@ import { ToolbarProps } from '~/types'
 
 import { withTokenRefresh } from './toolbarAuth'
 import type { toolbarConfigLogicType } from './toolbarConfigLogicType'
-import { cleanToolbarAuthHash, generatePKCE, LOCALSTORAGE_KEY, OAUTH_LOCALSTORAGE_KEY, PKCE_STORAGE_KEY } from './utils'
+import {
+    cleanToolbarAuthHash,
+    generatePKCE,
+    LOCALSTORAGE_KEY,
+    OAUTH_LOCALSTORAGE_KEY,
+    PKCE_STORAGE_KEY,
+    readToolbarAuthHash,
+} from './utils'
 
 export const toolbarConfigLogic = kea<toolbarConfigLogicType>([
     path(['toolbar', 'toolbarConfigLogic']),
@@ -81,7 +88,15 @@ export const toolbarConfigLogic = kea<toolbarConfigLogicType>([
                 // it's window.location.origin of the app itself, so it's always correct even
                 // for reverse-proxy customers who haven't set ui_host in posthog.init().
                 if (props.uiHost) {
-                    return props.uiHost.replace(/\/+$/, '')
+                    // Validate scheme to prevent javascript:/data: XSS via crafted hash params
+                    try {
+                        const parsed = new URL(props.uiHost)
+                        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                            return props.uiHost.replace(/\/+$/, '')
+                        }
+                    } catch {
+                        // invalid URL, fall through to other sources
+                    }
                 }
 
                 // requestRouter.uiHost honours explicit ui_host config and derives from
@@ -159,6 +174,7 @@ export const toolbarConfigLogic = kea<toolbarConfigLogicType>([
             // Including them would cause a re-initialization loop after OAuth callback.
             const hash = window.location.hash
                 .replace(/[#&]__posthog=[^&]*/g, '')
+                .replace(/[#&]__posthog_toolbar=[^&]*/g, '')
                 .replace(/^&/, '#')
                 .replace(/^#$/, '')
             const redirect = encodeURIComponent(
@@ -220,10 +236,13 @@ export const toolbarConfigLogic = kea<toolbarConfigLogicType>([
     })),
 
     afterMount(({ props, values, actions, cache }) => {
-        const authParams = cleanToolbarAuthHash()
+        // Read hash params WITHOUT modifying the URL. The URL cleanup is deferred
+        // to avoid triggering SPA routers that watch for history.replaceState changes
+        // and could destroy/re-mount the page (and the toolbar) mid-initialization.
+        const authParams = readToolbarAuthHash()
         if (authParams) {
-            // Defensive retry: some SPAs re-apply the original URL on initial render,
-            // undoing the replaceState above. Re-clean after a short delay.
+            // Defer hash cleanup: some SPAs re-apply the original URL on initial render,
+            // so we retry after a short delay as well.
             cache.hashRetryTimeout = setTimeout(cleanToolbarAuthHash, 500)
         }
 
@@ -403,13 +422,20 @@ function startCodeExchange(
     authParams: { code: string; clientId: string },
     actions: TokenActions
 ): void {
-    exchangeCodeForTokens(
+    void exchangeCodeForTokens(
         `${uiHost}/oauth/token/`,
         `${uiHost}/toolbar_oauth/callback`,
         authParams.code,
         authParams.clientId,
         actions
-    )
+    ).then((succeeded) => {
+        if (!succeeded) {
+            // Code exchange failed (stale code, expired PKCE, network error).
+            // Fall back to stored OAuth tokens so users don't have to
+            // re-authenticate when the hash wasn't cleaned properly.
+            restoreOAuthTokens(false, { accessToken: null }, actions)
+        }
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -424,7 +450,7 @@ async function exchangeCodeForTokens(
     code: string,
     clientId: string,
     actions: TokenActions
-): Promise<void> {
+): Promise<boolean> {
     actions.setAuthStatus('authenticating')
 
     let pkceData: { verifier?: string; ts?: number } = {}
@@ -438,13 +464,13 @@ async function exchangeCodeForTokens(
 
     if (!pkceData.verifier) {
         console.warn('PostHog Toolbar: no PKCE verifier found, cannot exchange code')
-        lemonToast.error('Authentication failed: session data missing. Please try again.')
-        return
+        actions.setAuthStatus('idle')
+        return false
     }
     if (pkceData.ts && Date.now() - pkceData.ts > PKCE_TTL_MS) {
         console.warn('PostHog Toolbar: PKCE verifier expired')
-        lemonToast.error('Authentication timed out. Please try again.')
-        return
+        actions.setAuthStatus('idle')
+        return false
     }
 
     const body = new URLSearchParams({
@@ -464,13 +490,15 @@ async function exchangeCodeForTokens(
         const data = await res.json()
         if (data.access_token && data.refresh_token) {
             actions.setOAuthTokens(data.access_token, data.refresh_token, clientId)
-        } else {
-            console.error('PostHog Toolbar: token exchange failed', data.error || data)
-            lemonToast.error('Authentication failed. Please try again.')
+            return true
         }
+        console.error('PostHog Toolbar: token exchange failed', data.error || data)
+        lemonToast.error('Authentication failed. Please try again.')
+        return false
     } catch (err) {
         console.error('PostHog Toolbar: token exchange network error', err)
         lemonToast.error('Authentication failed due to a network error. Please try again.')
+        return false
     } finally {
         actions.setAuthStatus('idle')
     }
