@@ -1,11 +1,13 @@
 import { useActions, useValues } from 'kea'
 import { router } from 'kea-router'
+import { useState } from 'react'
 
 import { IconGridMasonry, IconPlusSmall, IconShare } from '@posthog/icons'
 
 import { AccessControlAction } from 'lib/components/AccessControlAction'
 import { AppShortcut } from 'lib/components/AppShortcuts/AppShortcut'
 import { keyBinds } from 'lib/components/AppShortcuts/shortcuts'
+import { useFeatureFlag } from 'lib/hooks/useFeatureFlag'
 import { LemonButton } from 'lib/lemon-ui/LemonButton'
 import { DashboardEventSource } from 'lib/utils/eventUsageLogic'
 import { MaxTool } from 'scenes/max/MaxTool'
@@ -16,6 +18,7 @@ import { iconForType } from '~/layout/panel-layout/ProjectTree/defaultTree'
 import { AccessControlLevel, AccessControlResourceType, DashboardMode } from '~/types'
 
 import { addInsightToDashboardLogic } from './addInsightToDashboardModalLogic'
+import { AddWidgetModal } from './AddWidgetModal'
 import { DashboardLoadAction, dashboardLogic } from './dashboardLogic'
 
 export function EditModeActions(): JSX.Element {
@@ -93,6 +96,9 @@ export function ViewModeActions(): JSX.Element {
     const { setDashboardMode, loadDashboard } = useActions(dashboardLogic)
     const { showAddInsightToDashboardModal } = useActions(addInsightToDashboardLogic)
     const { push } = useActions(router)
+    const hasTileRedesign = useFeatureFlag('DASHBOARD_TILE_REDESIGN')
+    const [addWidgetModalOpen, setAddWidgetModalOpen] = useState(false)
+
     if (!dashboard) {
         return <></>
     }
@@ -135,7 +141,25 @@ export function ViewModeActions(): JSX.Element {
                     </LemonButton>
                 </AppShortcut>
             </AccessControlAction>
-            {canEditDashboard && (
+            <AccessControlAction
+                resourceType={AccessControlResourceType.Dashboard}
+                minAccessLevel={AccessControlLevel.Editor}
+                userAccessLevel={dashboard.user_access_level}
+            >
+                <LemonButton
+                    onClick={() => setAddWidgetModalOpen(true)}
+                    data-attr="add-widget-to-dashboard"
+                    type="secondary"
+                    size="small"
+                    tooltip="Add widget"
+                    tooltipPlacement="top"
+                    icon={<IconPlusSmall />}
+                >
+                    Widget
+                </LemonButton>
+            </AccessControlAction>
+            <AddWidgetModal isOpen={addWidgetModalOpen} onClose={() => setAddWidgetModalOpen(false)} />
+            {canEditDashboard && hasTileRedesign && (
                 <AppShortcut
                     name="EnterEditMode"
                     scope={Scene.Dashboard}
