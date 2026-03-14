@@ -669,18 +669,19 @@ class DashboardSerializer(DashboardMetadataSerializer):
             )
         elif tile_data.get("widget", None):
             widget_json: dict = tile_data.get("widget", {})
-            widget_defaults = {
-                "widget_type": widget_json.get("widget_type"),
+            widget_defaults: dict = {
                 "config": widget_json.get("config", {}),
                 "team_id": instance.team_id,
                 "last_modified_at": now(),
                 "last_modified_by": user,
+                "created_by": user,
             }
             widget_id = widget_json.get("id", None)
-            if widget_id:
-                widget_defaults["created_by"] = user
-            else:
-                widget_defaults["created_by"] = user
+            # widget_type is required for new widgets, optional for updates
+            if "widget_type" in widget_json:
+                widget_defaults["widget_type"] = widget_json["widget_type"]
+            elif not widget_id:
+                raise serializers.ValidationError("widget_type is required when creating a new widget")
 
             widget, _ = DashboardWidget.objects.update_or_create(
                 id=widget_id, team_id=instance.team_id, defaults=widget_defaults

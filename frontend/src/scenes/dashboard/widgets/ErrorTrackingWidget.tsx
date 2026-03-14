@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 
-import { IconWarning } from '@posthog/icons'
-import { LemonButton, LemonSkeleton, LemonTable } from '@posthog/lemon-ui'
+import { IconLogomark, IconWarning } from '@posthog/icons'
+import { LemonSkeleton } from '@posthog/lemon-ui'
 
 import api from 'lib/api'
 import { TZLabel } from 'lib/components/TZLabel'
+import { Link } from 'lib/lemon-ui/Link'
 import { urls } from 'scenes/urls'
 
 interface ErrorTrackingWidgetProps {
@@ -17,19 +18,15 @@ interface ErrorIssue {
     name: string
     description: string | null
     status: string
-    occurrences: number
-    sessions: number
-    users: number
     first_seen: string
-    last_seen: string
 }
 
-const STATUS_COLORS: Record<string, string> = {
-    active: 'text-danger',
-    resolved: 'text-success',
-    archived: 'text-muted',
-    pending_release: 'text-warning',
-    suppressed: 'text-muted',
+const STATUS_BADGE: Record<string, { dot: string; text: string }> = {
+    active: { dot: 'bg-warning', text: 'Active' },
+    resolved: { dot: 'bg-success', text: 'Resolved' },
+    archived: { dot: 'bg-muted', text: 'Archived' },
+    pending_release: { dot: 'bg-muted', text: 'Pending release' },
+    suppressed: { dot: 'bg-danger', text: 'Suppressed' },
 }
 
 function ErrorTrackingWidget({ config }: ErrorTrackingWidgetProps): JSX.Element {
@@ -44,22 +41,26 @@ function ErrorTrackingWidget({ config }: ErrorTrackingWidgetProps): JSX.Element 
             params.status = config.status
         }
 
-        api.get('api/projects/@current/error_tracking/issues', params)
+        api.get('api/environments/@current/error_tracking/issues', params)
             .then((data: any) => {
                 setIssues(data.results || [])
                 setLoading(false)
             })
             .catch(() => {
-                setError('Failed to load error tracking issues')
+                setError('Failed to load errors')
                 setLoading(false)
             })
     }, [config.status])
 
     if (loading) {
         return (
-            <div className="p-4 space-y-2">
+            <div className="p-3 space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
-                    <LemonSkeleton key={i} className="h-8 w-full" />
+                    <div key={i} className="space-y-1">
+                        <LemonSkeleton className="h-4 w-3/4" />
+                        <LemonSkeleton className="h-3 w-full" />
+                        <LemonSkeleton className="h-3 w-1/3" />
+                    </div>
                 ))}
             </div>
         )
@@ -74,60 +75,53 @@ function ErrorTrackingWidget({ config }: ErrorTrackingWidgetProps): JSX.Element 
         )
     }
 
+    if (issues.length === 0) {
+        return (
+            <div className="p-4 flex flex-col items-center justify-center h-full text-muted">
+                <IconWarning className="text-3xl mb-2" />
+                <span>No errors found</span>
+            </div>
+        )
+    }
+
     return (
-        <div className="h-full flex flex-col overflow-hidden">
-            <LemonTable
-                dataSource={issues}
-                size="small"
-                className="flex-1"
-                columns={[
-                    {
-                        title: 'Error',
-                        key: 'name',
-                        render: (_, issue) => (
-                            <LemonButton
-                                type="tertiary"
-                                size="xsmall"
-                                to={urls.errorTrackingIssue(issue.id)}
-                                className="max-w-[300px]"
-                            >
-                                <span className="truncate">{issue.name || 'Unknown error'}</span>
-                            </LemonButton>
-                        ),
-                    },
-                    {
-                        title: 'Status',
-                        key: 'status',
-                        width: 80,
-                        render: (_, issue) => (
-                            <span className={`text-xs font-medium capitalize ${STATUS_COLORS[issue.status] || ''}`}>
-                                {issue.status?.replace('_', ' ')}
-                            </span>
-                        ),
-                    },
-                    {
-                        title: 'Events',
-                        key: 'occurrences',
-                        width: 70,
-                        align: 'right',
-                        render: (_, issue) => <span className="text-xs">{issue.occurrences}</span>,
-                    },
-                    {
-                        title: 'Last seen',
-                        key: 'last_seen',
-                        width: 120,
-                        render: (_, issue) =>
-                            issue.last_seen ? <TZLabel time={issue.last_seen} className="text-xs" /> : null,
-                    },
-                ]}
-                rowKey="id"
-                emptyState={
-                    <div className="text-center py-8 text-muted">
-                        <IconWarning className="text-2xl mb-2" />
-                        <div>No error issues found</div>
-                    </div>
-                }
-            />
+        <div className="h-full overflow-auto">
+            {issues.map((issue) => {
+                const badge = STATUS_BADGE[issue.status] || { dot: 'bg-muted', text: issue.status }
+                return (
+                    <Link
+                        key={issue.id}
+                        to={urls.errorTrackingIssue(issue.id)}
+                        subtle
+                        className="group/row block px-3 py-2 border-b border-border-light !no-underline hover:bg-surface-secondary"
+                    >
+                        <div className="flex flex-col gap-[3px]">
+                            <div className="flex items-center h-[1rem] gap-2">
+                                <IconLogomark className="shrink-0 text-muted" fontSize="0.7rem" />
+                                <span className="font-semibold text-[0.9rem] line-clamp-1">
+                                    {issue.name || 'Unknown error'}
+                                </span>
+                            </div>
+                            {issue.description && (
+                                <div
+                                    title={issue.description}
+                                    className="font-medium line-clamp-1 text-[var(--gray-8)]"
+                                >
+                                    {issue.description}
+                                </div>
+                            )}
+                            <div className="flex items-center text-secondary gap-1">
+                                <span className="flex items-center gap-1 text-xs">
+                                    <span className={`inline-block h-2 w-2 rounded-full ${badge.dot}`} />
+                                    {badge.text}
+                                </span>
+                                <span className="text-quaternary mx-0.5">|</span>
+                                <TZLabel time={issue.first_seen} className="border-dotted border-b text-xs" />
+                            </div>
+                        </div>
+                    </Link>
+                )
+            })}
         </div>
     )
 }

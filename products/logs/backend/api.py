@@ -76,16 +76,18 @@ class LogsViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.ViewSet):
                 pass  # Invalid cursor format, continue with original date range
 
         requested_limit = min(query_data.get("limit", 1000), 2000)
-        logs_query_params = {
+        logs_query_params: dict = {
             "dateRange": date_range,
             "severityLevels": query_data.get("severityLevels", []),
             "serviceNames": query_data.get("serviceNames", []),
             "orderBy": order_by,
-            "searchTerm": query_data.get("searchTerm", None),
-            "filterGroup": query_data.get("filterGroup", None),
-            "resourceFingerprint": query_data.get("resourceFingerprint", None),
             "limit": requested_limit + 1,  # Fetch limit plus 1 to see if theres another page
         }
+        if query_data.get("searchTerm") is not None:
+            logs_query_params["searchTerm"] = query_data["searchTerm"]
+        logs_query_params["filterGroup"] = query_data.get("filterGroup") or {"type": "AND", "values": []}
+        if query_data.get("resourceFingerprint") is not None:
+            logs_query_params["resourceFingerprint"] = query_data["resourceFingerprint"]
         if live_logs_checkpoint:
             logs_query_params["liveLogsCheckpoint"] = live_logs_checkpoint
         if after_cursor:

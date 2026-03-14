@@ -1,4 +1,5 @@
-import React from 'react'
+import { useActions } from 'kea'
+import React, { useState } from 'react'
 
 import { WidgetCard } from 'lib/components/Cards/WidgetCard/WidgetCard'
 import { LemonButton } from 'lib/lemon-ui/LemonButton'
@@ -16,17 +17,20 @@ import type {
     QueryBasedInsightModel,
 } from '~/types'
 
+import { dashboardLogic } from '../dashboardLogic'
+import { EditWidgetModal } from '../widgets/EditWidgetModal'
 import { WidgetRenderer } from '../widgets/WidgetRenderer'
 
-interface DashboardWidgetItemProps {
+type BaseWidgetCardProps = React.ComponentProps<typeof WidgetCard>
+
+interface DashboardWidgetItemProps extends Omit<
+    BaseWidgetCardProps,
+    'widget' | 'placement' | 'moreButtonOverlay' | 'openUrl' | 'contentRenderer'
+> {
     tile: DashboardTile<QueryBasedInsightModel>
     widget: DashboardWidgetModel
     placement: DashboardPlacement
     otherDashboards: Pick<DashboardType, 'id' | 'name'>[]
-    showResizeHandles?: boolean
-    canEnterEditModeFromEdge?: boolean
-    onEnterEditModeFromEdge?: () => void
-    onDragHandleMouseDown?: React.MouseEventHandler<HTMLDivElement>
     moveToDashboard?: (target: Pick<DashboardType, 'id' | 'name'>) => void
     removeFromDashboard?: () => void
     showEditingControls?: boolean
@@ -55,84 +59,91 @@ function DashboardWidgetItemInternal(
         widget,
         placement,
         otherDashboards,
-        showResizeHandles,
-        canEnterEditModeFromEdge,
-        onEnterEditModeFromEdge,
-        onDragHandleMouseDown,
         moveToDashboard,
         removeFromDashboard,
+        ...widgetCardProps
     }: DashboardWidgetItemProps,
     ref: React.ForwardedRef<HTMLDivElement>
 ): JSX.Element {
+    const { updateWidgetConfig } = useActions(dashboardLogic)
+    const [editModalOpen, setEditModalOpen] = useState(false)
     const openUrl = getWidgetOpenUrl(widget.widget_type, widget.config)
 
     return (
-        <WidgetCard
-            ref={ref}
-            widget={widget}
-            placement={placement}
-            showResizeHandles={showResizeHandles}
-            canEnterEditModeFromEdge={canEnterEditModeFromEdge}
-            onEnterEditModeFromEdge={onEnterEditModeFromEdge}
-            onDragHandleMouseDown={onDragHandleMouseDown}
-            openUrl={openUrl}
-            contentRenderer={<WidgetRenderer tileId={tile.id} widget={widget} />}
-            moreButtonOverlay={
-                <>
-                    {moveToDashboard && (
-                        <LemonMenu
-                            placement="right-start"
-                            fallbackPlacements={['left-start']}
-                            closeParentPopoverOnClickInside
-                            items={
-                                otherDashboards.length
-                                    ? otherDashboards.map((otherDashboard) => ({
-                                          label: otherDashboard.name || <i>Untitled</i>,
-                                          onClick: () => moveToDashboard(otherDashboard),
-                                      }))
-                                    : [
-                                          {
-                                              label: 'No other dashboards',
-                                              disabledReason: 'No other dashboards',
-                                          },
-                                      ]
-                            }
-                        >
-                            <LemonButton
-                                fullWidth
-                                disabledReason={otherDashboards.length ? undefined : 'No other dashboards'}
-                            >
-                                Move to
-                            </LemonButton>
-                        </LemonMenu>
-                    )}
-                    <LemonDivider />
-                    {removeFromDashboard && (
-                        <LemonButton
-                            status="danger"
-                            onClick={() =>
-                                LemonDialog.open({
-                                    title: 'Remove widget from dashboard',
-                                    description: 'Are you sure you want to remove this widget from the dashboard?',
-                                    primaryButton: {
-                                        children: 'Remove from dashboard',
-                                        status: 'danger',
-                                        onClick: () => removeFromDashboard(),
-                                    },
-                                    secondaryButton: {
-                                        children: 'Cancel',
-                                    },
-                                })
-                            }
-                            fullWidth
-                            data-attr="remove-widget-tile-from-dashboard"
-                        >
-                            Delete
+        <>
+            <WidgetCard
+                ref={ref}
+                widget={widget}
+                placement={placement}
+                openUrl={openUrl}
+                contentRenderer={<WidgetRenderer tileId={tile.id} widget={widget} />}
+                {...widgetCardProps}
+                moreButtonOverlay={
+                    <>
+                        <LemonButton fullWidth onClick={() => setEditModalOpen(true)}>
+                            Edit
                         </LemonButton>
-                    )}
-                </>
-            }
-        />
+                        {moveToDashboard && (
+                            <LemonMenu
+                                placement="right-start"
+                                fallbackPlacements={['left-start']}
+                                closeParentPopoverOnClickInside
+                                items={
+                                    otherDashboards.length
+                                        ? otherDashboards.map((otherDashboard) => ({
+                                              label: otherDashboard.name || <i>Untitled</i>,
+                                              onClick: () => moveToDashboard(otherDashboard),
+                                          }))
+                                        : [
+                                              {
+                                                  label: 'No other dashboards',
+                                                  disabledReason: 'No other dashboards',
+                                              },
+                                          ]
+                                }
+                            >
+                                <LemonButton
+                                    fullWidth
+                                    disabledReason={otherDashboards.length ? undefined : 'No other dashboards'}
+                                >
+                                    Move to
+                                </LemonButton>
+                            </LemonMenu>
+                        )}
+                        <LemonDivider />
+                        {removeFromDashboard && (
+                            <LemonButton
+                                status="danger"
+                                onClick={() =>
+                                    LemonDialog.open({
+                                        title: 'Remove widget from dashboard',
+                                        description: 'Are you sure you want to remove this widget from the dashboard?',
+                                        primaryButton: {
+                                            children: 'Remove from dashboard',
+                                            status: 'danger',
+                                            onClick: () => removeFromDashboard(),
+                                        },
+                                        secondaryButton: {
+                                            children: 'Cancel',
+                                        },
+                                    })
+                                }
+                                fullWidth
+                                data-attr="remove-widget-tile-from-dashboard"
+                            >
+                                Delete
+                            </LemonButton>
+                        )}
+                    </>
+                }
+            />
+            <EditWidgetModal
+                isOpen={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                widget={widget}
+                onSave={(config) => updateWidgetConfig(tile.id, widget.id, config)}
+            />
+        </>
     )
 }
 

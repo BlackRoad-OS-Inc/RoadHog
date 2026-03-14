@@ -3,21 +3,14 @@ import React from 'react'
 
 import { IconExternal } from '@posthog/icons'
 
-import { Resizeable } from 'lib/components/Cards/CardMeta'
+import { CardMeta, Resizeable } from 'lib/components/Cards/CardMeta'
 import { DashboardResizeHandles } from 'lib/components/Cards/handles'
 import { EditModeEdgeOverlay } from 'lib/components/Cards/InsightCard/EditModeEdgeOverlay'
 import { LemonButton } from 'lib/lemon-ui/LemonButton'
-import { More, MoreProps } from 'lib/lemon-ui/LemonButton/More'
+import { MoreProps } from 'lib/lemon-ui/LemonButton/More'
+import { WIDGET_TYPE_CONFIG } from 'scenes/dashboard/widgets/widgetTypes'
 
-import { DashboardPlacement, DashboardWidgetModel, DashboardWidgetType } from '~/types'
-
-const WIDGET_TYPE_LABELS: Record<DashboardWidgetType, string> = {
-    [DashboardWidgetType.Experiment]: 'Experiment',
-    [DashboardWidgetType.Logs]: 'Logs',
-    [DashboardWidgetType.ErrorTracking]: 'Error tracking',
-    [DashboardWidgetType.SessionReplays]: 'Session replays',
-    [DashboardWidgetType.SurveyResponses]: 'Survey responses',
-}
+import { DashboardPlacement, DashboardWidgetModel } from '~/types'
 
 export interface WidgetCardProps extends React.HTMLAttributes<HTMLDivElement>, Resizeable {
     widget: DashboardWidgetModel
@@ -49,26 +42,36 @@ function WidgetCardInternal(
     ref: React.Ref<HTMLDivElement>
 ): JSX.Element {
     const shouldHideMoreButton = placement === DashboardPlacement.Public
+    const config = WIDGET_TYPE_CONFIG[widget.widget_type]
 
     return (
         <div
-            className={clsx('WidgetCard bg-surface-primary border rounded flex flex-col overflow-hidden', className)}
+            className={clsx('WidgetCard InsightCard border rounded flex flex-col', className)}
             data-attr="widget-card"
             {...divProps}
             ref={ref}
         >
-            <div
-                className={clsx(
-                    'CardMeta flex items-center justify-between px-4 py-2 border-b shrink-0',
-                    onDragHandleMouseDown && 'cursor-grab'
-                )}
+            <CardMeta
+                showEditingControls={!shouldHideMoreButton && !!moreButtonOverlay}
+                showDetailsControls={false}
+                topHeading={
+                    <span className="flex items-center gap-1.5">
+                        <span
+                            className="inline-flex items-center justify-center"
+                            // eslint-disable-next-line react/forbid-dom-props
+                            style={{ color: config.color }}
+                        >
+                            {config.icon}
+                        </span>
+                        {config.label}
+                    </span>
+                }
+                content={null}
+                metaDetails={null}
+                moreButtons={moreButtonOverlay}
                 onMouseDown={onDragHandleMouseDown}
-            >
-                <span className="text-xs font-semibold text-muted uppercase tracking-wide">
-                    {WIDGET_TYPE_LABELS[widget.widget_type]}
-                </span>
-                <div className="flex items-center gap-1">
-                    {openUrl && (
+                extraControls={
+                    openUrl ? (
                         <LemonButton
                             size="small"
                             type="tertiary"
@@ -77,10 +80,9 @@ function WidgetCardInternal(
                             targetBlank={false}
                             tooltip="Open full view"
                         />
-                    )}
-                    {moreButtonOverlay && !shouldHideMoreButton && <More overlay={moreButtonOverlay} />}
-                </div>
-            </div>
+                    ) : null
+                }
+            />
 
             <div className="flex-1 overflow-auto min-h-0">{contentRenderer}</div>
 

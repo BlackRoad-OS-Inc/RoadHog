@@ -309,6 +309,11 @@ export const dashboardLogic = kea<dashboardLogicType>([
         }),
         setTextTileId: (textTileId: number | 'new' | null) => ({ textTileId }),
         addWidget: (widgetType: DashboardWidgetType, config: Record<string, any>) => ({ widgetType, config }),
+        updateWidgetConfig: (tileId: number, widgetId: number, config: Record<string, any>) => ({
+            tileId,
+            widgetId,
+            config,
+        }),
         setTileOverride: (tile: DashboardTile<QueryBasedInsightModel>) => ({ tile }),
 
         /**
@@ -1278,6 +1283,15 @@ export const dashboardLogic = kea<dashboardLogicType>([
                                           color: tile.color,
                                       }
                                   }
+                                  if (tile.widget) {
+                                      return {
+                                          type: 'WIDGET',
+                                          widget_type: tile.widget.widget_type,
+                                          config: tile.widget.config,
+                                          layouts: tile.layouts,
+                                          color: tile.color,
+                                      }
+                                  }
                                   throw new Error('Unknown tile type')
                               }),
                           variables: [],
@@ -1683,6 +1697,23 @@ export const dashboardLogic = kea<dashboardLogicType>([
                 lemonToast.success('Widget added to dashboard')
             } catch (e) {
                 lemonToast.error('Could not add widget: ' + String(e))
+            }
+        },
+        updateWidgetConfig: async ({ tileId, widgetId, config }) => {
+            try {
+                // Find the existing widget to preserve widget_type (backend requires it on update)
+                const tile = values.tiles.find((t) => t.id === tileId)
+                const widgetType = tile?.widget?.widget_type
+                const dashboard: DashboardType<InsightModel> = await api.update(
+                    `api/environments/${values.currentTeamId}/dashboards/${props.id}`,
+                    {
+                        tiles: [{ id: tileId, widget: { id: widgetId, widget_type: widgetType, config } }],
+                    }
+                )
+                actions.loadDashboardSuccess(getQueryBasedDashboard(dashboard))
+                lemonToast.success('Widget updated')
+            } catch (e) {
+                lemonToast.error('Could not update widget: ' + String(e))
             }
         },
         updateTileColor: async ({ tileId, color }) => {
