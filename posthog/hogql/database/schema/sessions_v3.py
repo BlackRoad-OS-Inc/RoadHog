@@ -27,6 +27,8 @@ from posthog.hogql.errors import ResolutionError
 from posthog.hogql.modifiers import create_default_modifiers_for_team
 
 from posthog.models.raw_sessions.sessions_v3 import (
+    RAW_SELECT_SESSION_PROP_ARRAY_VALUES_SQL_V3,
+    RAW_SELECT_SESSION_PROP_ARRAY_VALUES_SQL_WITH_FILTER_V3,
     RAW_SELECT_SESSION_PROP_STRING_VALUES_SQL_V3,
     RAW_SELECT_SESSION_PROP_STRING_VALUES_SQL_WITH_FILTER_V3,
     SESSION_V3_LOWER_TIER_AD_IDS,
@@ -583,6 +585,30 @@ def get_lazy_session_table_values_v3(key: str, search_term: Optional[str], team:
             query_type="get_session_property_values",
             team_id=team.pk,
         )
+    if isinstance(field_definition, StringArrayDatabaseField):
+        array_column_map = {
+            "$urls": "urls",
+            "$hosts": "hosts",
+            "$emails": "emails",
+        }
+        column = array_column_map.get(key)
+        if not column:
+            return []
+
+        if search_term:
+            return insight_sync_execute(
+                RAW_SELECT_SESSION_PROP_ARRAY_VALUES_SQL_WITH_FILTER_V3.format(property_expr=column),
+                {"team_id": team.pk, "key": key, "value": "%{}%".format(search_term)},
+                query_type="get_session_property_values_with_value",
+                team_id=team.pk,
+            )
+        return insight_sync_execute(
+            RAW_SELECT_SESSION_PROP_ARRAY_VALUES_SQL_V3.format(property_expr=column),
+            {"team_id": team.pk, "key": key},
+            query_type="get_session_property_values",
+            team_id=team.pk,
+        )
+
     if isinstance(field_definition, BooleanDatabaseField):
         # ideally we'd be able to just send [[True], [False]]
         return [["1"], ["0"]]

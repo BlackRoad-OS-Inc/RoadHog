@@ -770,6 +770,48 @@ ORDER BY count(value) DESC
 LIMIT 20
 """
 
+RAW_SELECT_SESSION_PROP_ARRAY_VALUES_SQL_V3 = """
+SELECT
+    value,
+    count(value)
+FROM (
+    SELECT
+        arrayJoin({property_expr}) as value
+    FROM
+        raw_sessions_v3
+    WHERE
+        team_id = %(team_id)s AND
+        value IS NOT NULL AND
+        value != ''
+    ORDER BY session_id_v7 DESC
+    LIMIT 100000
+)
+GROUP BY value
+ORDER BY count(value) DESC
+LIMIT 20
+"""
+
+RAW_SELECT_SESSION_PROP_ARRAY_VALUES_SQL_WITH_FILTER_V3 = """
+SELECT
+    value,
+    count(value)
+FROM (
+    SELECT
+        arrayJoin({property_expr}) as value
+    FROM
+        raw_sessions_v3
+    WHERE
+        team_id = %(team_id)s
+    HAVING
+        value ILIKE %(value)s
+    ORDER BY session_id_v7 DESC
+    LIMIT 100000
+)
+GROUP BY value
+ORDER BY count(value) DESC
+LIMIT 20
+"""
+
 
 def GET_NUM_SHARDED_RAW_SESSIONS_ACTIVE_PARTS(partitions: list[str]) -> str:
     """Get the maximum number of active parts across specified partitions and all nodes.

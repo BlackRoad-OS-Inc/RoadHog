@@ -37,7 +37,7 @@ from posthog.schema import (
 
 from posthog.hogql import ast
 from posthog.hogql.base import AST
-from posthog.hogql.database.models import BooleanDatabaseField
+from posthog.hogql.database.models import BooleanDatabaseField, StringArrayDatabaseField
 from posthog.hogql.database.schema.sessions_v3 import LAZY_SESSIONS_FIELDS
 from posthog.hogql.errors import NotImplementedError, QueryError
 from posthog.hogql.functions import find_hogql_aggregation
@@ -777,6 +777,13 @@ def property_to_expr(
             # Use the all_urls array field to filter for pages visited during recording.
             all_urls_field = ast.Field(chain=["all_urls"])
 
+        session_array_field: ast.Field | None = (
+            field
+            if property.type == "session"
+            and isinstance(LAZY_SESSIONS_FIELDS.get(property.key), StringArrayDatabaseField)
+            else None
+        )
+
         is_exception_string_array_property = property.type == "event" and property.key in [
             "$exception_types",
             "$exception_values",
@@ -819,7 +826,7 @@ def property_to_expr(
 
                     left = (
                         ast.Field(chain=["v"])
-                        if (is_exception_string_array_property or is_visited_page_property)
+                        if (is_exception_string_array_property or is_visited_page_property or session_array_field)
                         else expr
                     )
                     compare_op = ast.CompareOperation(
@@ -842,12 +849,20 @@ def property_to_expr(
                                 "field": all_urls_field,
                             },
                         )
+                    elif session_array_field:
+                        return parse_expr(
+                            "arrayExists(v -> {compare_op}, {field})",
+                            {
+                                "compare_op": compare_op,
+                                "field": session_array_field,
+                            },
+                        )
                     else:
                         return compare_op
                 elif operator in (PropertyOperator.ICONTAINS, PropertyOperator.NOT_ICONTAINS):
                     # For contains operators, delegate to _expr_to_compare_op which handles multiple values efficiently
-                    if is_exception_string_array_property or is_visited_page_property:
-                        # For exception properties and visited_page, use multiSearch optimization within arrayExists
+                    if is_exception_string_array_property or is_visited_page_property or session_array_field:
+                        # For array properties, use multiSearch optimization within arrayExists
                         multi_search_expr = _expr_to_compare_op(
                             ast.Field(chain=["v"]), value, operator, property, property.type != "session", team
                         )
@@ -856,10 +871,15 @@ def property_to_expr(
                                 "arrayExists(v -> {expr}, {key})",
                                 {"expr": multi_search_expr, "key": extracted_field},
                             )
-                        else:  # is_visited_page_property
+                        elif is_visited_page_property:
                             return parse_expr(
                                 "arrayExists(v -> {expr}, {key})",
                                 {"expr": multi_search_expr, "key": all_urls_field},
+                            )
+                        else:  # session_array_field
+                            return parse_expr(
+                                "arrayExists(v -> {expr}, {key})",
+                                {"expr": multi_search_expr, "key": session_array_field},
                             )
                     else:
                         return _expr_to_compare_op(expr, value, operator, property, property.type != "session", team)
@@ -887,8 +907,10 @@ def property_to_expr(
                     return ast.And(exprs=exprs)
                 return ast.Or(exprs=exprs)
 
+        is_any_array_property = is_exception_string_array_property or is_visited_page_property or session_array_field
+
         expr = _expr_to_compare_op(
-            expr=ast.Field(chain=["v"]) if (is_exception_string_array_property or is_visited_page_property) else expr,
+            expr=ast.Field(chain=["v"]) if is_any_array_property else expr,
             value=value,
             operator=operator,
             team=team,
@@ -901,24 +923,25 @@ def property_to_expr(
                 "arrayExists(v -> {expr}, {key})",
                 {"expr": expr, "key": extracted_field},
             )
-        elif is_visited_page_property:
+        elif is_visited_page_property or session_array_field:
+            array_field = all_urls_field if is_visited_page_property else session_array_field
             # Handle IS_SET and IS_NOT_SET operators specially for arrays
             if operator == PropertyOperator.IS_SET:
                 return ast.CompareOperation(
                     op=ast.CompareOperationOp.Gt,
-                    left=ast.Call(name="length", args=[all_urls_field]),
+                    left=ast.Call(name="length", args=[array_field]),
                     right=ast.Constant(value=0),
                 )
             elif operator == PropertyOperator.IS_NOT_SET:
                 return ast.CompareOperation(
                     op=ast.CompareOperationOp.Eq,
-                    left=ast.Call(name="length", args=[all_urls_field]),
+                    left=ast.Call(name="length", args=[array_field]),
                     right=ast.Constant(value=0),
                 )
             else:
                 return parse_expr(
                     "arrayExists(v -> {expr}, {key})",
-                    {"expr": expr, "key": all_urls_field},
+                    {"expr": expr, "key": array_field},
                 )
         else:
             return expr

@@ -906,6 +906,60 @@ class TestProperty(BaseTest):
             self._parse_expr("session.$is_bounce = false"),
         )
 
+    def test_session_array_property_exact(self):
+        self.assertEqual(
+            self._property_to_expr(
+                {"type": "session", "key": "$hosts", "value": "example.com", "operator": "exact"},
+                scope="event",
+            ),
+            self._parse_expr("arrayExists(v -> v = 'example.com', session.$hosts)"),
+        )
+
+    def test_session_array_property_exact_multi_value(self):
+        self.assertEqual(
+            self._property_to_expr(
+                {"type": "session", "key": "$hosts", "value": ["a.com", "b.com"], "operator": "exact"},
+                scope="event",
+            ),
+            self._parse_expr("arrayExists(v -> v IN ('a.com', 'b.com'), session.$hosts)"),
+        )
+
+    def test_session_array_property_icontains(self):
+        self.assertEqual(
+            self._property_to_expr(
+                {"type": "session", "key": "$emails", "value": "test", "operator": "icontains"},
+                scope="event",
+            ),
+            self._parse_expr("arrayExists(v -> toString(v) ILIKE '%test%', session.$emails)"),
+        )
+
+    def test_session_array_property_is_set(self):
+        self.assertEqual(
+            self._property_to_expr(
+                {"type": "session", "key": "$hosts", "operator": "is_set"},
+                scope="event",
+            ),
+            self._parse_expr("length(session.$hosts) > 0"),
+        )
+
+    def test_session_array_property_is_not_set(self):
+        self.assertEqual(
+            self._property_to_expr(
+                {"type": "session", "key": "$hosts", "operator": "is_not_set"},
+                scope="event",
+            ),
+            self._parse_expr("length(session.$hosts) = 0"),
+        )
+
+    def test_session_array_property_is_not(self):
+        self.assertEqual(
+            self._property_to_expr(
+                {"type": "session", "key": "$hosts", "value": "example.com", "operator": "is_not"},
+                scope="event",
+            ),
+            self._parse_expr("arrayExists(v -> v != 'example.com', session.$hosts)"),
+        )
+
     def test_data_warehouse_person_property(self):
         credential = DataWarehouseCredential.objects.create(
             team=self.team, access_key="_accesskey", access_secret="_secret"
