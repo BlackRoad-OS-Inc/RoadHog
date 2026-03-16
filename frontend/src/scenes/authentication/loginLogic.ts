@@ -32,6 +32,7 @@ export interface PrecheckResponseType {
 
 // Routes that should be handled by Django, not the React router
 const BACKEND_ONLY_ROUTES = [
+    '/api/agentic/authorize',
     '/login/vercel/continue',
     '/oauth/authorize',
     '/toolbar_oauth/authorize',
