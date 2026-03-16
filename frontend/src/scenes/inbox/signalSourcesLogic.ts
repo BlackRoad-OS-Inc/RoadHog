@@ -22,7 +22,7 @@ import {
 
 export type DataWarehouseSource = 'Linear' | 'Zendesk' | 'Github'
 
-const DATA_WAREHOUSE_SOURCE_CONFIG: Record<
+export const DATA_WAREHOUSE_SOURCE_CONFIG: Record<
     DataWarehouseSource,
     {
         sourceProduct: SignalSourceProduct
@@ -112,6 +112,12 @@ export const signalSourcesLogic = kea<signalSourcesLogicType>([
         openDataSourceSetup: (product: ExternalDataSourceType) => ({ product }),
         closeDataSourceSetup: true,
         onDataSourceSetupComplete: (product: ExternalDataSourceType) => ({ product }),
+        openExistingSourceSelection: (dwSource: DataWarehouseSource, sources: ExternalDataSource[]) => ({
+            dwSource,
+            sources,
+        }),
+        closeExistingSourceSelection: true,
+        selectExistingSource: (sourceId: string, dwSource: DataWarehouseSource) => ({ sourceId, dwSource }),
         toggleSignalSource: (params: ToggleSignalSourceParams) => ({ params }),
         toggleSignalSourceSuccess: (params: ToggleSignalSourceParams) => ({ params }),
         toggleSignalSourceFailure: (params: ToggleSignalSourceParams, error: string) => ({ params, error }),
@@ -152,6 +158,14 @@ export const signalSourcesLogic = kea<signalSourcesLogicType>([
             {
                 openDataSourceSetup: (_, { product }) => product,
                 closeDataSourceSetup: () => null,
+                closeSourcesModal: () => null,
+            },
+        ],
+        existingSourceSelection: [
+            null as { dwSource: DataWarehouseSource; sources: ExternalDataSource[] } | null,
+            {
+                openExistingSourceSelection: (_, { dwSource, sources }) => ({ dwSource, sources }),
+                closeExistingSourceSelection: () => null,
                 closeSourcesModal: () => null,
             },
         ],
@@ -253,47 +267,52 @@ export const signalSourcesLogic = kea<signalSourcesLogicType>([
     }),
 
     listeners(({ actions, values }) => {
-        // If the required table for a signal source is not yet syncing on the existing DW source,
-        // enable it so the signals workflow has data to process.
-        async function ensureRequiredTableSyncing(dwSourceType: string, tableName: string): Promise<void> {
-            const source = values.dataWarehouseSources?.results?.find(
-                (s: ExternalDataSource) => s.source_type === dwSourceType
-            )
-            if (!source) {
-                return
-            }
-            const schema = source.schemas?.find((s: ExternalDataSourceSchema) => s.name === tableName)
-            if (schema && !schema.should_sync) {
-                await api.externalDataSchemas.update(schema.id, { should_sync: true })
-            }
-        }
-
         return {
             openSourcesModal: () => {
                 // Load external data sources so we can check connectivity when user toggles a source
                 actions.loadSources()
             },
             initiateDataWarehouseSourceToggle: async ({ dwSource }) => {
-                const { requiredTable, enableErrorMessage } = DATA_WAREHOUSE_SOURCE_CONFIG[dwSource]
                 const sourceConfig = getDataWarehouseSourceConfig(values, dwSource)
                 const isCurrentlyEnabled = sourceConfig?.enabled === true
                 if (!isCurrentlyEnabled) {
-                    const hasSource =
-                        values.dataWarehouseSources?.results?.some(
+                    const matchingSources =
+                        values.dataWarehouseSources?.results?.filter(
                             (s: ExternalDataSource) => s.source_type === dwSource
-                        ) ?? false
-                    if (!hasSource) {
+                        ) ?? []
+                    if (matchingSources.length === 0) {
                         actions.openDataSourceSetup(dwSource)
                         return
                     }
-                    try {
-                        await ensureRequiredTableSyncing(dwSource, requiredTable)
-                    } catch (error: any) {
-                        lemonToast.error(error?.detail || error?.message || enableErrorMessage)
-                        return
-                    }
+                    // One or more existing sources found — let the user pick which one to use
+                    actions.openExistingSourceSelection(dwSource, matchingSources)
+                    return
                 }
                 actions.toggleDataWarehouseSource(dwSource)
+            },
+            selectExistingSource: async ({ sourceId, dwSource }) => {
+                const { requiredTable, enableErrorMessage } = DATA_WAREHOUSE_SOURCE_CONFIG[dwSource]
+                const source = values.existingSourceSelection?.sources.find(
+                    (s: ExternalDataSource) => s.id === sourceId
+                )
+                if (!source) {
+                    return
+                }
+                try {
+                    const schema = source.schemas?.find((s: ExternalDataSourceSchema) => s.name === requiredTable)
+                    if (schema && !schema.should_sync) {
+                        await api.externalDataSchemas.update(schema.id, { should_sync: true })
+                    }
+                } catch (error: any) {
+                    lemonToast.error(error?.detail || error?.message || enableErrorMessage)
+                    return
+                }
+                const { sourceProduct, sourceType } = DATA_WAREHOUSE_SOURCE_CONFIG[dwSource]
+                actions.closeExistingSourceSelection()
+                // Call toggleSignalSource directly rather than going through toggleDataWarehouseSource,
+                // which would optimistically insert a fake 'new_' ID into sourceConfigs and cause
+                // toggleSignalSource to try to create instead of update an existing config.
+                actions.toggleSignalSource({ sourceProduct, sourceType, enabled: true })
             },
             onDataSourceSetupComplete: ({ product }: { product: ExternalDataSourceType }) => {
                 const mapping: Partial<
@@ -324,12 +343,32 @@ export const signalSourcesLogic = kea<signalSourcesLogicType>([
                         }
                         await api.signalSourceConfigs.update(existing.id, updateData)
                     } else if (enabled) {
-                        await api.signalSourceConfigs.create({
-                            source_product: sourceProduct,
-                            source_type: sourceType,
-                            enabled,
-                            config: config ?? {},
-                        })
+                        try {
+                            await api.signalSourceConfigs.create({
+                                source_product: sourceProduct,
+                                source_type: sourceType,
+                                enabled,
+                                config: config ?? {},
+                            })
+                        } catch (createError: any) {
+                            // If the config already exists in the backend but wasn't reflected in local state
+                            // (e.g. sourceConfigs hadn't loaded yet), fetch it and update instead
+                            const msg: string = createError?.detail || createError?.message || ''
+                            if (msg.includes('already exists')) {
+                                const fresh = await api.signalSourceConfigs.list()
+                                const realConfig = fresh.results.find(
+                                    (c: SignalSourceConfig) =>
+                                        c.source_product === sourceProduct && c.source_type === sourceType
+                                )
+                                if (realConfig) {
+                                    await api.signalSourceConfigs.update(realConfig.id, { enabled })
+                                } else {
+                                    throw createError
+                                }
+                            } else {
+                                throw createError
+                            }
+                        }
                     }
                     breakpoint()
                     actions.toggleSignalSourceSuccess(params)
