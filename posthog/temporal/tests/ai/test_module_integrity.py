@@ -105,6 +105,7 @@ class TestAITemporalModuleIntegrity:
             "verify_match_specificity_activity",
             "run_signal_semantic_search_activity",
             "report_safety_judge_activity",
+            "safety_filter_activity",
             "wait_for_signal_in_clickhouse_activity",
             "summarize_signals_activity",
             "delete_report_activity",

@@ -128,7 +128,6 @@ async def safety_filter(description: str) -> SafetyFilterJudgeResponse:
             system_prompt=SAFETY_FILTER_PROMPT,
             user_prompt=user_prompt,
             validate=validate,
-            thinking=True,
         )
     except EmptyLLMResponseError:
         return SafetyFilterJudgeResponse(
