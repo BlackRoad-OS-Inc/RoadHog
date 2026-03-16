@@ -12,6 +12,7 @@ _DETECT_FNS: dict[str, BatchDetectFn] = {}
 
 # Add product health check modules here to register them.
 HEALTH_CHECK_MODULES = [
+    "products.cdp.backend.temporal.health_checks.hog_function_error",
     "products.web_analytics.backend.temporal.health_checks.no_live_events",
     "products.web_analytics.backend.temporal.health_checks.no_pageleave_events",
 ]

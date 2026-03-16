@@ -46,6 +46,9 @@ const KIND_TO_CATEGORY: Record<string, HealthIssueCategory> = {
     no_pageleave_events: 'ingestion',
     ingestion_lag: 'ingestion',
 
+    // Pipelines
+    hog_function_error: 'pipelines',
+
     // SDKs
     sdk_outdated: 'sdk',
 }
@@ -54,6 +57,7 @@ export const KIND_LABELS: Record<string, string> = {
     no_live_events: 'No live events',
     no_pageleave_events: 'No pageleave events',
     ingestion_lag: 'Ingestion lag',
+    hog_function_error: 'HogFunction errors',
     sdk_outdated: 'SDK outdated',
 }
 
