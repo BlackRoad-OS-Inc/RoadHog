@@ -925,7 +925,11 @@ def property_to_expr(
                 {"expr": expr, "key": extracted_field},
             )
         elif is_visited_page_property or session_array_field is not None:
-            array_field: ast.Expr = all_urls_field if is_visited_page_property else session_array_field
+            if is_visited_page_property:
+                array_field: ast.Expr = all_urls_field
+            else:
+                assert session_array_field is not None
+                array_field = session_array_field
             # Handle IS_SET and IS_NOT_SET operators specially for arrays
             if operator == PropertyOperator.IS_SET:
                 return ast.CompareOperation(
