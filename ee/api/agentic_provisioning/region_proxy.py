@@ -121,13 +121,13 @@ _STRATEGY_CHECKS = {
 }
 
 
-def stripe_region_proxy(strategy: str, *, require_api_version: bool = True):
+def stripe_region_proxy(strategy: str):
     check_fn = _STRATEGY_CHECKS[strategy]
 
     def decorator(view_func):
         @functools.wraps(view_func)
         def wrapper(request: Request, *args, **kwargs) -> Response:
-            error = verify_stripe_signature(request, require_api_version=require_api_version)
+            error = verify_stripe_signature(request)
             if error:
                 return error
 
