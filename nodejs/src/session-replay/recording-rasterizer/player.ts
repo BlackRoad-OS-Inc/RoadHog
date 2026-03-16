@@ -143,10 +143,14 @@ export class PlayerController {
                 }
             }
 
-            void promise.then(() => {
-                cleanup()
-                resolve()
-            })
+            void promise
+                .then(() => {
+                    cleanup()
+                    resolve()
+                })
+                .catch(() => {
+                    // timeout or error already rejected — swallow
+                })
         })
     }
 

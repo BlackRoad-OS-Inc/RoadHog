@@ -22,16 +22,16 @@ a single browser instance is reused across exports and recycled after N uses.
 
 ## Modules
 
-| File              | Purpose                                                          |
-| ----------------- | ---------------------------------------------------------------- |
-| `index.ts`        | Worker entry point — launches browser pool, connects to Temporal |
-| `activities.ts`   | Temporal activity: record → postprocess → upload → cleanup       |
-| `recorder.ts`     | puppeteer-capture deterministic recording with virtual time      |
+| File              | Purpose                                                            |
+| ----------------- | ------------------------------------------------------------------ |
+| `index.ts`        | Worker entry point — launches browser pool, connects to Temporal   |
+| `activities.ts`   | Temporal activity: record → postprocess → upload → cleanup         |
+| `recorder.ts`     | puppeteer-capture deterministic recording with virtual time        |
 | `postprocess.ts`  | ffmpeg post-processing (speed correction, trim) + video timestamps |
-| `browser-pool.ts` | Warm Chromium lifecycle manager                                  |
-| `storage.ts`      | S3 upload                                                        |
-| `config.ts`       | Environment variable configuration                               |
-| `types.ts`        | Input/output contracts                                           |
+| `browser-pool.ts` | Warm Chromium lifecycle manager                                    |
+| `storage.ts`      | S3 upload                                                          |
+| `config.ts`       | Environment variable configuration                                 |
+| `types.ts`        | Input/output contracts                                             |
 
 ## Running locally
 

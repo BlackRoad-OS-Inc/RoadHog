@@ -143,8 +143,14 @@ export async function capturePlayback(
         }
     }
 
-    const rawStat = await fs.stat(outputPath)
-    log.info({ file_size_bytes: rawStat.size }, 'capture stopped')
+    let fileSize = 0
+    try {
+        const rawStat = await fs.stat(outputPath)
+        fileSize = rawStat.size
+    } catch {
+        log.warn('output file missing after capture — ffmpeg may have failed to start')
+    }
+    log.info({ file_size_bytes: fileSize }, 'capture stopped')
 
     const inactivityPeriods: InactivityPeriod[] = player.getInactivityPeriods()
 
