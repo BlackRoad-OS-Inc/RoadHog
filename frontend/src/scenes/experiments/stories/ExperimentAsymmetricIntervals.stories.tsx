@@ -18,9 +18,6 @@ const meta: Meta = {
         viewMode: 'story',
         mockDate: '2025-01-27',
         pageUrl: urls.experiment(EXPERIMENT_WITH_ASYMMETRIC_INTERVALS.id),
-        testOptions: {
-            waitForSelector: '[data-attr="metrics-chart-tick-labels"]',
-        },
     },
     decorators: [
         mswDecorator({
