@@ -165,17 +165,19 @@ class BufferSignalsWorkflow:
                     for s in batch
                 ]
             )
-            for s, r in zip(batch, safety_results):
-                if not r.safe:
-                    workflow.logger.info(
-                        "Safety filter dropped signal",
-                        team_id=s.team_id,
-                        source_product=s.source_product,
-                        source_type=s.source_type,
-                        source_id=s.source_id,
-                        threat_type=r.threat_type,
+            safe_signals: list[EmitSignalInputs] = []
+            for signal, result in zip(batch, safety_results):
+                if result.safe:
+                    safe_signals.append(signal)
+                else:
+                    workflow.logger.warning(
+                        f"Safety filter dropped signal: {result.threat_type}",
+                        team_id=signal.team_id,
+                        source_product=signal.source_product,
+                        source_type=signal.source_type,
+                        source_id=signal.source_id,
                     )
-            batch = [s for s, r in zip(batch, safety_results) if r.safe]
+            batch = safe_signals
 
             if not batch:
                 continue
