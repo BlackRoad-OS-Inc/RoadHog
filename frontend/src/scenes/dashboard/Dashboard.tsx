@@ -3,14 +3,14 @@ import './Dashboard.scss'
 import { BindLogic, useActions, useMountedLogic, useValues } from 'kea'
 
 import { IconThumbsDown, IconThumbsUp } from '@posthog/icons'
-import { LemonBanner, LemonButton } from '@posthog/lemon-ui'
+import { LemonBanner, LemonButton, LemonMenu } from '@posthog/lemon-ui'
 
 import { AccessDenied } from 'lib/components/AccessDenied'
 import { NotFound } from 'lib/components/NotFound'
 import { useFileSystemLogView } from 'lib/hooks/useFileSystemLogView'
 import { useOnMountEffect } from 'lib/hooks/useOnMountEffect'
 import { cn } from 'lib/utils/css-classes'
-import { DashboardEventSource } from 'lib/utils/eventUsageLogic'
+import { DashboardEventSource, eventUsageLogic } from 'lib/utils/eventUsageLogic'
 import { DashboardFilterBar } from 'scenes/dashboard/DashboardFilters'
 import { DashboardItems } from 'scenes/dashboard/DashboardItems'
 import { DashboardLogicProps, dashboardLogic } from 'scenes/dashboard/dashboardLogic'
@@ -74,6 +74,7 @@ function DashboardScene({ backTo }: { backTo?: { url: string; name: string } }):
         tiles,
         itemsLoading,
         dashboardMode,
+        currentLayoutSize,
         dashboardFailedToLoad,
         accessDeniedToDashboard,
         refreshAnalysisResult,
@@ -93,7 +94,9 @@ function DashboardScene({ backTo }: { backTo?: { url: string; name: string } }):
         applyFilters,
         setDashboardMode,
         setLayoutZoom,
+        autoLayoutTiles,
     } = useActions(dashboardLogic)
+    const { reportDashboardAutoLayoutChanged } = useActions(eventUsageLogic)
     const { addInsightToDashboardModalVisible } = useValues(addInsightToDashboardLogic)
 
     useFileSystemLogView({
@@ -207,6 +210,44 @@ function DashboardScene({ backTo }: { backTo?: { url: string; name: string } }):
                             ].includes(placement) && (
                                 <DashboardZoomControl layoutZoom={layoutZoom} setLayoutZoom={setLayoutZoom} />
                             )}
+                        {dashboardMode === DashboardMode.Edit && (
+                            <LemonMenu
+                                items={[
+                                    {
+                                        label: '1 column',
+                                        'data-attr': 'dashboard-auto-layout-1-col',
+                                        onClick: () => {
+                                            autoLayoutTiles(1)
+                                            reportDashboardAutoLayoutChanged(dashboard?.id, 1)
+                                        },
+                                    },
+                                    {
+                                        label: '2 columns',
+                                        'data-attr': 'dashboard-auto-layout-2-col',
+                                        onClick: () => {
+                                            autoLayoutTiles(2)
+                                            reportDashboardAutoLayoutChanged(dashboard?.id, 2)
+                                        },
+                                    },
+                                ]}
+                                placement="bottom-end"
+                                fallbackPlacements={['bottom-start', 'bottom']}
+                            >
+                                <LemonButton
+                                    size="small"
+                                    type="secondary"
+                                    data-attr="dashboard-auto-layout-button"
+                                    disabled={currentLayoutSize === 'xs'}
+                                    tooltip={
+                                        currentLayoutSize === 'xs'
+                                            ? 'Layout editing is disabled on smaller screens.'
+                                            : undefined
+                                    }
+                                >
+                                    Auto layout
+                                </LemonButton>
+                            </LemonMenu>
+                        )}
                     </SceneStickyBar>
 
                     <DashboardItems />

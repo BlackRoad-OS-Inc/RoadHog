@@ -33,7 +33,7 @@ import { clearDOMTextSelection, getJSHeapMemory, shouldCancelQuery, toParams, uu
 import { accessLevelSatisfied } from 'lib/utils/accessControlUtils'
 import { DashboardEventSource, eventUsageLogic } from 'lib/utils/eventUsageLogic'
 import { BREAKPOINTS } from 'scenes/dashboard/dashboardUtils'
-import { calculateDuplicateLayout, calculateLayouts } from 'scenes/dashboard/tileLayouts'
+import { calculateAutoLayoutTiles, calculateDuplicateLayout, calculateLayouts } from 'scenes/dashboard/tileLayouts'
 import { dataThemeLogic } from 'scenes/dataThemeLogic'
 import { MaxContextInput, createMaxContextHelpers } from 'scenes/max/maxTypes'
 import { Scene } from 'scenes/sceneTypes'
@@ -285,6 +285,7 @@ export const dashboardLogic = kea<dashboardLogicType>([
          */
         updateLayouts: (layouts: ResponsiveLayouts) => ({ layouts }),
         updateContainerWidth: (containerWidth: number, columns: number) => ({ containerWidth, columns }),
+        autoLayoutTiles: (columns: 1 | 2) => ({ columns }),
         updateTileColor: (tileId: number, color: InsightColor | null) => ({ tileId, color }),
         toggleTileDescription: (tileId: number) => ({ tileId }),
         setTileProperty: (tileId: number, properties: Partial<Pick<DashboardTile, 'color' | 'show_description'>>) => ({
@@ -658,6 +659,25 @@ export const dashboardLogic = kea<dashboardLogicType>([
                         tiles: state?.tiles?.map((tile) => ({
                             ...tile,
                             layouts: itemLayouts[tile.id]?.sm ? { sm: itemLayouts[tile.id].sm } : {},
+                        })),
+                    } as DashboardType<QueryBasedInsightModel>
+                },
+                autoLayoutTiles: (state, { columns }) => {
+                    if (!state?.tiles) {
+                        return state
+                    }
+
+                    const layoutsToUpdate = calculateAutoLayoutTiles(
+                        state.tiles.filter((t) => !t.deleted),
+                        columns
+                    )
+                    const layoutsById = Object.fromEntries(layoutsToUpdate.map((t) => [t.id, t.layouts]))
+
+                    return {
+                        ...state,
+                        tiles: state.tiles.map((tile) => ({
+                            ...tile,
+                            ...(layoutsById[tile.id] ? { layouts: layoutsById[tile.id] } : {}),
                         })),
                     } as DashboardType<QueryBasedInsightModel>
                 },

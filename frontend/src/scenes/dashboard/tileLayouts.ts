@@ -235,3 +235,38 @@ export const calculateLayouts = (
 
     return allLayouts
 }
+
+export function calculateAutoLayoutTiles(
+    tiles: DashboardTile<QueryBasedInsightModel>[],
+    columns: 1 | 2
+): Array<{ id: number; layouts: { sm: TileLayout } }> {
+    const smColumnCount = BREAKPOINT_COLUMN_COUNTS.sm
+    const tileWidth = columns === 1 ? smColumnCount : Math.floor(smColumnCount / 2)
+
+    const calculated = calculateLayouts(tiles)
+    const calculatedSm = (calculated.sm || []) as unknown as Array<{ i: string; h: number }>
+    const calculatedHeightById: Record<number, number> = Object.fromEntries(
+        calculatedSm.map((l) => [parseInt(l.i), l.h]).filter(([id]) => Number.isFinite(id))
+    )
+
+    const sortedTiles = sortTilesByLayout(tiles, 'sm')
+    const columnHeights = Array.from({ length: columns }, () => 0)
+
+    return sortedTiles.map((tile) => {
+        const height = tile.layouts?.sm?.h ?? calculatedHeightById[tile.id] ?? 5
+
+        let columnIndex = 0
+        if (columns === 2) {
+            columnIndex = columnHeights[0] <= columnHeights[1] ? 0 : 1
+        }
+
+        const x = columnIndex * tileWidth
+        const y = columnHeights[columnIndex]
+        columnHeights[columnIndex] += height
+
+        return {
+            id: tile.id,
+            layouts: { sm: { x, y, w: tileWidth, h: height } },
+        }
+    })
+}

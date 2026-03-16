@@ -358,6 +358,10 @@ export const eventUsageLogic = kea<eventUsageLogicType>([
             layoutZoom: number,
             source: 'button' | 'shortcut'
         ) => ({ dashboard, layoutZoom, source }),
+        reportDashboardAutoLayoutChanged: (dashboardId: number | null | undefined, columns: 1 | 2) => ({
+            dashboardId,
+            columns,
+        }),
         reportDashboardRefreshed: (
             dashboardId: number,
             dashboard: DashboardType<QueryBasedInsightModel> | null,
@@ -1146,6 +1150,12 @@ export const eventUsageLogic = kea<eventUsageLogicType>([
                 dashboard: sanitizeDashboard(dashboard),
                 layout_zoom: layoutZoom,
                 source,
+            })
+        },
+        reportDashboardAutoLayoutChanged: async ({ dashboardId, columns }) => {
+            posthog.capture('dashboard auto layout changed', {
+                dashboard_id: dashboardId,
+                columns,
             })
         },
         reportDashboardRefreshed: async ({

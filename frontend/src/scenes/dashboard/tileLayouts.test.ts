@@ -1,6 +1,6 @@
 import { Layout, LayoutItem } from 'react-grid-layout'
 
-import { calculateDuplicateLayout, calculateLayouts } from 'scenes/dashboard/tileLayouts'
+import { calculateAutoLayoutTiles, calculateDuplicateLayout, calculateLayouts } from 'scenes/dashboard/tileLayouts'
 
 import { DashboardLayoutSize, DashboardTile, QueryBasedInsightModel, TileLayout } from '~/types'
 
@@ -59,6 +59,43 @@ describe('calculating tile layouts', () => {
         expect(actual.xs?.map((layout) => layout.x)).toEqual([0, 0, 0, 0])
         // one col with equal height of 6 should be
         expect(actual.xs?.map((layout) => layout.y)).toEqual([0, 2, 4, 6])
+    })
+})
+
+describe('calculateAutoLayoutTiles', () => {
+    it('stacks tiles into a single column preserving order and heights', () => {
+        const tiles: DashboardTile<QueryBasedInsightModel>[] = [
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 1),
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 2),
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 3),
+        ]
+
+        const layouts = calculateAutoLayoutTiles(tiles, 1)
+
+        expect(layouts.map((l) => l.id)).toEqual([1, 2, 3])
+        // All tiles should be full-width in a single column (12x grid).
+        expect(layouts.map((l) => l.layouts.sm.x)).toEqual([0, 0, 0])
+        expect(layouts.map((l) => l.layouts.sm.w)).toEqual([12, 12, 12])
+        // Text tiles default to h=2, so they should stack at y: 0, 2, 4.
+        expect(layouts.map((l) => l.layouts.sm.y)).toEqual([0, 2, 4])
+    })
+
+    it('balances tiles between two columns by shortest column height', () => {
+        const tiles: DashboardTile<QueryBasedInsightModel>[] = [
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 1),
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 2),
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 3),
+        ]
+
+        const layouts = calculateAutoLayoutTiles(tiles, 2)
+
+        const byId = Object.fromEntries(layouts.map((l) => [l.id, l.layouts.sm]))
+
+        // Column width is half of 12-grid => 6.
+        expect(byId[1]).toMatchObject({ x: 0, y: 0, w: 6 })
+        expect(byId[2]).toMatchObject({ x: 6, y: 0, w: 6 })
+        // Third tile should go into the (now) shorter first column, below tile 1.
+        expect(byId[3]).toMatchObject({ x: 0, y: 2, w: 6 })
     })
 })
 
