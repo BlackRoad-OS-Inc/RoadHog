@@ -1,29 +1,16 @@
 import { useActions, useValues } from 'kea'
-import { useEffect, useState } from 'react'
 
 import { LemonButton, LemonInput } from '@posthog/lemon-ui'
-
-import { teamLogic } from 'scenes/teamLogic'
 
 import { snippetVersionPinLogic } from './snippetVersionPinLogic'
 
 export function SnippetVersionPin(): JSX.Element {
-    const { currentTeam } = useValues(teamLogic)
-    const { versionPin, resolvedVersion, loading, saving } = useValues(snippetVersionPinLogic)
-    const { loadVersionPin, saveVersionPin } = useActions(snippetVersionPinLogic)
-    const [localPin, setLocalPin] = useState(versionPin ?? '')
+    const { versionPinResponse, versionPinResponseLoading, localPin } = useValues(snippetVersionPinLogic)
+    const { saveVersionPin, setLocalPin } = useActions(snippetVersionPinLogic)
 
-    useEffect(() => {
-        if (currentTeam) {
-            loadVersionPin()
-        }
-    }, [currentTeam?.id, currentTeam, loadVersionPin])
-
-    useEffect(() => {
-        setLocalPin(versionPin ?? '')
-    }, [versionPin])
-
-    const hasChanged = (localPin || null) !== (versionPin || null)
+    const savedPin = versionPinResponse?.snippet_version_pin ?? ''
+    const resolvedVersion = versionPinResponse?.resolved_version
+    const hasChanged = (localPin || null) !== (savedPin || null)
 
     return (
         <div className="space-y-4 max-w-160">
@@ -33,13 +20,13 @@ export function SnippetVersionPin(): JSX.Element {
                     value={localPin}
                     onChange={setLocalPin}
                     placeholder="1 (default)"
-                    disabled={loading}
+                    disabled={versionPinResponseLoading}
                 />
                 <LemonButton
                     type="primary"
-                    onClick={() => saveVersionPin(localPin || null)}
-                    disabled={!hasChanged || saving}
-                    loading={saving}
+                    onClick={() => saveVersionPin({ pin: localPin || null })}
+                    disabled={!hasChanged || versionPinResponseLoading}
+                    loading={versionPinResponseLoading}
                 >
                     Save
                 </LemonButton>
