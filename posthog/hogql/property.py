@@ -849,7 +849,7 @@ def property_to_expr(
                                 "field": all_urls_field,
                             },
                         )
-                    elif session_array_field:
+                    elif session_array_field is not None:
                         return parse_expr(
                             "arrayExists(v -> {compare_op}, {field})",
                             {
@@ -876,7 +876,8 @@ def property_to_expr(
                                 "arrayExists(v -> {expr}, {key})",
                                 {"expr": multi_search_expr, "key": all_urls_field},
                             )
-                        else:  # session_array_field
+                        else:  # session_array_field is not None
+                            assert session_array_field is not None
                             return parse_expr(
                                 "arrayExists(v -> {expr}, {key})",
                                 {"expr": multi_search_expr, "key": session_array_field},
@@ -923,8 +924,8 @@ def property_to_expr(
                 "arrayExists(v -> {expr}, {key})",
                 {"expr": expr, "key": extracted_field},
             )
-        elif is_visited_page_property or session_array_field:
-            array_field = all_urls_field if is_visited_page_property else session_array_field
+        elif is_visited_page_property or session_array_field is not None:
+            array_field: ast.Expr = all_urls_field if is_visited_page_property else session_array_field
             # Handle IS_SET and IS_NOT_SET operators specially for arrays
             if operator == PropertyOperator.IS_SET:
                 return ast.CompareOperation(
