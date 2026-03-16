@@ -6,7 +6,7 @@ import structlog
 from posthog.constants import ENRICHED_DASHBOARD_INSIGHT_IDENTIFIER
 from posthog.models.dashboard import Dashboard
 from posthog.models.dashboard_templates import DashboardTemplate
-from posthog.models.dashboard_tile import DashboardTile, Text
+from posthog.models.dashboard_tile import DashboardTile, DashboardWidget, Text
 from posthog.models.insight import Insight
 from posthog.models.tag import Tag
 
@@ -498,8 +498,40 @@ def create_from_template(dashboard: Dashboard, template: DashboardTemplate, user
                 layouts=template_tile.get("layouts"),
                 body=template_tile.get("body"),
             )
+        elif template_tile["type"] == "WIDGET":
+            _create_tile_for_widget(
+                dashboard,
+                widget_type=template_tile.get("widget_type"),
+                config=template_tile.get("config", {}),
+                color=template_tile.get("color"),
+                layouts=template_tile.get("layouts"),
+                user=user,
+            )
         else:
             logger.error("dashboard_templates.creation.unknown_type", template=template)
+
+
+def _create_tile_for_widget(
+    dashboard: Dashboard,
+    widget_type: str,
+    config: dict,
+    layouts: dict,
+    color: Optional[str],
+    user=None,
+) -> None:
+    widget = DashboardWidget.objects.create(
+        widget_type=widget_type,
+        config=config,
+        team=dashboard.team,
+        created_by=user,
+        last_modified_by=user,
+    )
+    DashboardTile.objects.create(
+        widget=widget,
+        dashboard=dashboard,
+        layouts=layouts,
+        color=color,
+    )
 
 
 def _create_tile_for_text(dashboard: Dashboard, body: str, layouts: dict, color: Optional[str]) -> None:
