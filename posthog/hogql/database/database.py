@@ -248,13 +248,14 @@ def build_database_root_node(*, include_posthog_tables: bool = True) -> TableNod
         children = {
             **root_tables,
             "posthog": TableNode(
+                name="posthog",
                 children={
                     **clone_root_tables(),
                     # Add new tables here
                     "metrics": TableNode(name="metrics", table=MetricsTable()),
                     "metric_attributes": TableNode(name="metric_attributes", table=MetricAttributesTable()),
                     "metrics_kafka_metrics": TableNode(name="metrics_kafka_metrics", table=MetricsKafkaMetricsTable()),
-                }
+                },
             ),
             "system": SystemTables(),
             **children,
