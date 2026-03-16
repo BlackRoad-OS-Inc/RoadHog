@@ -1,6 +1,8 @@
+import json
+
 from posthog.test.base import APIBaseTest
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from posthog.utils import get_context_for_template
 
@@ -39,3 +41,23 @@ class TestGetContextForTemplate(APIBaseTest):
             )
 
         assert actual["stripe_public_key"] == "pk_test_12345"
+
+    @patch("posthog.utils.posthoganalytics.get_all_flags")
+    def test_bootstrap_includes_distinct_id_for_authenticated_users(self, mock_get_all_flags):
+        mock_get_all_flags.return_value = {"test-flag": True}
+
+        mock_request = MagicMock()
+        mock_request.user = self.user
+        mock_request.GET.get.return_value = None
+
+        with self.settings(PERSISTED_FEATURE_FLAGS=[]):
+            actual = get_context_for_template("layout", mock_request)
+
+        bootstrap = json.loads(actual["posthog_bootstrap"])
+
+        # Bootstrap should include distinctID and isIdentifiedID for authenticated users
+        # to ensure posthog-js uses the same identity for bootstrap and /decide calls
+        assert "featureFlags" in bootstrap
+        assert "distinctID" in bootstrap
+        assert bootstrap["isIdentifiedID"] is True
+        assert bootstrap["distinctID"] == str(self.user.distinct_id)

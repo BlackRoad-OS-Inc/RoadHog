@@ -549,8 +549,15 @@ def get_context_for_template(
             groups=groups,
             group_properties=group_properties,
         )
-        # don't forcefully set distinctID, as this breaks the link for anonymous users coming from `posthog.com`.
         posthog_bootstrap["featureFlags"] = feature_flags
+        # Include distinctID for authenticated users so posthog-js uses the same
+        # identity for both bootstrap flag reporting and /decide calls. This prevents
+        # duplicate $feature_flag_called events with different variants when
+        # hash(anonymous_id + flag_key) differs from hash(user_id + flag_key).
+        # Anonymous users from posthog.com are unaffected since posthog_distinct_id
+        # is only set when request.user is authenticated.
+        posthog_bootstrap["distinctID"] = posthog_distinct_id
+        posthog_bootstrap["isIdentifiedID"] = True
 
     # This allows immediate flag availability on the frontend, atleast for flags
     # that don't depend on any person properties. To get these flags, add person properties to the
