@@ -186,11 +186,13 @@ export class DashboardPage {
     }
 
     async findCardByTitle(title: string): Promise<Locator> {
-        const card = this.insightCards.filter({
-            has: this.page.locator('[data-attr="insight-card-title"]', { hasText: title }),
-        })
-        await expect(card.first()).toBeVisible({ timeout: 10000 })
-        return card.first()
+        const card = this.insightCards
+            .filter({
+                has: this.page.locator('[data-attr="insight-card-title"]', { hasText: title }),
+            })
+            .first()
+        await expect(card).toBeVisible({ timeout: 10000 })
+        return card
     }
 
     async openFirstTileMenu(): Promise<void> {
