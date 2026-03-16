@@ -12,7 +12,6 @@ import { LemonLabel } from 'lib/lemon-ui/LemonLabel/LemonLabel'
 import { LemonSelect } from 'lib/lemon-ui/LemonSelect'
 import { Spinner } from 'lib/lemon-ui/Spinner'
 import { organizationLogic } from 'scenes/organizationLogic'
-import { preflightLogic } from 'scenes/PreflightCheck/preflightLogic'
 import ScopeAccessSelector from 'scenes/settings/user/scopes/ScopeAccessSelector'
 
 import { AvailableFeature } from '~/types'
@@ -113,9 +112,7 @@ export const OAuthAuthorize = (): JSX.Element => {
         isMcpResource,
         resourceScopesLoading,
         showCreateProject,
-        showCreateOrganization,
         newProjectLoading,
-        newOrganizationLoading,
         selectedOrganization,
         user,
     } = useValues(oauthAuthorizeLogic)
@@ -123,28 +120,17 @@ export const OAuthAuthorize = (): JSX.Element => {
         cancel,
         submitOauthAuthorization,
         createNewProject,
-        createNewOrganization,
         setShowCreateProject,
-        setShowCreateOrganization,
         setSelectedOrganization,
         setOauthAuthorizationValue,
     } = useActions(oauthAuthorizeLogic)
 
     const { guardAvailableFeature } = useValues(upgradeModalLogic)
     const { currentOrganization, projectCreationForbiddenReason } = useValues(organizationLogic)
-    const { preflight } = useValues(preflightLogic)
-
-    const canCreateOrg = preflight?.can_create_org !== false
 
     const handleShowCreateProject = (): void => {
         guardAvailableFeature(AvailableFeature.ORGANIZATIONS_PROJECTS, () => setShowCreateProject(true), {
             currentUsage: currentOrganization?.teams?.length,
-        })
-    }
-
-    const handleShowCreateOrganization = (): void => {
-        guardAvailableFeature(AvailableFeature.ORGANIZATIONS_PROJECTS, () => setShowCreateOrganization(true), {
-            guardOnCloud: false,
         })
     }
 
@@ -242,41 +228,17 @@ export const OAuthAuthorize = (): JSX.Element => {
                             <>
                                 <div className="flex flex-col gap-2">
                                     <LemonLabel>Organization</LemonLabel>
-                                    {showCreateOrganization ? (
-                                        <InlineCreateForm
-                                            label="New organization name"
-                                            placeholder="e.g. Acme Inc."
-                                            loading={newOrganizationLoading}
-                                            onSubmit={createNewOrganization}
-                                            onCancel={() => setShowCreateOrganization(false)}
-                                        />
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex-1 min-w-0">
-                                                <LemonSelect
-                                                    fullWidth
-                                                    placeholder="Select organization"
-                                                    options={orgOptions}
-                                                    value={selectedOrganization}
-                                                    onChange={(val) => {
-                                                        if (val) {
-                                                            setSelectedOrganization(val)
-                                                        }
-                                                    }}
-                                                />
-                                            </div>
-                                            <LemonButton
-                                                className="shrink-0"
-                                                type="secondary"
-                                                size="small"
-                                                icon={<IconPlus />}
-                                                disabledReason={
-                                                    !canCreateOrg ? 'Organization creation is disabled' : undefined
-                                                }
-                                                onClick={handleShowCreateOrganization}
-                                            />
-                                        </div>
-                                    )}
+                                    <LemonSelect
+                                        fullWidth
+                                        placeholder="Select organization"
+                                        options={orgOptions}
+                                        value={selectedOrganization}
+                                        onChange={(val) => {
+                                            if (val) {
+                                                setSelectedOrganization(val)
+                                            }
+                                        }}
+                                    />
                                 </div>
 
                                 <div className="flex flex-col gap-2">

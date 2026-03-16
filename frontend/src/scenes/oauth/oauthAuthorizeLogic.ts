@@ -91,11 +91,8 @@ export const oauthAuthorizeLogic = kea<oauthAuthorizeLogicType>([
             preferredTeamId,
         }),
         setShowCreateProject: (show: boolean) => ({ show }),
-        setShowCreateOrganization: (show: boolean) => ({ show }),
         createNewProject: (name: string) => ({ name }),
-        createNewOrganization: (name: string) => ({ name }),
         setNewProjectLoading: (loading: boolean) => ({ loading }),
-        setNewOrganizationLoading: (loading: boolean) => ({ loading }),
     }),
     loaders({
         allTeams: [
@@ -188,24 +185,6 @@ export const oauthAuthorizeLogic = kea<oauthAuthorizeLogicType>([
                 actions.setNewProjectLoading(false)
             }
         },
-        createNewOrganization: async ({ name }) => {
-            actions.setNewOrganizationLoading(true)
-            try {
-                const org = await api.create('api/organizations/', { name })
-                lemonToast.success(`Organization "${name}" created`)
-                actions.setShowCreateOrganization(false)
-                // Reload user to get the new org in user.organizations, then reload teams
-                await userLogic.asyncActions.loadUser()
-                await oauthAuthorizeLogic.asyncActions.loadAllTeams()
-                if (org?.id) {
-                    actions.setSelectedOrganization(org.id)
-                }
-            } catch (e: any) {
-                lemonToast.error(e.detail || 'Failed to create organization')
-            } finally {
-                actions.setNewOrganizationLoading(false)
-            }
-        },
     })),
     reducers({
         scopes: [
@@ -262,22 +241,10 @@ export const oauthAuthorizeLogic = kea<oauthAuthorizeLogicType>([
                 setShowCreateProject: (_, { show }) => show,
             },
         ],
-        showCreateOrganization: [
-            false,
-            {
-                setShowCreateOrganization: (_, { show }) => show,
-            },
-        ],
         newProjectLoading: [
             false,
             {
                 setNewProjectLoading: (_, { loading }) => loading,
-            },
-        ],
-        newOrganizationLoading: [
-            false,
-            {
-                setNewOrganizationLoading: (_, { loading }) => loading,
             },
         ],
     }),
