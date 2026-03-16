@@ -9,6 +9,7 @@ import EXPERIMENT_WITH_RATIO_METRIC from '~/mocks/fixtures/api/experiments/exper
 import EXPOSURE_QUERY_RESULT from '~/mocks/fixtures/api/experiments/exposure_query_result.json'
 import RATIO_METRIC_RESULT from '~/mocks/fixtures/api/experiments/ratio_metric_result.json'
 import { NodeKind } from '~/queries/schema/schema-general'
+import { METRICS_CHART_TICK_LABELS_SELECTOR } from '~/scenes/experiments/MetricsView/new/constants'
 
 const meta: Meta = {
     component: App,
@@ -19,7 +20,7 @@ const meta: Meta = {
         mockDate: '2025-01-27',
         pageUrl: urls.experiment(EXPERIMENT_WITH_RATIO_METRIC.id),
         testOptions: {
-            waitForSelector: '[data-attr="metrics-chart-tick-labels"]',
+            waitForSelector: METRICS_CHART_TICK_LABELS_SELECTOR,
         },
     },
     decorators: [

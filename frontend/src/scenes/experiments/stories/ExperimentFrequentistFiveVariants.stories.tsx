@@ -14,6 +14,7 @@ import {
     isExperimentMeanMetric,
 } from '~/queries/schema/schema-general'
 import { App } from '~/scenes/App'
+import { METRICS_CHART_TICK_LABELS_SELECTOR } from '~/scenes/experiments/MetricsView/new/constants'
 import { urls } from '~/scenes/urls'
 
 const meta: Meta = {
@@ -25,7 +26,7 @@ const meta: Meta = {
         mockDate: '2025-01-27',
         pageUrl: urls.experiment(EXPERIMENT_FREQUENTIST_FIVE_VARIANTS.id),
         testOptions: {
-            waitForSelector: '[data-attr="metrics-chart-tick-labels"]',
+            waitForSelector: METRICS_CHART_TICK_LABELS_SELECTOR,
         },
     },
     decorators: [

@@ -4,7 +4,13 @@ import { ExperimentStatsMethod } from '~/types'
 
 import { useSvgResizeObserver } from '../hooks/useSvgResizeObserver'
 import { getNiceTickValues } from '../shared/utils'
-import { SVG_EDGE_MARGIN, TICK_FONT_SIZE_NEW, TICK_PANEL_HEIGHT, VIEW_BOX_WIDTH } from './constants'
+import {
+    METRICS_CHART_TICK_LABELS_DATA_ATTR,
+    SVG_EDGE_MARGIN,
+    TICK_FONT_SIZE_NEW,
+    TICK_PANEL_HEIGHT,
+    VIEW_BOX_WIDTH,
+} from './constants'
 import { TickLabels } from './TickLabels'
 import { useAxisScale } from './useAxisScale'
 
@@ -64,7 +70,7 @@ export function TableHeader({ axisRange, statsMethod }: TableHeaderProps): JSX.E
                                 viewBox={`0 0 ${VIEW_BOX_WIDTH} ${TICK_PANEL_HEIGHT + 10}`}
                                 preserveAspectRatio="xMidYMid meet"
                                 className="w-full"
-                                data-attr="metrics-chart-tick-labels"
+                                data-attr={METRICS_CHART_TICK_LABELS_DATA_ATTR}
                                 style={{
                                     minHeight: `${TICK_PANEL_HEIGHT + 10}px`,
                                 }}

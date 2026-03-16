@@ -17,3 +17,7 @@ export const MAX_AXIS_RANGE = 1.5 // Cap at ±150% to prevent outliers from squi
 
 // New temporary values until the new table have been fully rolled out
 export const TICK_FONT_SIZE_NEW = 11
+
+// Data attributes (used in component + story waitForSelector)
+export const METRICS_CHART_TICK_LABELS_DATA_ATTR = 'metrics-chart-tick-labels'
+export const METRICS_CHART_TICK_LABELS_SELECTOR = `[data-attr="${METRICS_CHART_TICK_LABELS_DATA_ATTR}"]`

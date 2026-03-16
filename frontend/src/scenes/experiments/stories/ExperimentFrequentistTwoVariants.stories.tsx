@@ -10,6 +10,7 @@ import FUNNEL_METRIC_RESULT from '~/mocks/fixtures/api/experiments/experiment_fr
 import MEAN_METRIC_RESULT from '~/mocks/fixtures/api/experiments/experiment_frequentist_two_variants_mean_metric_result.json'
 import EXPOSURE_QUERY_RESULT from '~/mocks/fixtures/api/experiments/exposure_query_result.json'
 import { NodeKind, isExperimentFunnelMetric, isExperimentMeanMetric } from '~/queries/schema/schema-general'
+import { METRICS_CHART_TICK_LABELS_SELECTOR } from '~/scenes/experiments/MetricsView/new/constants'
 
 const meta: Meta = {
     component: App,
@@ -20,7 +21,7 @@ const meta: Meta = {
         mockDate: '2025-01-27',
         pageUrl: urls.experiment(EXPERIMENT_FREQUENTIST_TWO_VARIANTS.id),
         testOptions: {
-            waitForSelector: '[data-attr="metrics-chart-tick-labels"]',
+            waitForSelector: METRICS_CHART_TICK_LABELS_SELECTOR,
         },
     },
     decorators: [

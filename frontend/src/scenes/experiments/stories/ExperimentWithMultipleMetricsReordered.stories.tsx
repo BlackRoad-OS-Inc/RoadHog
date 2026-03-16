@@ -16,6 +16,7 @@ import {
     isExperimentMeanMetric,
     isExperimentRatioMetric,
 } from '~/queries/schema/schema-general'
+import { METRICS_CHART_TICK_LABELS_SELECTOR } from '~/scenes/experiments/MetricsView/new/constants'
 
 const meta: Meta = {
     component: App,
@@ -26,7 +27,7 @@ const meta: Meta = {
         mockDate: '2025-01-27',
         pageUrl: urls.experiment(EXPERIMENT_WITH_MULTIPLE_METRICS_REORDERED.id),
         testOptions: {
-            waitForSelector: '[data-attr="metrics-chart-tick-labels"]',
+            waitForSelector: METRICS_CHART_TICK_LABELS_SELECTOR,
         },
     },
     decorators: [
