@@ -374,7 +374,10 @@ def agentic_authorize(request: Any) -> HttpResponseBase:
         return HttpResponseRedirect(f"{settings.SITE_URL}?error=expired_or_invalid_state")
 
     if request.user.email != pending["email"]:
-        return HttpResponseRedirect(f"{settings.SITE_URL}?error=email_mismatch")
+        expected_email = pending["email"]
+        masked = expected_email[:2] + "***@" + expected_email.split("@")[1] if "@" in expected_email else "***"
+        params = urlencode({"error": "email_mismatch", "expected": masked})
+        return HttpResponseRedirect(f"{settings.SITE_URL}?{params}")
 
     cache.delete(pending_key)
 

@@ -49,6 +49,7 @@ class TestAgenticAuthorize(APIBaseTest):
         res = self.client.get("/api/agentic/authorize?state=state_mismatch")
         assert res.status_code == 302
         assert "error=email_mismatch" in res["Location"]
+        assert "expected=ot%2A%2A%2A%40example.com" in res["Location"]
 
     def test_redirects_to_callback_with_code(self):
         self._set_pending_auth("state_ok", self.user.email)
