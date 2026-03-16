@@ -175,7 +175,7 @@ export const oauthAuthorizeLogic = kea<oauthAuthorizeLogicType>([
                 const existingIds = new Set((values.allTeams ?? []).map((t) => t.id))
                 await oauthAuthorizeLogic.asyncActions.loadAllTeams()
                 // Find the newly created team and auto-select it
-                const newTeam = (values.allTeams ?? []).find((t) => !existingIds.has(t.id))
+                const newTeam = (values.allTeams ?? []).find((t) => !existingIds.has(t.id) && t.organization === values.selectedOrganization)
                 if (newTeam) {
                     actions.setOauthAuthorizationValue('scoped_teams', [newTeam.id])
                 }
