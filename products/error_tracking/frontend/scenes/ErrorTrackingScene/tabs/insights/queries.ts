@@ -194,7 +194,7 @@ export function buildSessionEndingIssuesQuery(strategy: SessionEndingStrategy, t
     ),
     exception_ended AS (
         SELECT
-            ${strategy === 'strict' ? "argMaxIf(issue_id, timestamp, event = '$exception')" : 'last_exception_issue_id'} as issue_id,
+            last_exception_issue_id as issue_id,
             count() as sessions,
             groupArray(sid) as session_ids
         FROM session_data
