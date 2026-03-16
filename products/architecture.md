@@ -295,6 +295,8 @@ The `interfaces` setting in `tach.toml` controls which paths inside a product ot
 
 During migration, existing cross-product model imports are tracked in `tach.toml` `depends_on`. The goal is to replace them with facade calls over time.
 
+`hogli product:bootstrap` automatically configures `interfaces` for new products, and `hogli product:lint` verifies that isolated products have `interfaces` declared in `tach.toml`.
+
 ### Django Foreign Keys
 
 Django allows `ForeignKey` relationships across products. This is still allowed, but ForeignKey relations create **implicit reverse dependencies**, even if you never use them:
