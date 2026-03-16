@@ -1,14 +1,16 @@
-import { useValues } from 'kea'
+import { useActions, useValues } from 'kea'
 import { PropsWithChildren, useMemo, useState } from 'react'
 
-import { LemonButton } from '@posthog/lemon-ui'
+import { LemonButton, LemonLabel } from '@posthog/lemon-ui'
 
 import api from 'lib/api'
 import { RestrictionScope, useRestrictedArea } from 'lib/components/RestrictedArea'
 import { TeamMembershipLevel } from 'lib/constants'
+import { GitHubRepositoryPicker } from 'lib/integrations/GitHubIntegrationHelpers'
 import { integrationsLogic } from 'lib/integrations/integrationsLogic'
 import { IntegrationView } from 'lib/integrations/IntegrationView'
 import { GitLabSetupModal } from 'scenes/integrations/gitlab/GitLabSetupModal'
+import { relevantRepositoryLogic } from 'scenes/settings/environment/relevantRepositoryLogic'
 import { urls } from 'scenes/urls'
 
 import { IntegrationKind, IntegrationType } from '~/types'
@@ -30,14 +32,28 @@ export function LinearIntegration(): JSX.Element {
 }
 
 export function GithubIntegration(): JSX.Element {
-    return <OAuthIntegration kind="github" connectText="Connect organization" />
+    return (
+        <OAuthIntegration
+            kind="github"
+            connectText="Connect organization"
+            extraContent={<RelevantRepositoryPicker />}
+        />
+    )
 }
 
 export function JiraIntegration(): JSX.Element {
     return <OAuthIntegration kind="jira" connectText="Connect site" />
 }
 
-const OAuthIntegration = ({ kind, connectText }: { kind: IntegrationKind; connectText: string }): JSX.Element => {
+const OAuthIntegration = ({
+    kind,
+    connectText,
+    extraContent,
+}: {
+    kind: IntegrationKind
+    connectText: string
+    extraContent?: JSX.Element
+}): JSX.Element => {
     const restrictedReason = useRestrictedArea({
         scope: RestrictionScope.Project,
         minimumAccessLevel: TeamMembershipLevel.Admin,
@@ -50,7 +66,7 @@ const OAuthIntegration = ({ kind, connectText }: { kind: IntegrationKind; connec
     })
 
     return (
-        <Integration kind={kind}>
+        <Integration kind={kind} extraContent={extraContent}>
             <LemonButton
                 type="secondary"
                 disableClientSideRouting
@@ -63,7 +79,11 @@ const OAuthIntegration = ({ kind, connectText }: { kind: IntegrationKind; connec
     )
 }
 
-const Integration = ({ kind, children }: PropsWithChildren<{ kind: IntegrationKind }>): JSX.Element => {
+const Integration = ({
+    kind,
+    children,
+    extraContent,
+}: PropsWithChildren<{ kind: IntegrationKind; extraContent?: JSX.Element }>): JSX.Element => {
     const integrations = useIntegrations(kind)
 
     return (
@@ -73,6 +93,36 @@ const Integration = ({ kind, children }: PropsWithChildren<{ kind: IntegrationKi
                     <IntegrationView key={integration.id} integration={integration} />
                 ))}
                 <div className="flex">{children}</div>
+                {integrations.length > 0 && extraContent}
+            </div>
+        </div>
+    )
+}
+
+function RelevantRepositoryPicker(): JSX.Element | null {
+    const integrations = useIntegrations('github')
+    const { selectedRepository } = useValues(relevantRepositoryLogic)
+    const { setSelectedRepository } = useActions(relevantRepositoryLogic)
+
+    if (integrations.length === 0) {
+        return null
+    }
+
+    const integrationId = integrations[0].id
+
+    return (
+        <div className="flex flex-col gap-y-1">
+            <LemonLabel>Relevant repository</LemonLabel>
+            <p className="text-secondary text-xs mb-1">
+                Select the repository where your product code lives. This is used by features like auto-updating event
+                definitions from code.
+            </p>
+            <div className="max-w-120">
+                <GitHubRepositoryPicker
+                    integrationId={integrationId}
+                    value={selectedRepository ?? ''}
+                    onChange={(value) => setSelectedRepository(value || null)}
+                />
             </div>
         </div>
     )

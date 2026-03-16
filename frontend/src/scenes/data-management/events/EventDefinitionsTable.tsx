@@ -1,7 +1,7 @@
 import { useActions, useValues } from 'kea'
 import { useState } from 'react'
 
-import { IconApps, IconPlus } from '@posthog/icons'
+import { IconApps, IconPlus, IconSparkles } from '@posthog/icons'
 import { LemonButton, LemonInput, LemonSelect, LemonSelectOptions, Link } from '@posthog/lemon-ui'
 
 import { ObjectTags } from 'lib/components/ObjectTags/ObjectTags'
@@ -17,6 +17,7 @@ import { DefinitionHeader, getEventDefinitionIcon } from 'scenes/data-management
 import { EventDefinitionModal } from 'scenes/data-management/events/EventDefinitionModal'
 import { EventDefinitionProperties } from 'scenes/data-management/events/EventDefinitionProperties'
 import { eventDefinitionsTableLogic } from 'scenes/data-management/events/eventDefinitionsTableLogic'
+import { updateEventDefinitionsLogic } from 'scenes/data-management/events/updateEventDefinitionsLogic'
 import { sceneConfigurations } from 'scenes/scenes'
 import { Scene } from 'scenes/sceneTypes'
 import { urls } from 'scenes/urls'
@@ -42,6 +43,8 @@ const eventTypeOptions: LemonSelectOptions<EventDefinitionType> = [
 export function EventDefinitionsTable(): JSX.Element {
     const { eventDefinitions, eventDefinitionsLoading, filters } = useValues(eventDefinitionsTableLogic)
     const { loadEventDefinitions, setFilters } = useActions(eventDefinitionsTableLogic)
+    const { updateResultLoading } = useValues(updateEventDefinitionsLogic)
+    const { updateEventDefinitionsFromCode } = useActions(updateEventDefinitionsLogic)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
     const columns: LemonTableColumns<EventDefinition> = [
@@ -183,6 +186,15 @@ export function EventDefinitionsTable(): JSX.Element {
                         }}
                         size="small"
                     />
+                    <LemonButton
+                        type="secondary"
+                        icon={<IconSparkles />}
+                        onClick={() => updateEventDefinitionsFromCode()}
+                        loading={updateResultLoading}
+                        data-attr="update-event-definitions-from-code"
+                    >
+                        Update from code
+                    </LemonButton>
                     <LemonButton
                         type="primary"
                         icon={<IconPlus />}
