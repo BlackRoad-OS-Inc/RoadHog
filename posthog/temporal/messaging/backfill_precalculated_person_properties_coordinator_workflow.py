@@ -128,7 +128,7 @@ async def get_person_uuid_range_activity(
             FROM person
             WHERE team_id = %(team_id)s
             GROUP BY id
-            HAVING max(is_deleted) = 0
+            HAVING argMax(is_deleted, version) = 0
         )
         FORMAT JSONEachRow
     """
@@ -180,18 +180,17 @@ def generate_uuid_ranges(min_uuid: str, max_uuid: str, num_ranges: int) -> list[
         # Edge case: all UUIDs are the same or invalid range
         return [(min_uuid, max_uuid)]
 
-    # Calculate range size
-    range_size = (max_int - min_int) // num_ranges
-    if range_size == 0:
+    # Distribute total range evenly across all partitions to balance load
+    total_range = max_int - min_int
+    if total_range < num_ranges:
         # Very small range, reduce parallelism and use a single full range
         return [(min_uuid, max_uuid)]
 
     ranges = []
     for i in range(num_ranges):
-        start_int = min_int + i * range_size
+        start_int = min_int + (i * total_range) // num_ranges
         if i < num_ranges - 1:
-            # Make ranges non-overlapping: end just before the next range's start
-            end_int = min_int + (i + 1) * range_size - 1
+            end_int = min_int + ((i + 1) * total_range) // num_ranges - 1
         else:
             # Last range includes the max_int boundary
             end_int = max_int
