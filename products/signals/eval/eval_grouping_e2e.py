@@ -49,7 +49,8 @@ from products.signals.backend.temporal.grouping import (
     match_signal_to_report,
     verify_match_specificity,
 )
-from products.signals.backend.temporal.safety_judge import judge_report_safety
+from products.signals.backend.temporal.report_safety_judge import judge_report_safety
+from products.signals.backend.temporal.safety_filter import safety_filter
 from products.signals.backend.temporal.summarize_signals import summarize_signals
 from products.signals.backend.temporal.types import (
     ExistingReportMatch,
@@ -214,6 +215,13 @@ class TestGroupingPipeline:
                 self.progress.signal_dropped()
                 return
 
+            safety_result = await safety_filter(description)
+            await self._capture_safety_filter(case, safety_result)
+
+            if not safety_result.safe:
+                self.progress.signal_dropped()
+                return
+
             async with self._match_lock:
                 match_result, queries = await self._match(record_id, description, case)
                 await self._persist_signal(record_id, description, case, match_result, queries)
@@ -334,6 +342,27 @@ class TestGroupingPipeline:
                 return None
 
         return output.description or None
+
+    async def _capture_safety_filter(self, case: EvalSignalCase, result):
+        passed = result.safe == case.safe
+        self._capture(
+            eval_name="signal-safety-filter",
+            item_name=f"filter-{case.group_index}-{case.signal_index}",
+            input=case.signal.content.description,
+            output="SAFE" if result.safe else f"UNSAFE ({result.threat_type})",
+            expected="SAFE" if case.safe else "UNSAFE",
+            metrics=[
+                EvalMetric(
+                    name="correct_classification",
+                    result_type="binary",
+                    score=1.0 if passed else 0.0,
+                    score_min=0,
+                    score_max=1,
+                    reasoning=result.explanation,
+                ),
+            ],
+            passed=passed,
+        )
 
     async def _capture_pre_emit_actionability(self, case: EvalSignalCase, thoughts: str | None, outcome: bool):
         passed = outcome == case.actionable

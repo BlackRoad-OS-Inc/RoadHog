@@ -128,7 +128,7 @@ Runs when a report is promoted to `candidate` status. Summarizes the signal grou
 2. **Mark in-progress** in Postgres and advance `signals_at_run` by `SIGNALS_AT_RUN_INCREMENT` (3), so the report must accumulate that many new signals before it can be promoted and re-summarised again → `mark_report_in_progress_activity`
 3. **Summarize** signals into a title + summary via LLM → `summarize_signals_activity` (`summarize_signals.py`)
 4. **Safety judge** + **Actionability judge** — run **concurrently** via `asyncio.gather`:
-   - **Safety judge** → `safety_judge_activity` (`safety_judge.py`) — assess for prompt injection / manipulation
+   - **Safety judge** → `report_safety_judge_activity` (`report_safety_judge.py`) — assess for prompt injection / manipulation
    - **Actionability judge** → `actionability_judge_activity` (`actionability_judge.py`) — assess whether actionable by a coding agent
 5. **Evaluate results** (safety checked first):
    - If **unsafe** → `mark_report_failed_activity` with error, **stop**
@@ -415,7 +415,7 @@ Temperature: 0.2 (more deterministic).
 
 Takes a list of signals and produces a title (max 75 chars) + 2-4 sentence summary. The report is designed for consumption by both humans and coding agents. Temperature: 0.2.
 
-#### `judge_report_safety()` (`backend/temporal/safety_judge.py`)
+#### `judge_report_safety()` (`backend/temporal/report_safety_judge.py`)
 
 Assesses the report title, summary, and underlying signals for prompt injection and manipulation attempts. Checks for injected instructions targeting the coding agent, attempts to exfiltrate data, disable security features, introduce backdoors, or override system prompts.
 
@@ -529,7 +529,7 @@ products/signals/
 │       ├── reingestion.py          # SignalReportReingestionWorkflow + soft-delete/delete/reingest activities
 │       ├── summary.py              # SignalReportSummaryWorkflow + state management activities
 │       ├── summarize_signals.py    # Summarization LLM prompt + activity
-│       ├── safety_judge.py         # Safety judge LLM prompt + activity (stores artefact, uses thinking)
+│       ├── report_safety_judge.py  # Report-level safety judge LLM prompt + activity (stores artefact, uses thinking)
 │       ├── actionability_judge.py  # Actionability judge LLM prompt + activity (stores artefact, uses thinking)
 │       └── types.py                # Shared dataclasses + signal rendering helpers
 └── frontend/                       # Frontend components (not covered here)
