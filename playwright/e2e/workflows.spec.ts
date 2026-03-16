@@ -85,8 +85,10 @@ test.describe('Workflows', () => {
             await page.waitForSelector('[data-attr="message-channels"]', { timeout: 10000 })
             await expect(page.getByText('Loading', { exact: true })).not.toBeVisible({ timeout: 5000 })
 
-            // Wait for loading skeletons to disappear
-            await expect(page.locator('[data-attr="message-channels"] .LemonSkeleton').first()).not.toBeVisible()
+            // Wait for all loading skeletons to be removed from the DOM
+            await expect(page.locator('[data-attr="message-channels"] .LemonSkeleton')).not.toBeAttached({
+                timeout: 10000,
+            })
 
             await expect(page).toHaveScreenshot('channels-tab.png', { fullPage: true })
         })
