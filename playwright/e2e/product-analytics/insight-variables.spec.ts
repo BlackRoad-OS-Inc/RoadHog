@@ -11,7 +11,8 @@ test.describe('insight variables', () => {
 
         // Add a temporary override
         await page.goto(page.url() + '?query_variables=%7B"variable_4"%3A40%7D%20')
-        await expect(page.locator('.InsightCard').first()).toBeVisible()
+        // Wait for all insight cards to render before asserting titles
+        await expect(page.locator('.InsightCard')).toHaveCount(5, { timeout: 30000 })
 
         const cardForDefaultVariable = await dashboard.findCardByTitle('Variable default')
         await expect(cardForDefaultVariable.locator('.BoldNumber')).toHaveText('10')
