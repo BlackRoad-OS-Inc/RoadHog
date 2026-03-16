@@ -96,6 +96,7 @@ export function Playlist({
         filters,
         activeSessionRecordingId,
         totalFiltersCount,
+        summarizeDisabledReason,
         sessionRecordingsResponseLoading,
         visiblePinnedRecordings: pinnedRecordings,
         otherRecordings,
@@ -333,7 +334,7 @@ export function Playlist({
                             fullWidth
                             size="small"
                             className="mt-2"
-                            disabledReason={!firstItem ? 'No recordings in the list' : undefined}
+                            disabledReason={summarizeDisabledReason}
                         >
                             Summarize these recordings
                             <LemonTag type="warning" size="small" className="ml-auto uppercase">

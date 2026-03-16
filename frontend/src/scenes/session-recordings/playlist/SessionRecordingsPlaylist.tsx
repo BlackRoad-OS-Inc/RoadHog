@@ -28,6 +28,7 @@ export function SessionRecordingsPlaylist({
         ...props,
         autoPlay: props.autoPlay ?? true,
         onlyPinned: props.type === 'collection',
+        type: props.type,
     }
 
     const { sidePanelWidth } = useValues(panelLayoutLogic)
