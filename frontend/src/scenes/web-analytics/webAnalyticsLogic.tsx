@@ -19,6 +19,7 @@ import { tabAwareUrlToAction } from 'lib/logic/scenes/tabAwareUrlToAction'
 import {
     UnexpectedNeverError,
     getDefaultInterval,
+    getZoomInterval,
     isNotNil,
     isValidRelativeOrAbsoluteDate,
     objectsEqual,
@@ -2487,7 +2488,7 @@ export const webAnalyticsLogic = kea<webAnalyticsLogicType>([
                         interval: values.dateFilter.interval,
                     })
                 }
-                actions.setDatesAndInterval(dateFrom, dateTo, getDefaultInterval(dateFrom, dateTo))
+                actions.setDatesAndInterval(dateFrom, dateTo, getZoomInterval(dateFrom, dateTo))
             },
             resetZoom: () => {
                 const preZoom = values.preZoomDateFilter

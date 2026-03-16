@@ -11,7 +11,7 @@ import { Intervals, intervals } from 'lib/components/IntervalFilter/intervals'
 import { parseProperties } from 'lib/components/PropertyFilters/utils'
 import { NON_TIME_SERIES_DISPLAY_TYPES, NON_VALUES_ON_SERIES_DISPLAY_TYPES } from 'lib/constants'
 import { dayjs } from 'lib/dayjs'
-import { dateMapping, is12HoursOrLess, isLessThan2Days } from 'lib/utils'
+import { dateMapping, getZoomInterval, is12HoursOrLess, isLessThan2Days } from 'lib/utils'
 import { databaseTableListLogic } from 'scenes/data-management/database/databaseTableListLogic'
 import { dataThemeLogic } from 'scenes/dataThemeLogic'
 import { getClampedFunnelStepRange } from 'scenes/funnels/funnelUtils'
@@ -832,13 +832,7 @@ const handleQuerySourceUpdateSideEffects = (
         const { date_from, date_to } = { ...currentState.dateRange, ...update.dateRange }
 
         if (date_from && date_to && dayjs(date_from).isValid() && dayjs(date_to).isValid()) {
-            if (dayjs(date_to).diff(dayjs(date_from), 'day') <= 3) {
-                ;(mergedUpdate as TrendsQuery).interval = 'hour'
-            } else if (dayjs(date_to).diff(dayjs(date_from), 'month') <= 3) {
-                ;(mergedUpdate as TrendsQuery).interval = 'day'
-            } else {
-                ;(mergedUpdate as TrendsQuery).interval = 'month'
-            }
+            ;(mergedUpdate as TrendsQuery).interval = getZoomInterval(date_from, date_to)
         } else {
             // get a defaultInterval for dateOptions that have a default value
             const selectedDateMapping = dateMapping.find(

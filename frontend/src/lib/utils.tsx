@@ -1572,6 +1572,23 @@ export const getDefaultInterval = (dateFrom: string | null, dateTo: string | nul
     return 'day'
 }
 
+/** Pick an interval appropriate for an absolute date range (e.g. after drag-to-zoom). */
+export const getZoomInterval = (dateFrom: string, dateTo: string): IntervalType => {
+    const from = dayjs(dateFrom)
+    const to = dayjs(dateTo)
+    const days = to.diff(from, 'day')
+    if (days <= 3) {
+        return 'hour'
+    }
+    if (days <= 21) {
+        return 'day'
+    }
+    if (to.diff(from, 'month') <= 3) {
+        return 'week'
+    }
+    return 'month'
+}
+
 /* If the interval changes, check if it's compatible with the selected dates, and return new dates
  * from a map of sensible defaults if not */
 export const areDatesValidForInterval = (
