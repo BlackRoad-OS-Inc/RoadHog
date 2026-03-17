@@ -1,0 +1,68 @@
+Hey team,
+
+I'm going through the AI features from product teams to give you some ideas on making your product agent-friendly in Q2 and taking it further to product autonomy. Here are some ideas and suggestions from PostHog AI's perspective — feel free to ignore this if you think it's not relevant.
+
+*Two things to invest in Q2 (in order):*
+
+1. *MCP tools* — basic atomic capabilities that let agents interact with your product. Think of these as the API surface agents can reach. Make sure yours are covered: agents should be able to read, create, and update the core entities in your product.
+2. *Skills* — the most impactful thing you can do for agents right now. Skills are instructions that teach agents *how* to accomplish goals with your product and other products: what sequence of steps to take, what to look for, how to interpret results. Unlike docs (which assume a human clicking through UI), skills are written for agents working through APIs and limited environments.
+
+*Once your product is agent-interactable*, the next steps unlock naturally:
+
+- *Automations & background agents (Q2)* — recurring tasks the coding agent handles on a schedule or from the UI
+- *Signals (Q3)* — your product becomes proactive, reacting to events and triggering agents automatically
+
+If you have any questions or feedback, message #team-posthog-ai or DM me.
+
+Below I've gone through your product areas with specific suggestions.
+
+---
+
+*MCP (Q2)* – basic capabilities for AI agents to interact with your product:
+
+- You already have the basics covered and code-generated (nice!): `list`, `get`, `create`, `update`, `delete`
+- Missing capabilities (currently disabled in `products/feature_flags/mcp/tools.yaml`):
+  - `GET /feature_flags/{id}/status/` — lets agents check flag health and evaluation status
+  - `GET /feature_flags/{id}/dependent_flags/` — understand flag dependency chains before making changes
+  - `POST /feature_flags/user_blast_radius/` — assess impact before changing rollout conditions
+  - `GET /feature_flags/evaluation_reasons/` — debug why a flag evaluates a certain way for a user
+  - `GET /feature_flags/{id}/activity/` — audit trail for a flag
+  - `POST /organizations/{org_id}/feature_flags/copy_flags/` — cross-project flag management
+- These are already implemented as API endpoints — just need to be enabled in the MCP YAML config.
+
+*SQL tables* – helps the agent to effectively search data across products:
+
+- `system.feature_flags` is already implemented with: id, team_id, key, name, filters, rollout_percentage, created_at, deleted
+- Consider adding more fields:
+  - `active` — whether the flag is currently active
+  - `evaluation_runtime` — server vs. client evaluation
+  - `last_called_at` — critical for stale flag detection
+
+*Skills (Q2)* – instructions on achieving specific results or jobs-to-be-done:
+
+- Create a feature flag — guide the agent through choosing flag type (boolean vs. multivariant), setting up targeting rules (property filters, cohorts, percentage rollout), and evaluation runtime (server/client)
+- Roll out a feature flag — gradual rollout strategy: start at X%, monitor errors/metrics, increase to Y%, rinse and repeat until 100%
+- Debug feature flag evaluation — sequence of steps to diagnose why a flag isn't working for a user (check evaluation reasons, blast radius, dependent flags, evaluation contexts)
+- Clean up stale flags — identify flags that haven't been called recently (`last_called_at`), check dependencies, safely archive
+- Instrument a feature flag — how to add a flag to code (SDK setup, checking flags, tracking usage)
+
+*Automations/Background agents (Q2)* – using PostHog AI's coding agent to automate chores:
+
+- Stale flag cleanup on CRON — identify and report flags not evaluated in N days, suggest cleanup actions
+- Gradual rollout automation — agent monitors error rates/metrics and automatically increases rollout percentage on schedule
+- Flag audit report — periodic report on flag health: stale flags, flags without usage dashboards, flags with high blast radius changes
+- Instrument a flag from web UI/PostHog AI chat
+
+*Signals (Q3)* – how your product becomes automated and proactive:
+
+- Flag evaluation anomaly → investigate (sudden drop/spike in evaluations could indicate an issue)
+- Flag not called in N days → suggest cleanup or archival
+- Rollout reached 100% → suggest removing the flag from code and cleaning up
+- New flag created without targeting rules → suggest proper setup
+- Flag error rate spike → auto-rollback or alert
+
+Moonshot ideas:
+
+- Autonomous feature rollout: Deploy flag → gradually roll out → monitor error rates and key metrics → auto-rollback if degradation detected → auto-ship to 100% if stable. Full hands-off deployment pipeline.
+- Flag-driven A/B testing without Experiments: agent creates a multivariant flag, instruments tracking, monitors results, and picks the winner — lightweight experimentation for teams that don't need full Experiments.
+- Codebase flag hygiene agent: scans the codebase for flag references, cross-references with PostHog to find flags that are 100% rolled out but still in code, and submits PRs to remove dead flag checks.
