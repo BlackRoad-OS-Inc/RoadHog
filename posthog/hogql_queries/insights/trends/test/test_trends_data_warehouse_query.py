@@ -795,3 +795,34 @@ class TestTrendsDataWarehouseQuery(ClickhouseTestMixin, BaseTest):
 
         assert len(response.results) == 1
         assert response.results[0]["count"] == expected_count
+
+
+class TestTrendsSystemTableQuery(ClickhouseTestMixin, BaseTest):
+    @parameterized.expand(
+        [
+            ("line_chart", None),
+            ("bold_number", ChartDisplayType.BOLD_NUMBER),
+            ("bar_value", ChartDisplayType.ACTIONS_BAR_VALUE),
+            ("pie", ChartDisplayType.ACTIONS_PIE),
+        ]
+    )
+    def test_system_table_trends(self, _name: str, display_type: ChartDisplayType | None):
+        trends_query = TrendsQuery(
+            kind="TrendsQuery",
+            dateRange=DateRange(date_from="2024-01-01", date_to="2025-01-01"),
+            series=[
+                DataWarehouseNode(
+                    id="system.insights",
+                    table_name="system.insights",
+                    id_field="id",
+                    distinct_id_field="id",
+                    timestamp_field="created_at",
+                )
+            ],
+            trendsFilter=TrendsFilter(display=display_type) if display_type else None,
+        )
+
+        response = TrendsQueryRunner(team=self.team, query=trends_query).calculate()
+
+        assert len(response.results) == 1
+        assert response.hogql is not None

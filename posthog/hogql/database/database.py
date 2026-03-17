@@ -1208,11 +1208,26 @@ class Database(BaseModel):
                             table_chain = warehouse_modifier.table_name.split(".")
                             if database.has_table(table_chain):
                                 table = database.get_table(table_chain)
-                                if "timestamp" not in table.fields:
+
+                                # Add id alias if needed
+                                if "id" not in table.fields:
+                                    table.fields["id"] = ExpressionField(
+                                        name="id",
+                                        expr=parse_expr(warehouse_modifier.id_field),
+                                    )
+
+                                # Add timestamp alias — avoid self-referencing ExpressionField
+                                if warehouse_modifier.timestamp_field == "timestamp":
+                                    if "timestamp" not in table.fields:
+                                        table.fields["timestamp"] = DateTimeDatabaseField(name="timestamp")
+                                elif "timestamp" not in table.fields or not isinstance(
+                                    table.fields.get("timestamp"), DateTimeDatabaseField
+                                ):
                                     table.fields["timestamp"] = ExpressionField(
                                         name="timestamp",
                                         expr=ast.Field(chain=[warehouse_modifier.timestamp_field]),
                                     )
+
                                 if "distinct_id" not in table.fields:
                                     table.fields["distinct_id"] = ExpressionField(
                                         name="distinct_id",
