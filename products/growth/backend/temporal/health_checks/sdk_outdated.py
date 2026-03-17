@@ -1,6 +1,8 @@
 import json
 from typing import Any
 
+import structlog
+
 from posthog.dags.common.owners import JobOwners
 from posthog.models.health_issue import HealthIssue
 from posthog.redis import get_client
@@ -9,6 +11,8 @@ from posthog.temporal.health_checks.framework import HealthCheck
 from posthog.temporal.health_checks.models import HealthCheckResult
 
 from products.growth.dags.github_sdk_versions import SDK_TYPES
+
+logger = structlog.get_logger(__name__)
 
 
 def _decode_redis_json(raw: bytes | str) -> Any:
@@ -40,7 +44,8 @@ class SdkOutdatedCheck(HealthCheck):
     def detect(self, team_ids: list[int]) -> dict[int, list[HealthCheckResult]]:
         github_data = _load_github_sdk_data()
         if not github_data:
-            raise RuntimeError("GitHub SDK version data unavailable in Redis")
+            logger.warning("GitHub SDK version data unavailable in Redis; skipping sdk_outdated check")
+            return {}
 
         redis_client = get_client()
         keys = [f"sdk_versions:team:{tid}" for tid in team_ids]
