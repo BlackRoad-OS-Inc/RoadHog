@@ -19,6 +19,7 @@ use anyhow::Result;
 use assert_json_diff::assert_json_include;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
+use serial_test::serial;
 
 use crate::common::*;
 
@@ -60,6 +61,7 @@ fn flag_json_for_redis(
 /// This is the **exact scenario** that regressed in PR #51002: realtime cohorts were
 /// sent to `NoOpCohortMembershipProvider` which always returns "not a member".
 #[tokio::test]
+#[serial]
 async fn test_realtime_cohort_with_person_property_filter() -> Result<()> {
     let config = DEFAULT_TEST_CONFIG.clone();
     let distinct_id = "realtime_cohort_user".to_string();
@@ -213,6 +215,7 @@ async fn test_realtime_cohort_with_person_property_filter() -> Result<()> {
 /// Same as above but with multiple person-property conditions (AND logic).
 /// Django should still classify this as realtime since all leaf filters support bytecode.
 #[tokio::test]
+#[serial]
 async fn test_realtime_cohort_with_multiple_person_property_conditions() -> Result<()> {
     let config = DEFAULT_TEST_CONFIG.clone();
     let client = setup_redis_client(Some(config.redis_url.clone())).await;
@@ -376,6 +379,7 @@ async fn test_realtime_cohort_with_multiple_person_property_conditions() -> Resu
 /// Reproduces the pattern from `test_cohort_filter_with_regex_and_negation` but with
 /// realistic serialized data.
 #[tokio::test]
+#[serial]
 async fn test_realtime_cohort_with_regex_and_negation() -> Result<()> {
     let config = DEFAULT_TEST_CONFIG.clone();
     let client = setup_redis_client(Some(config.redis_url.clone())).await;
@@ -556,6 +560,7 @@ async fn test_realtime_cohort_with_regex_and_negation() -> Result<()> {
 /// Both cohorts have person-property filters, so Django marks both as realtime.
 /// The Rust evaluator must recursively resolve the nested cohort membership.
 #[tokio::test]
+#[serial]
 async fn test_nested_realtime_cohorts() -> Result<()> {
     let config = DEFAULT_TEST_CONFIG.clone();
     let client = setup_redis_client(Some(config.redis_url.clone())).await;
@@ -766,6 +771,7 @@ async fn test_nested_realtime_cohorts() -> Result<()> {
 /// Cohort with AND + negated cohort reference: user must be in the main cohort
 /// AND NOT in the excluded cohort. Both are realtime (person-property filters).
 #[tokio::test]
+#[serial]
 async fn test_realtime_cohort_with_negated_cohort_reference() -> Result<()> {
     let config = DEFAULT_TEST_CONFIG.clone();
     let client = setup_redis_client(Some(config.redis_url.clone())).await;
@@ -966,6 +972,7 @@ async fn test_realtime_cohort_with_negated_cohort_reference() -> Result<()> {
 /// this as realtime. Verifies the Rust evaluator handles date comparisons correctly
 /// when the cohort is realtime.
 #[tokio::test]
+#[serial]
 async fn test_realtime_cohort_with_date_filter() -> Result<()> {
     let config = DEFAULT_TEST_CONFIG.clone();
     let client = setup_redis_client(Some(config.redis_url.clone())).await;
@@ -1106,6 +1113,7 @@ async fn test_realtime_cohort_with_date_filter() -> Result<()> {
 /// Verifies that super condition evaluation works correctly when the underlying
 /// cohort is realtime.
 #[tokio::test]
+#[serial]
 async fn test_super_condition_with_realtime_cohort() -> Result<()> {
     let config = DEFAULT_TEST_CONFIG.clone();
     let client = setup_redis_client(Some(config.redis_url.clone())).await;
@@ -1255,6 +1263,7 @@ async fn test_super_condition_with_realtime_cohort() -> Result<()> {
 /// cohort created via Django serializer (with `is_static: true`) is correctly
 /// evaluated by the Rust `/flags` endpoint using the cohortpeople lookup path.
 #[tokio::test]
+#[serial]
 async fn test_static_cohort_membership() -> Result<()> {
     let config = DEFAULT_TEST_CONFIG.clone();
     let client = setup_redis_client(Some(config.redis_url.clone())).await;

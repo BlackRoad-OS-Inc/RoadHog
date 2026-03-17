@@ -1628,8 +1628,9 @@ impl TestContext {
         }
 
         // Wait with a timeout to prevent hanging if Django fails to start.
-        // 60 seconds should be plenty for Django bootstrap + serializer ops.
-        let timeout = std::time::Duration::from_secs(60);
+        // Django bootstrap can take 30-40s, and in CI with parallel tests,
+        // resource contention can slow things down further. 180s is conservative.
+        let timeout = std::time::Duration::from_secs(180);
         let start = std::time::Instant::now();
 
         // Poll for completion with timeout
