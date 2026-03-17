@@ -1,5 +1,6 @@
 {
   "name": "funnel_research_output",
+  "report_id": "test-funnel-report-001",
   "generated_at": "2026-03-17T20:22:37Z",
   "repository": "posthog/posthog",
   "report": {
