@@ -55,4 +55,5 @@ Uses first team/user if omitted. Runs `execute_summarize_session` with `video_va
 
 - Compare runs by saving output: `list_signal_reports --json > run_baseline.json`
 - Read each command's source for all available flags — they are in this directory
+- If you are looking for the local-only debug commands `analyze_report.py` or `parse_sandbox_log.py`, those are documented in `../report_generation/AGENTS.md`
 - **If you change any command or the flow, update this file to match**
