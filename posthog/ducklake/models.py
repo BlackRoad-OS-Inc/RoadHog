@@ -120,7 +120,6 @@ class DucklingBackfillRun(CreatedMetaFields, UpdatedMetaFields, UUIDModel):
     data_type = models.CharField(max_length=20)  # "events" or "persons"
     partition_key = models.CharField(max_length=50)  # "2024-01-15" or "2024-01"
     status = models.CharField(max_length=20, default="pending")  # pending/running/completed/failed
-    attempts = models.IntegerField(default=0)
     workflow_id = models.CharField(max_length=255, blank=True, default="")
     error_message = models.TextField(blank=True, default="")
     records_exported = models.IntegerField(default=0)

@@ -378,148 +378,87 @@ def test_register_with_ducklake_activity_production_mode_registers_multiple_path
 # discover_duckling_teams_activity — unit tests (async, mocked ORM)
 # ---------------------------------------------------------------------------
 
+CATALOG_DEFAULTS = {
+    "db_host": "localhost",
+    "db_port": 5432,
+    "db_database": "ducklake",
+    "db_username": "user",
+    "db_password": "pass",
+    "bucket": "test-bucket",
+    "bucket_region": "us-east-1",
+    "cross_account_role_arn": "arn:aws:iam::123:role/test",
+    "cross_account_external_id": "ext-id",
+}
+
 
 @pytest.mark.asyncio
 @pytest.mark.django_db
-async def test_discover_duckling_teams_activity_returns_teams_without_completed_run(ateam):
+async def test_discover_returns_all_lookback_dates_for_team_without_completed_runs(ateam):
+    from posthog.ducklake.models import DuckLakeCatalog
+    from posthog.sync import database_sync_to_async
+    from posthog.temporal.ducklake.duckling_backfill_activities import BACKFILL_LOOKBACK_DAYS
+
+    await database_sync_to_async(DuckLakeCatalog.objects.create)(team=ateam, **CATALOG_DEFAULTS)
+
+    results = await discover_duckling_teams_activity(DucklingDiscoveryInputs(data_type="events"))
+
+    matching = [r for r in results if r.team_id == ateam.id]
+    assert len(matching) == BACKFILL_LOOKBACK_DAYS
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db
+async def test_discover_skips_completed_partition_but_includes_others(ateam):
+    from django.utils import timezone
+
     from posthog.ducklake.models import DuckLakeCatalog, DucklingBackfillRun
     from posthog.sync import database_sync_to_async
+    from posthog.temporal.ducklake.duckling_backfill_activities import BACKFILL_LOOKBACK_DAYS
 
-    # Team 20 gets a completed run; ateam does not
-    other_org = await database_sync_to_async(
-        lambda: __import__("posthog.models", fromlist=["Organization"]).Organization.objects.create(
-            name="OtherOrg-discover-test"
-        )
-    )()
-    other_team = await database_sync_to_async(
-        lambda: __import__("posthog.models", fromlist=["Team"]).Team.objects.create(
-            organization=other_org, name="OtherTeam-discover-test"
-        )
-    )()
+    await database_sync_to_async(DuckLakeCatalog.objects.create)(team=ateam, **CATALOG_DEFAULTS)
 
-    try:
-        await database_sync_to_async(DuckLakeCatalog.objects.create)(
-            team=ateam,
-            db_host="localhost",
-            db_port=5432,
-            db_database="ducklake",
-            db_username="user",
-            db_password="pass",
-            bucket="test-bucket",
-            bucket_region="us-east-1",
-            cross_account_role_arn="arn:aws:iam::123:role/test",
-            cross_account_external_id="ext-id",
-        )
-        await database_sync_to_async(DuckLakeCatalog.objects.create)(
-            team=other_team,
-            db_host="localhost",
-            db_port=5432,
-            db_database="ducklake",
-            db_username="user",
-            db_password="pass",
-            bucket="test-bucket",
-            bucket_region="us-east-1",
-            cross_account_role_arn="arn:aws:iam::123:role/test",
-            cross_account_external_id="ext-id",
-        )
+    yesterday = (timezone.now() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    await database_sync_to_async(DucklingBackfillRun.objects.create)(
+        team=ateam, data_type="events", partition_key=yesterday, status="completed"
+    )
 
-        # Mark other_team as already completed for yesterday
-        from django.utils import timezone
+    results = await discover_duckling_teams_activity(DucklingDiscoveryInputs(data_type="events"))
 
-        yesterday = (timezone.now() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
-        await database_sync_to_async(DucklingBackfillRun.objects.create)(
-            team=other_team,
-            data_type="events",
-            partition_key=yesterday,
-            status="completed",
-        )
-
-        inputs = DucklingDiscoveryInputs(data_type="events")
-        results = await discover_duckling_teams_activity(inputs)
-
-        returned_team_ids = {r.team_id for r in results}
-        assert ateam.id in returned_team_ids
-        assert other_team.id not in returned_team_ids
-    finally:
-        await database_sync_to_async(other_team.delete)()
-        await database_sync_to_async(other_org.delete)()
+    matching = [r for r in results if r.team_id == ateam.id]
+    partition_keys = {r.partition_key for r in matching}
+    assert yesterday not in partition_keys
+    assert len(matching) == BACKFILL_LOOKBACK_DAYS - 1
 
 
 @pytest.mark.asyncio
 @pytest.mark.django_db
-async def test_discover_duckling_teams_activity_returns_empty_when_no_catalogs():
-    # No DuckLakeCatalog rows at all → no teams to backfill
-    inputs = DucklingDiscoveryInputs(data_type="events")
-    results = await discover_duckling_teams_activity(inputs)
-
-    # We can only assert the result is a list; catalog rows from other tests may exist
+async def test_discover_returns_empty_when_no_catalogs():
+    results = await discover_duckling_teams_activity(DucklingDiscoveryInputs(data_type="events"))
     assert isinstance(results, list)
 
 
 @pytest.mark.asyncio
 @pytest.mark.django_db
-async def test_discover_duckling_teams_activity_skips_team_with_completed_run(ateam):
+async def test_discover_auto_pauses_team_with_too_many_failures(ateam):
     from django.utils import timezone
 
     from posthog.ducklake.models import DuckLakeCatalog, DucklingBackfillRun
     from posthog.sync import database_sync_to_async
+    from posthog.temporal.ducklake.duckling_backfill_activities import FAILURE_THRESHOLD
 
-    await database_sync_to_async(DuckLakeCatalog.objects.create)(
-        team=ateam,
-        db_host="localhost",
-        db_port=5432,
-        db_database="ducklake",
-        db_username="user",
-        db_password="pass",
-        bucket="test-bucket",
-        bucket_region="us-east-1",
-        cross_account_role_arn="arn:aws:iam::123:role/test",
-        cross_account_external_id="ext-id",
-    )
+    await database_sync_to_async(DuckLakeCatalog.objects.create)(team=ateam, **CATALOG_DEFAULTS)
 
-    yesterday = (timezone.now() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
-    await database_sync_to_async(DucklingBackfillRun.objects.create)(
-        team=ateam,
-        data_type="events",
-        partition_key=yesterday,
-        status="completed",
-    )
+    # Create enough failed runs to trigger auto-pause
+    for i in range(FAILURE_THRESHOLD):
+        date = (timezone.now() - dt.timedelta(days=100 + i)).strftime("%Y-%m-%d")
+        await database_sync_to_async(DucklingBackfillRun.objects.create)(
+            team=ateam, data_type="events", partition_key=date, status="failed"
+        )
 
-    inputs = DucklingDiscoveryInputs(data_type="events")
-    results = await discover_duckling_teams_activity(inputs)
+    results = await discover_duckling_teams_activity(DucklingDiscoveryInputs(data_type="events"))
 
-    returned_team_ids = {r.team_id for r in results}
-    assert ateam.id not in returned_team_ids
-
-
-@pytest.mark.asyncio
-@pytest.mark.django_db
-async def test_discover_duckling_teams_activity_uses_yesterday_as_partition_key(ateam):
-    from django.utils import timezone
-
-    from posthog.ducklake.models import DuckLakeCatalog
-    from posthog.sync import database_sync_to_async
-
-    await database_sync_to_async(DuckLakeCatalog.objects.create)(
-        team=ateam,
-        db_host="localhost",
-        db_port=5432,
-        db_database="ducklake",
-        db_username="user",
-        db_password="pass",
-        bucket="test-bucket",
-        bucket_region="us-east-1",
-        cross_account_role_arn="arn:aws:iam::123:role/test",
-        cross_account_external_id="ext-id",
-    )
-
-    inputs = DucklingDiscoveryInputs(data_type="events")
-    results = await discover_duckling_teams_activity(inputs)
-
-    expected_yesterday = (timezone.now() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
     matching = [r for r in results if r.team_id == ateam.id]
-    assert len(matching) == 1
-    assert matching[0].partition_key == expected_yesterday
+    assert len(matching) == 0
 
 
 # ---------------------------------------------------------------------------
