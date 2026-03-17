@@ -17,6 +17,9 @@ on:
             - 'rust/feature-flags/**'
             - 'posthog/api/test/test_feature_flag_rust_integration.py'
 
+permissions:
+    contents: read
+
 concurrency:
     group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
     cancel-in-progress: true
