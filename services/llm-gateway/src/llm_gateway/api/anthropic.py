@@ -72,7 +72,6 @@ async def _handle_count_tokens(
     settings = get_settings()
     start_time = time.monotonic()
     status_code = "200"
-    data = body.model_dump(exclude_none=True)
 
     api_key = settings.anthropic_api_key
     if not api_key:
@@ -80,6 +79,9 @@ async def _handle_count_tokens(
             status_code=503,
             detail={"error": {"message": "Anthropic API key not configured", "type": "configuration_error"}},
         )
+
+    data = body.model_dump(exclude_none=True)
+
     headers = {
         "x-api-key": api_key,
         "anthropic-version": ANTHROPIC_API_VERSION,
