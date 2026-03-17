@@ -47,10 +47,3 @@ def is_within_ai_events_ttl(date_from: datetime, now: datetime) -> bool:
     now_naive = now.replace(tzinfo=None)
     cutoff = now_naive - timedelta(days=AI_EVENTS_TTL_DAYS + 1)
     return date_from_naive >= cutoff
-
-
-def validate_ai_event_names(events: list[str]) -> None:
-    """Raise if any event name is not a recognized AI event."""
-    invalid = set(events) - AI_EVENT_NAMES
-    if invalid:
-        raise ValueError(f"AiEventsQuery only supports AI events, got: {invalid}")

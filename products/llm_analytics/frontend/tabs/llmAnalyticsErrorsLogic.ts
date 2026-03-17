@@ -1,15 +1,12 @@
 import { actions, connect, kea, key, path, props, reducers, selectors } from 'kea'
 
 import { TaxonomicFilterGroupType } from 'lib/components/TaxonomicFilter/types'
-import { FEATURE_FLAGS } from 'lib/constants'
-import { FeatureFlagsSet, featureFlagLogic } from 'lib/logic/featureFlagLogic'
 
 import { groupsModel } from '~/models/groupsModel'
 import { DataTableNode, NodeKind } from '~/queries/schema/schema-general'
 import { AnyPropertyFilter } from '~/types'
 
-import aiEventsQueryTemplate from '../../backend/queries/errors.sql?raw'
-import eventsQueryTemplate from '../../backend/queries/errors_events.sql?raw'
+import queryTemplate from '../../backend/queries/errors.sql?raw'
 import { SortDirection, SortState, llmAnalyticsSharedLogic } from '../llmAnalyticsSharedLogic'
 import type { llmAnalyticsErrorsLogicType } from './llmAnalyticsErrorsLogicType'
 
@@ -27,8 +24,6 @@ export const llmAnalyticsErrorsLogic = kea<llmAnalyticsErrorsLogicType>([
             ['dateFilter', 'shouldFilterTestAccounts', 'propertyFilters'],
             groupsModel,
             ['groupsTaxonomicTypes'],
-            featureFlagLogic,
-            ['featureFlags'],
         ],
     })),
 
@@ -47,27 +42,16 @@ export const llmAnalyticsErrorsLogic = kea<llmAnalyticsErrorsLogicType>([
 
     selectors({
         errorsQuery: [
-            (s) => [
-                s.dateFilter,
-                s.shouldFilterTestAccounts,
-                s.propertyFilters,
-                s.errorsSort,
-                s.groupsTaxonomicTypes,
-                s.featureFlags,
-            ],
+            (s) => [s.dateFilter, s.shouldFilterTestAccounts, s.propertyFilters, s.errorsSort, s.groupsTaxonomicTypes],
             (
                 dateFilter: { dateFrom: string | null; dateTo: string | null },
                 shouldFilterTestAccounts: boolean,
                 propertyFilters: AnyPropertyFilter[],
                 errorsSort: SortState,
-                groupsTaxonomicTypes: TaxonomicFilterGroupType[],
-                featureFlags: FeatureFlagsSet
+                groupsTaxonomicTypes: TaxonomicFilterGroupType[]
             ): DataTableNode => {
-                const useAiEvents = !!featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_AI_EVENTS_TABLE_ROLLOUT]
-                const template = useAiEvents ? aiEventsQueryTemplate : eventsQueryTemplate
-
                 // Simple placeholder replacement - no escaping needed
-                const query = template
+                const query = queryTemplate
                     .replace('__ORDER_BY__', errorsSort.column)
                     .replace('__ORDER_DIRECTION__', errorsSort.direction)
 

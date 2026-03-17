@@ -211,7 +211,7 @@ export const llmAnalyticsGenerationsLogic = kea<llmAnalyticsGenerationsLogicType
             ): DataTableNode => ({
                 kind: NodeKind.DataTableNode,
                 source: {
-                    kind: NodeKind.AiEventsQuery,
+                    kind: NodeKind.EventsQuery,
                     limit: 100,
                     select:
                         effectiveGenerationsColumns ||

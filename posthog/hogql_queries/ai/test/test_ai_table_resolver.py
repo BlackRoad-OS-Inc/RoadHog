@@ -1,14 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from unittest.mock import Mock, patch
 
-from posthog.hogql_queries.ai.ai_table_resolver import (
-    AI_EVENTS_TTL_DAYS,
-    is_ai_events_enabled,
-    is_within_ai_events_ttl,
-    validate_ai_event_names,
-)
+from posthog.hogql_queries.ai.ai_table_resolver import AI_EVENTS_TTL_DAYS, is_ai_events_enabled, is_within_ai_events_ttl
 
 
 class TestIsWithinAiEventsTtl:
@@ -69,22 +63,3 @@ class TestIsAiEventsEnabled:
             group_properties={"organization": {"id": "org_xyz"}},
             send_feature_flag_events=False,
         )
-
-
-class TestValidateAiEventNames:
-    def test_valid_ai_events(self):
-        validate_ai_event_names(["$ai_generation", "$ai_span", "$ai_trace"])
-
-    def test_single_valid_event(self):
-        validate_ai_event_names(["$ai_generation"])
-
-    def test_empty_list(self):
-        validate_ai_event_names([])
-
-    def test_invalid_event_raises(self):
-        with pytest.raises(ValueError, match="only supports AI events"):
-            validate_ai_event_names(["$pageview"])
-
-    def test_mixed_valid_invalid_raises(self):
-        with pytest.raises(ValueError, match="only supports AI events"):
-            validate_ai_event_names(["$ai_generation", "$pageview"])
