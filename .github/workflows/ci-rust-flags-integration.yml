@@ -1,0 +1,147 @@
+name: Rust Flags Integration Tests
+
+on:
+    workflow_dispatch:
+    pull_request:
+        paths:
+            - 'rust/feature-flags/**'
+            - 'posthog/api/test/test_feature_flag_rust_integration.py'
+            - 'posthog/api/feature_flags/**'
+            - 'posthog/models/feature_flag/**'
+            - 'posthog/models/cohort/**'
+            - '.github/workflows/ci-rust-flags-integration.yml'
+    push:
+        branches:
+            - master
+        paths:
+            - 'rust/feature-flags/**'
+            - 'posthog/api/test/test_feature_flag_rust_integration.py'
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+    cancel-in-progress: true
+
+env:
+    SECRET_KEY: '6b01eee4f945ca25045b5aab440b953461b81b72' # unsafe - for testing only
+    DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/posthog'
+    REDIS_URL: 'redis://localhost:6379/'
+    TEST: 1
+    UV_HTTP_TIMEOUT: 300
+
+jobs:
+    rust-flags-integration:
+        name: Rust /flags Integration Tests
+        runs-on: depot-ubuntu-latest
+        timeout-minutes: 30
+
+        services:
+            postgres:
+                image: postgres:16-alpine
+                env:
+                    POSTGRES_USER: posthog
+                    POSTGRES_PASSWORD: posthog
+                    POSTGRES_DB: posthog
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd pg_isready
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+
+            redis:
+                image: redis:7-alpine
+                ports:
+                    - 6379:6379
+                options: >-
+                    --health-cmd "redis-cli ping"
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Set up Python
+              uses: actions/setup-python@v6
+              with:
+                  python-version: '3.12.12'
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v4
+              with:
+                  version: '0.10.2'
+                  enable-cache: true
+
+            - name: Install SAML dependencies
+              run: sudo apt-get update && sudo apt-get install -y libxml2-dev libxmlsec1-dev libxmlsec1-openssl
+
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e
+              with:
+                  toolchain: 1.91.1
+
+            - name: Cache Rust dependencies
+              uses: Swatinem/rust-cache@v2
+              with:
+                  shared-key: 'v2-rust-flags-integration'
+                  workspaces: rust
+                  save-if: ${{ github.ref == 'refs/heads/master' }}
+
+            - name: Install sqlx-cli
+              uses: ./.github/actions/setup-sqlx-cli
+
+            - name: Install Python dependencies
+              run: UV_PROJECT_ENVIRONMENT=$pythonLocation uv sync --frozen --dev
+
+            - name: Set up Django database
+              run: |
+                  python manage.py migrate --run-syncdb
+              env:
+                  DEBUG: '1'
+
+            - name: Run sqlx migrations for Rust
+              working-directory: rust
+              env:
+                  DATABASE_URL: postgres://posthog:posthog@localhost:5432/posthog
+              run: |
+                  cargo sqlx database setup --source feature-flags/migrations
+
+            - name: Build Rust flags service
+              working-directory: rust
+              run: cargo build --release -p feature-flags
+
+            - name: Start Rust flags service
+              working-directory: rust
+              run: |
+                  ./target/release/feature-flags &
+                  echo "RUST_FLAGS_PID=$!" >> $GITHUB_ENV
+                  # Wait for service to be ready
+                  for i in {1..30}; do
+                      if curl -s http://127.0.0.1:3001/_readiness > /dev/null 2>&1; then
+                          echo "Rust flags service is ready"
+                          break
+                      fi
+                      echo "Waiting for Rust flags service... ($i/30)"
+                      sleep 2
+                  done
+              env:
+                  BIND_HOST: '127.0.0.1'
+                  BIND_PORT: '3001'
+                  READ_DATABASE_URL: postgres://posthog:posthog@localhost:5432/posthog
+                  WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/posthog
+                  REDIS_URL: redis://localhost:6379/
+
+            - name: Run integration tests
+              run: |
+                  pytest posthog/api/test/test_feature_flag_rust_integration.py -v --tb=short
+              env:
+                  SKIP_RUST_INTEGRATION_TESTS: '0'
+                  FEATURE_FLAGS_SERVICE_URL: 'http://127.0.0.1:3001'
+
+            - name: Stop Rust flags service
+              if: always()
+              run: |
+                  if [ -n "$RUST_FLAGS_PID" ]; then
+                      kill $RUST_FLAGS_PID || true
+                  fi
