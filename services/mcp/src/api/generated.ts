@@ -7221,20 +7221,6 @@ export namespace Schemas {
       version?: number | null;
     }
 
-    /**
-     * * `0` - Disabled
-    * `1` - Stateless
-    * `2` - Stateful
-     */
-    export type CookielessServerHashModeEnum = typeof CookielessServerHashModeEnum[keyof typeof CookielessServerHashModeEnum];
-
-
-    export const CookielessServerHashModeEnum = {
-      Number0: 0,
-      Number1: 1,
-      Number2: 2,
-    } as const;
-
     export interface CoreEvent {
       readonly id: string;
       /**
@@ -23588,11 +23574,6 @@ export namespace Schemas {
       live_events_columns?: string[] | null;
       /** @nullable */
       recording_domains?: (string | null)[] | null;
-      /**
-       * @minimum -32768
-       * @maximum 32767
-       */
-      cookieless_server_hash_mode?: CookielessServerHashModeEnum | NullEnum | null;
       /** @nullable */
       human_friendly_comparison_periods?: boolean | null;
       /** @nullable */
@@ -28037,11 +28018,6 @@ export namespace Schemas {
       live_events_columns?: string[] | null;
       /** @nullable */
       recording_domains?: (string | null)[] | null;
-      /**
-       * @minimum -32768
-       * @maximum 32767
-       */
-      cookieless_server_hash_mode?: CookielessServerHashModeEnum | NullEnum | null;
       /** @nullable */
       human_friendly_comparison_periods?: boolean | null;
       /** @nullable */
