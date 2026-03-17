@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 import numpy as np
@@ -92,8 +94,8 @@ class TestAnomalyDetectors:
             ),
         ]
     )
-    def test_detect(self, _name: str, detector: object, data: object, expected_anomaly: bool) -> None:
-        result = detector.detect(data)  # type: ignore[union-attr]
+    def test_detect(self, _name: str, detector: Any, data: Any, expected_anomaly: bool) -> None:
+        result = detector.detect(data)
         assert result.is_anomaly == expected_anomaly
 
     def test_scores_are_normalized_probabilities(self) -> None:
@@ -136,7 +138,7 @@ class TestAnomalyDetectors:
             ),
         ]
     )
-    def test_detect_batch(self, _name: str, detector: object, data: object, min_triggered: int) -> None:
+    def test_detect_batch(self, _name: str, detector: Any, data: Any, min_triggered: int) -> None:
         result = detector.detect_batch(data)
         assert result.is_anomaly
         assert len(result.triggered_indices) >= min_triggered
@@ -195,7 +197,7 @@ class TestThresholdDetector:
             ),
         ]
     )
-    def test_detect(self, _name: str, config: dict, data: object, expected_anomaly: bool) -> None:
+    def test_detect(self, _name: str, config: Any, data: Any, expected_anomaly: bool) -> None:
         detector = ThresholdDetector(config)
         result = detector.detect(data)
         assert result.is_anomaly == expected_anomaly
@@ -266,7 +268,7 @@ class TestEnsembleDetector:
             ),
         ]
     )
-    def test_detect(self, _name: str, operator: str, data: object, expected_anomaly: bool) -> None:
+    def test_detect(self, _name: str, operator: str, data: Any, expected_anomaly: bool) -> None:
         detector = EnsembleDetector(
             {
                 "type": "ensemble",
