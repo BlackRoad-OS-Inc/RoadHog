@@ -2,22 +2,19 @@ import shlex
 import logging
 from dataclasses import dataclass
 
-from django.conf import settings
-
 from temporalio import activity
 
 from posthog.temporal.common.utils import asyncify
 
 from products.tasks.backend.models import SandboxSnapshot, Task, TaskRun
-from products.tasks.backend.services.connection_token import get_sandbox_jwt_public_key
 from products.tasks.backend.services.sandbox import Sandbox, SandboxConfig, SandboxTemplate
 from products.tasks.backend.temporal.exceptions import GitHubAuthenticationError, OAuthTokenError, TaskNotFoundError
 from products.tasks.backend.temporal.metrics import StepTimer, increment_snapshot_usage
 from products.tasks.backend.temporal.oauth import create_oauth_access_token
 from products.tasks.backend.temporal.observability import emit_agent_log, log_activity_execution
 from products.tasks.backend.temporal.process_task.utils import (
+    build_sandbox_environment_variables,
     get_github_token,
-    get_sandbox_api_url,
     get_sandbox_name_for_task,
 )
 
@@ -78,16 +75,13 @@ def get_sandbox_for_repository(input: GetSandboxForRepositoryInput) -> GetSandbo
                 cause=e,
             )
 
-        environment_variables = {
-            "GITHUB_TOKEN": github_token,
-            "POSTHOG_PERSONAL_API_KEY": access_token,
-            "POSTHOG_API_URL": get_sandbox_api_url(),
-            "POSTHOG_PROJECT_ID": str(ctx.team_id),
-            "JWT_PUBLIC_KEY": get_sandbox_jwt_public_key(),
-        }
-
-        if settings.SANDBOX_LLM_GATEWAY_URL:
-            environment_variables["LLM_GATEWAY_URL"] = settings.SANDBOX_LLM_GATEWAY_URL
+        sandbox_env = ctx.get_sandbox_environment()
+        environment_variables = build_sandbox_environment_variables(
+            github_token=github_token,
+            access_token=access_token,
+            team_id=ctx.team_id,
+            sandbox_environment=sandbox_env,
+        )
 
         # Check for resume snapshot (takes priority over integration-level snapshots)
         resume_snapshot_ext_id = (ctx.state or {}).get("snapshot_external_id")
