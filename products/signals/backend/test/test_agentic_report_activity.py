@@ -1,0 +1,235 @@
+import json
+import random
+from datetime import UTC, datetime
+
+import pytest
+
+import pytest_asyncio
+from asgiref.sync import sync_to_async
+
+from posthog.models import Organization, Team
+from posthog.sync import database_sync_to_async
+
+from products.signals.backend.models import SignalReport, SignalReportArtefact
+from products.signals.backend.report_generation.research import (
+    ActionabilityAssessment,
+    PriorityAssessment,
+    ReportResearchOutput,
+    SignalFinding,
+)
+from products.signals.backend.temporal.actionability_judge import ActionabilityChoice, Priority
+from products.signals.backend.temporal.agentic_report import (
+    RunAgenticReportInput,
+    SignalsAgenticReportGateInput,
+    run_agentic_report_activity,
+    signals_agentic_report_gate_activity,
+)
+from products.signals.backend.temporal.types import SignalData
+from products.tasks.backend.services.custom_prompt_runner import CustomPromptSandboxContext
+
+
+@pytest_asyncio.fixture
+async def aorganization():
+    organization = await sync_to_async(Organization.objects.create)(
+        name=f"SignalsTestOrg-{random.randint(1, 99999)}",
+        is_ai_data_processing_approved=True,
+    )
+
+    yield organization
+
+    await sync_to_async(organization.delete)()
+
+
+@pytest_asyncio.fixture
+async def ateam(aorganization):
+    team = await sync_to_async(Team.objects.create)(
+        organization=aorganization,
+        name=f"SignalsTestTeam-{random.randint(1, 99999)}",
+    )
+
+    yield team
+
+    await sync_to_async(team.delete)()
+
+
+def _build_research_output() -> ReportResearchOutput:
+    return ReportResearchOutput(
+        title="Onboarding funnel completion tracking may be regressing",
+        summary="Signals point to a likely regression around onboarding completion event tracking.",
+        findings=[
+            SignalFinding(
+                signal_id="sig-1",
+                relevant_code_paths=["frontend/src/scenes/onboarding/OnboardingFlow.tsx"],
+                data_queried="Checked onboarding_completed volume in recent events; it dropped 38% week over week.",
+                verified=True,
+            ),
+            SignalFinding(
+                signal_id="sig-2",
+                relevant_code_paths=["posthog/api/event.py"],
+                data_queried="Compared pageview and user_signed_up volumes; those remained stable.",
+                verified=True,
+            ),
+        ],
+        actionability=ActionabilityAssessment(
+            explanation="The issue has a clear code path and supporting event-volume evidence.",
+            actionability=ActionabilityChoice.IMMEDIATELY_ACTIONABLE,
+            already_addressed=False,
+        ),
+        priority=PriorityAssessment(
+            explanation="The regression affects a core onboarding flow and should be addressed quickly.",
+            priority=Priority.P1,
+        ),
+    )
+
+
+def _build_signals() -> list[SignalData]:
+    now = datetime.now(UTC)
+    return [
+        SignalData(
+            signal_id="sig-1",
+            content="Bug report: onboarding_completed volume appears to have dropped sharply.",
+            source_product="zendesk",
+            source_type="bug",
+            source_id="44891",
+            weight=0.8,
+            timestamp=now,
+        ),
+        SignalData(
+            signal_id="sig-2",
+            content="Related issue mentions completion tracking may not fire in some onboarding paths.",
+            source_product="github",
+            source_type="issue",
+            source_id="42606",
+            weight=0.5,
+            timestamp=now,
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db
+@pytest.mark.parametrize("flag_enabled", [True, False])
+async def test_signals_agentic_report_gate_activity(monkeypatch, ateam, flag_enabled):
+    captured = {}
+
+    def fake_feature_enabled(
+        key,
+        distinct_id,
+        *,
+        groups=None,
+        group_properties=None,
+        only_evaluate_locally=False,
+        send_feature_flag_events=True,
+    ):
+        captured["key"] = key
+        captured["distinct_id"] = distinct_id
+        captured["groups"] = groups
+        captured["group_properties"] = group_properties
+        captured["only_evaluate_locally"] = only_evaluate_locally
+        captured["send_feature_flag_events"] = send_feature_flag_events
+        return flag_enabled
+
+    monkeypatch.setattr(
+        "products.signals.backend.temporal.agentic_report.posthoganalytics.feature_enabled",
+        fake_feature_enabled,
+    )
+
+    result = await signals_agentic_report_gate_activity(SignalsAgenticReportGateInput(team_id=ateam.id))
+
+    assert result is flag_enabled
+    assert captured["key"] == "signals-agentic-report-generation"
+    assert captured["distinct_id"] == str(ateam.uuid)
+    assert captured["groups"] == {"organization": str(ateam.organization_id), "project": str(ateam.id)}
+    assert captured["only_evaluate_locally"] is True
+    assert captured["send_feature_flag_events"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db
+async def test_run_agentic_report_activity_persists_artefacts(monkeypatch, ateam):
+    report = await database_sync_to_async(SignalReport.objects.create)(
+        team=ateam,
+        status=SignalReport.Status.IN_PROGRESS,
+        signal_count=2,
+        total_weight=1.3,
+    )
+
+    monkeypatch.setattr(
+        "products.signals.backend.temporal.agentic_report._resolve_sandbox_context_for_report",
+        lambda team_id: CustomPromptSandboxContext(team_id=team_id, user_id=1, repository="posthog/posthog"),
+    )
+
+    async def fake_run_multi_turn_research(*args, **kwargs):
+        return _build_research_output()
+
+    monkeypatch.setattr(
+        "products.signals.backend.temporal.agentic_report.run_multi_turn_research",
+        fake_run_multi_turn_research,
+    )
+
+    result = await run_agentic_report_activity(
+        RunAgenticReportInput(team_id=ateam.id, report_id=str(report.id), signals=_build_signals())
+    )
+
+    assert result.title == "Onboarding funnel completion tracking may be regressing"
+    assert result.choice == ActionabilityChoice.IMMEDIATELY_ACTIONABLE
+    assert result.priority == Priority.P1
+    assert result.already_addressed is False
+
+    artefacts = await database_sync_to_async(
+        lambda: list(SignalReportArtefact.objects.filter(report=report).order_by("type", "created_at"))
+    )()
+    assert [artefact.type for artefact in artefacts] == [
+        SignalReportArtefact.ArtefactType.ACTIONABILITY_JUDGMENT,
+        SignalReportArtefact.ArtefactType.PRIORITY_JUDGMENT,
+        SignalReportArtefact.ArtefactType.SIGNAL_FINDING,
+        SignalReportArtefact.ArtefactType.SIGNAL_FINDING,
+    ]
+
+    actionability_content = json.loads(artefacts[0].content)
+    assert actionability_content == {
+        "actionability": "immediately_actionable",
+        "explanation": "The issue has a clear code path and supporting event-volume evidence.",
+        "already_addressed": False,
+    }
+
+    priority_content = json.loads(artefacts[1].content)
+    assert priority_content == {
+        "priority": "P1",
+        "explanation": "The regression affects a core onboarding flow and should be addressed quickly.",
+    }
+
+    finding_contents = [json.loads(artefact.content) for artefact in artefacts[2:]]
+    assert [finding["signal_id"] for finding in finding_contents] == ["sig-1", "sig-2"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db
+async def test_run_agentic_report_activity_does_not_persist_partial_artefacts(monkeypatch, ateam):
+    report = await database_sync_to_async(SignalReport.objects.create)(
+        team=ateam,
+        status=SignalReport.Status.IN_PROGRESS,
+        signal_count=1,
+        total_weight=0.8,
+    )
+
+    monkeypatch.setattr(
+        "products.signals.backend.temporal.agentic_report._resolve_sandbox_context_for_report",
+        lambda team_id: CustomPromptSandboxContext(team_id=team_id, user_id=1, repository="posthog/posthog"),
+    )
+
+    async def fake_run_multi_turn_research(*args, **kwargs):
+        raise RuntimeError("sandbox failed")
+
+    monkeypatch.setattr(
+        "products.signals.backend.temporal.agentic_report.run_multi_turn_research",
+        fake_run_multi_turn_research,
+    )
+
+    with pytest.raises(RuntimeError, match="sandbox failed"):
+        await run_agentic_report_activity(
+            RunAgenticReportInput(team_id=ateam.id, report_id=str(report.id), signals=_build_signals()[:1])
+        )
+
+    artefact_count = await database_sync_to_async(lambda: SignalReportArtefact.objects.filter(report=report).count())()
+    assert artefact_count == 0
