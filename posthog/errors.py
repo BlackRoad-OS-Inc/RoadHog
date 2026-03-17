@@ -49,7 +49,7 @@ class ExposedCHQueryError(InternalCHQueryError):
             end_index = message.index("Stack trace:")
         except ValueError:
             end_index = len(message)
-        return message[start_index:end_index].strip()
+        return self.message[start_index:end_index].strip()
 
 
 @dataclass
