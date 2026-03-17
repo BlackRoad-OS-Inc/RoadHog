@@ -71,9 +71,13 @@ export class DashboardPage {
 
     async addInsightToNewDashboard(insightName?: string): Promise<void> {
         await this.page.getByRole('button', { name: 'Add insight' }).first().click()
+        const table = this.page.locator('.LemonModal .LemonTable')
+        // Wait for the table to finish loading so rows are stable (no layout shift).
+        await expect(table).toBeVisible()
+        await expect(table).not.toHaveClass(/LemonTable--loading/, { timeout: 30000 })
         const row = insightName
-            ? this.page.locator('.LemonModal .LemonTable tbody tr').filter({ hasText: insightName }).first()
-            : this.page.locator('.LemonModal .LemonTable tbody tr').first()
+            ? table.locator('tbody tr').filter({ hasText: insightName }).first()
+            : table.locator('tbody tr').first()
         await row.click()
         await this.page.getByRole('button', { name: 'Close' }).click()
     }
