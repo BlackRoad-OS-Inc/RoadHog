@@ -90,10 +90,15 @@ def rust_flags_server() -> Generator[str, None, None]:
     env = os.environ.copy()
     env["BIND_HOST"] = "127.0.0.1"
     env["BIND_PORT"] = str(port)
-    # Use the test database
-    env["READ_DATABASE_URL"] = (
-        settings.DATABASES["default"]["TEST"]["NAME"] or "postgres://posthog:posthog@localhost:5432/test_posthog"
-    )
+
+    # Build database URL from Django settings
+    db_settings = settings.DATABASES["default"]
+    db_name = db_settings.get("TEST", {}).get("NAME") or db_settings.get("NAME") or "posthog"
+    db_user = db_settings.get("USER", "posthog")
+    db_password = db_settings.get("PASSWORD", "posthog")
+    db_host = db_settings.get("HOST", "localhost")
+    db_port = db_settings.get("PORT", "5432")
+    env["READ_DATABASE_URL"] = f"postgres://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     env["WRITE_DATABASE_URL"] = env["READ_DATABASE_URL"]
     env["REDIS_URL"] = getattr(settings, "REDIS_URL", "redis://localhost:6379/")
 
