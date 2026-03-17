@@ -158,17 +158,12 @@ def select_from_persons_table(
         if filter is not None:
             cast(ast.SelectQuery, cast(ast.CompareOperation, select.where).right).where = filter
 
-        # START order_by/limit optimization.
-        # Only push ORDER BY + LIMIT into the inner subquery when:
-        #  1. The query selects directly from the persons table (no joins/subqueries)
-        #  2. There's no GROUP BY (not yet supported)
-        #  3. There's a LIMIT (ORDER BY without LIMIT in a subquery is meaningless)
-        #  4. There's no outer WHERE/PREWHERE — if there is one, the V1
-        #     where_optimization path (above) already tried and failed to extract
-        #     it, meaning the filter runs *after* the inner query. Pushing a LIMIT
-        #     would exclude rows before that filter runs, producing wrong results
-        #     (e.g. cohort members missed because the LIMIT grabbed non-matching
-        #     rows first).
+        # Push ORDER BY + LIMIT into the inner deduplication subquery so
+        # ClickHouse can stop early instead of deduplicating every person.
+        # Only safe when there's no outer WHERE/PREWHERE -- an outer filter
+        # runs after deduplication, so a premature inner LIMIT would exclude
+        # valid rows (e.g. cohort members missed because the LIMIT grabbed
+        # non-matching rows first).
         can_push_to_inner = (
             node.select_from
             and node.select_from.type
@@ -188,8 +183,8 @@ def select_from_persons_table(
 
                 order_by_without_virtual_fields = []
                 for order_by in right_select.order_by:
-                    # Skip virtual field order_by expressions - they'll be handled by the outer query as they require
-                    # a join with revenue analytics table
+                    # Virtual fields (e.g. $virt_mrr) require a join that only
+                    # exists in the outer query, so skip them here.
                     if not _is_virtual_field_requiring_join(order_by.expr):
                         order_by.expr = ast.Call(
                             name="argMax", args=[order_by.expr, ast.Field(chain=["raw_persons", "version"])]
@@ -199,10 +194,9 @@ def select_from_persons_table(
 
             node_limit = cast(ast.Constant, node.limit)
             node_offset = cast(ast.Constant, node.offset)
-            effective_limit = (node_limit.value if node.limit else 100) + (node_offset.value if node.offset else 0) + 1
+            effective_limit = node_limit.value + (node_offset.value if node.offset else 0) + 1
             right_select.limit = ast.Constant(value=effective_limit)
             right_select.offset = ast.Constant(value=0)
-            # Do NOT set node.limit/node.offset directly, outer paginator will slice results
 
         for field_name, field_chain in join_or_table.fields_accessed.items():
             # We need to always select the 'id' field for the join constraint. The field name here is likely to

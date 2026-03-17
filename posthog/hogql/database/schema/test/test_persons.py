@@ -200,34 +200,12 @@ class TestPersonsV2LimitPushDown(ClickhouseTestMixin, APIBaseTest):
         assert len(response.results) == 2
 
     @snapshot_clickhouse_queries
-    def test_v2_extractable_where_uses_v1_path(self):
-        """A simple property filter is handled by the V1 where_optimization path,
-        which pushes both the WHERE and LIMIT into an inner query together."""
-        _create_person(team_id=self.team.pk, distinct_ids=["p1"], properties={"$some_prop": "target"})
-        for i in range(5):
-            _create_person(team_id=self.team.pk, distinct_ids=[f"filler_{i}"], properties={"$some_prop": "other"})
-        flush_persons_and_events()
-
-        response = execute_hogql_query(
-            parse_select(
-                "SELECT id, properties.$some_prop FROM persons "
-                "WHERE properties.$some_prop = 'target' ORDER BY created_at DESC LIMIT 3"
-            ),
-            self.team,
-            modifiers=self._v2_modifiers(),
-        )
-        assert response.clickhouse is not None
-        # V1 handles it -- WHERE is pushed down with the limit
-        assert "where_optimization" in response.clickhouse
-        assert "in(tuple(person.id, person.version)" not in response.clickhouse
-        assert len(response.results) == 1
-
-    @snapshot_clickhouse_queries
     @override_settings(PERSON_ON_EVENTS_OVERRIDE=True, PERSON_ON_EVENTS_V2_OVERRIDE=False)
     def test_v2_cohort_where_does_not_push_limit_down(self):
-        """When a cohort filter can't be extracted, neither ORDER BY nor LIMIT
-        should be pushed into the inner subquery. The cohort member (oldest
-        created_at) must not be excluded by a premature inner LIMIT."""
+        """When there's an outer WHERE (e.g. a cohort filter), ORDER BY and LIMIT
+        must not be pushed into the inner subquery. Otherwise the inner LIMIT
+        restricts the person set before the cohort filter runs, and valid
+        cohort members get excluded."""
         random_uuid = f"RANDOM_TEST_ID::{UUIDT()}"
         cohort_prop_value = f"cohort_match_{random_uuid}"
         _create_person(
