@@ -93,7 +93,7 @@ class TestAiColumnToPropertyRewriter:
 
     def test_numeric_column_usable_in_sum(self):
         """Verify the rewriter produces sumIf(toFloat(properties.$ai_input_tokens), ...) instead of sumIf(properties.$ai_input_tokens, ...)."""
-        query = parse_select("SELECT sumIf(input_tokens, event = '$ai_generation') FROM ai_events")
+        query = parse_select("SELECT sumIf(input_tokens, event = '$ai_generation') FROM posthog.ai_events AS ai_events")
         result = rewrite_query_for_events_table(query)
         assert isinstance(result, ast.SelectQuery)
         # The sumIf argument should be toFloat(properties.$ai_input_tokens)
@@ -115,7 +115,7 @@ class TestAiColumnToPropertyRewriter:
             assert isinstance(result, ast.Field), f"{col_name} should not be wrapped"
 
     def test_scope_only_rewrites_in_ai_events_query(self):
-        query = parse_select("SELECT trace_id FROM ai_events")
+        query = parse_select("SELECT trace_id FROM posthog.ai_events AS ai_events")
         result = rewrite_query_for_events_table(query)
         assert isinstance(result, ast.SelectQuery)
         assert isinstance(result.select[0], ast.Field)
@@ -123,6 +123,7 @@ class TestAiColumnToPropertyRewriter:
         assert result.select_from is not None
         assert isinstance(result.select_from.table, ast.Field)
         assert result.select_from.table.chain == ["events"]
+        assert result.select_from.alias is None
 
     def test_scope_skips_non_ai_events_query(self):
         query = parse_select("SELECT trace_id FROM events")
@@ -132,7 +133,9 @@ class TestAiColumnToPropertyRewriter:
         assert result.select[0].chain == ["trace_id"]
 
     def test_subquery_inner_rewritten_outer_preserved(self):
-        query = parse_select("SELECT trace_id FROM (SELECT trace_id AS trace_id FROM ai_events GROUP BY trace_id)")
+        query = parse_select(
+            "SELECT trace_id FROM (SELECT trace_id AS trace_id FROM posthog.ai_events AS ai_events GROUP BY trace_id)"
+        )
         result = rewrite_query_for_events_table(query)
         assert isinstance(result, ast.SelectQuery)
         # Outer trace_id references the alias — NOT rewritten
@@ -189,9 +192,9 @@ class TestAiColumnToPropertyRewriter:
     def test_union_all_both_branches_rewritten(self):
         query = parse_select(
             """
-            SELECT trace_id AS trace_id FROM ai_events
+            SELECT trace_id AS trace_id FROM posthog.ai_events AS ai_events
             UNION ALL
-            SELECT trace_id AS trace_id FROM ai_events
+            SELECT trace_id AS trace_id FROM posthog.ai_events AS ai_events
             """
         )
         result = rewrite_query_for_events_table(query)
