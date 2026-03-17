@@ -104,7 +104,7 @@ def rust_flags_server() -> Generator[str, None, None]:
 
     # Start the Rust server
     process = subprocess.Popen(
-        ["cargo", "run", "--release"],
+        ["cargo", "run", "--bin", "feature-flags", "--release"],
         cwd=rust_dir,
         env=env,
         stdout=subprocess.PIPE,
