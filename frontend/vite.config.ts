@@ -8,6 +8,8 @@ import { htmlGenerationPlugin } from './vite-html-plugin'
 import { posthogJsPlugin } from './vite-posthog-js-plugin'
 import { publicAssetsPlugin } from './vite-public-assets-plugin'
 
+const backendPort = parseInt(process.env.BACKEND_PORT || '8000', 10)
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
     const isDev = mode === 'development'
@@ -107,7 +109,7 @@ export default defineConfig(({ mode }) => {
             origin: 'http://localhost:8234',
             proxy: {
                 '/static': {
-                    target: 'http://localhost:8000',
+                    target: `http://localhost:${backendPort}`,
                     changeOrigin: true,
                 },
             },

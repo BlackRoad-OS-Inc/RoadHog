@@ -26,7 +26,7 @@ case "$GO_SVC" in
 
     # Core settings
     export LIVESTREAM_DEBUG=true
-    export PORT="8666"
+    export PORT="${LIVESTREAM_PORT:-8666}"
 
     # Kafka settings
     export LIVESTREAM_KAFKA_BROKERS=localhost:9092

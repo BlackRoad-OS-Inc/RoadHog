@@ -498,7 +498,10 @@ API_QUERIES_ENABLED = get_from_env("API_QUERIES_ENABLED", False, type_cast=str_t
 # Livestream
 
 # Passed to the frontend for the web app to know where to connect to
-LIVESTREAM_HOST = get_from_env("LIVESTREAM_HOST", "")
+_livestream_port = get_from_env("LIVESTREAM_PORT", "8666")
+LIVESTREAM_HOST = get_from_env(
+    "LIVESTREAM_HOST", f"http://localhost:{_livestream_port}" if _livestream_port != "8666" else ""
+)
 
 ####
 # Graceful shutdown

@@ -37,5 +37,6 @@ python ${DEBUG:+ -m debugpy --listen 127.0.0.1:5678} -m granian \
     --reload-paths ./products \
     --reload-paths ./frontend/src/products.json \
     --host $HOST_BIND \
+    --port "${BACKEND_PORT:-8000}" \
     --log-level debug \
     --workers 1

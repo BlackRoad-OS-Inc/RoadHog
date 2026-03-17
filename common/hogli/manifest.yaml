@@ -733,6 +733,16 @@ utilities:
             TEMPORAL_NAMESPACE="wt_${ID}"
             PG_BASE="postgres://posthog:posthog@localhost:5432"
 
+            # Find the next free ports for backend and livestream services.
+            BACKEND_PORT=8000
+            while lsof -iTCP:$BACKEND_PORT -sTCP:LISTEN >/dev/null 2>&1; do
+                BACKEND_PORT=$((BACKEND_PORT + 1))
+            done
+            LIVESTREAM_PORT=8666
+            while lsof -iTCP:$LIVESTREAM_PORT -sTCP:LISTEN >/dev/null 2>&1; do
+                LIVESTREAM_PORT=$((LIVESTREAM_PORT + 1))
+            done
+
             # DB 0 = main REDIS_URL, DB 1 = main FLAGS_REDIS_URL.
             # Worktrees use consecutive pairs starting at DB 2: REDIS=2N, FLAGS=2N+1.
             # With --databases 256 in docker-compose.base.yml, 127 distinct hash slots are available.
@@ -774,6 +784,8 @@ utilities:
                 -e '/^FLAGS_REDIS_URL=/d' \
                 -e '/^KAFKA_PREFIX=/d' \
                 -e '/^TEMPORAL_NAMESPACE=/d' \
+                -e '/^BACKEND_PORT=/d' \
+                -e '/^LIVESTREAM_PORT=/d' \
                 -e '/^# Worktree-isolated/d' \
                 "$ENV_FILE"
 
@@ -799,6 +811,8 @@ utilities:
                 echo "DAGSTER_TEST_DB_NAME=${DAGSTER_TEST_DB}"
                 echo "DAGSTER_TEST_POSTGRES_URL=${PG_BASE}/${DAGSTER_TEST_DB}"
                 echo "TEMPORAL_NAMESPACE=${TEMPORAL_NAMESPACE}"
+                echo "BACKEND_PORT=${BACKEND_PORT}"
+                echo "LIVESTREAM_PORT=${LIVESTREAM_PORT}"
             } >> "$ENV_FILE"
 
             echo "Creating worktree databases…"
@@ -840,6 +854,8 @@ utilities:
             echo "   Redis:       DB index $REDIS_IDX"
             echo "   Kafka:       prefix wt_${ID}_"
             echo "   Temporal:    namespace ${TEMPORAL_NAMESPACE}"
+            echo "   Backend:     port ${BACKEND_PORT}"
+            echo "   Livestream:  port ${LIVESTREAM_PORT}"
             echo ""
             echo "Next: cd $WORKTREE_PATH && hogli worktree:init"
         description: Patch a worktree's .env with isolated database names and create

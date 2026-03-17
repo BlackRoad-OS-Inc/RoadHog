@@ -85,7 +85,7 @@ services:
                     }
 
                     handle {
-                        reverse_proxy web:8000
+                        reverse_proxy web:${BACKEND_PORT:-8000}
                     }
                 }
 
