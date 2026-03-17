@@ -1,6 +1,7 @@
 from django.utils.dateparse import parse_datetime
 
 import dagster
+import posthoganalytics
 from dagster import Backoff, Jitter, RetryPolicy
 from prometheus_client import Counter, Gauge
 
@@ -15,7 +16,8 @@ from posthog.exceptions_capture import capture_exception
 from posthog.hogql_queries.query_cache import DjangoCacheQueryCacheManager
 from posthog.hogql_queries.query_runner import get_query_runner
 from posthog.models import Team
-from posthog.models.instance_setting import get_instance_setting
+
+FEATURE_FLAG_NAME = "error-tracking-cache-warming"
 
 STALE_ERROR_TRACKING_QUERIES_GAUGE = Gauge(
     "posthog_cache_warming_stale_error_tracking_query_gauge",
@@ -52,8 +54,15 @@ DEFAULT_ERROR_TRACKING_QUERY: dict = {
 }
 
 
-def get_teams_enabled_for_error_tracking_cache_warming() -> list[int]:
-    return get_instance_setting("ERROR_TRACKING_WARMING_TEAMS_TO_WARM")
+def is_cache_warming_enabled_for_team(team: Team) -> bool:
+    return posthoganalytics.feature_enabled(
+        FEATURE_FLAG_NAME,
+        str(team.uuid),
+        groups={"project": str(team.id)},
+        group_properties={"project": {"id": str(team.id)}},
+        only_evaluate_locally=True,
+        send_feature_flag_events=False,
+    )
 
 
 def get_queries_for_team(team: Team) -> list[dict]:
@@ -80,10 +89,14 @@ def get_queries_for_team(team: Team) -> list[dict]:
 def get_teams_for_error_tracking_warming_op(
     context: dagster.OpExecutionContext, posthoganalytics: PostHogAnalyticsResource
 ) -> list[int]:
-    team_ids = get_teams_enabled_for_error_tracking_cache_warming()
-    context.log.info(f"Found {len(team_ids)} teams for error tracking cache warming")
-    context.add_output_metadata({"team_count": len(team_ids), "team_ids": str(team_ids)})
-    return team_ids
+    all_teams = list(Team.objects.exclude(id=0).only("id", "uuid"))
+    context.log.info(f"Checking {len(all_teams)} teams for {FEATURE_FLAG_NAME} feature flag")
+
+    enabled_ids: list[int] = [team.id for team in all_teams if is_cache_warming_enabled_for_team(team)]
+
+    context.log.info(f"Found {len(enabled_ids)} teams with cache warming enabled")
+    context.add_output_metadata({"team_count": len(enabled_ids), "team_ids": str(enabled_ids)})
+    return enabled_ids
 
 
 @dagster.op

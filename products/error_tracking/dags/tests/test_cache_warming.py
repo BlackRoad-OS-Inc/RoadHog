@@ -13,24 +13,9 @@ from posthog.schema import ErrorTrackingQuery
 from products.error_tracking.dags.cache_warming import (
     DEFAULT_ERROR_TRACKING_QUERY,
     get_queries_for_team,
-    get_teams_enabled_for_error_tracking_cache_warming,
+    is_cache_warming_enabled_for_team,
     warm_error_tracking_queries_op,
 )
-
-
-class TestGetTeamsEnabled(TestCase):
-    @patch("products.error_tracking.dags.cache_warming.get_instance_setting")
-    def test_returns_configured_teams(self, mock_get_setting):
-        mock_get_setting.return_value = [1, 2, 3]
-        result = get_teams_enabled_for_error_tracking_cache_warming()
-        assert result == [1, 2, 3]
-        mock_get_setting.assert_called_once_with("ERROR_TRACKING_WARMING_TEAMS_TO_WARM")
-
-    @patch("products.error_tracking.dags.cache_warming.get_instance_setting")
-    def test_returns_empty_list_by_default(self, mock_get_setting):
-        mock_get_setting.return_value = []
-        result = get_teams_enabled_for_error_tracking_cache_warming()
-        assert result == []
 
 
 class TestDefaultQueryShape(TestCase):
@@ -49,6 +34,26 @@ class TestDefaultQueryShape(TestCase):
         assert DEFAULT_ERROR_TRACKING_QUERY["withFirstEvent"] is False
         assert DEFAULT_ERROR_TRACKING_QUERY["withLastEvent"] is False
         assert DEFAULT_ERROR_TRACKING_QUERY["filterTestAccounts"] is False
+
+
+class TestIsCacheWarmingEnabled(BaseTest):
+    @patch("products.error_tracking.dags.cache_warming.posthoganalytics")
+    def test_checks_feature_flag_for_team(self, mock_posthoganalytics):
+        mock_posthoganalytics.feature_enabled.return_value = True
+        assert is_cache_warming_enabled_for_team(self.team) is True
+        mock_posthoganalytics.feature_enabled.assert_called_once_with(
+            "error-tracking-cache-warming",
+            str(self.team.uuid),
+            groups={"project": str(self.team.id)},
+            group_properties={"project": {"id": str(self.team.id)}},
+            only_evaluate_locally=True,
+            send_feature_flag_events=False,
+        )
+
+    @patch("products.error_tracking.dags.cache_warming.posthoganalytics")
+    def test_returns_false_when_flag_disabled(self, mock_posthoganalytics):
+        mock_posthoganalytics.feature_enabled.return_value = False
+        assert is_cache_warming_enabled_for_team(self.team) is False
 
 
 class TestGetQueriesForTeam(BaseTest):
