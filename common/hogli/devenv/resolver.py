@@ -35,6 +35,7 @@ class Capability:
     requires: list[str] = field(default_factory=list)
     docker_profiles: list[str] = field(default_factory=list)
     uv_groups: list[str] = field(default_factory=list)
+    dagster_locations: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -78,6 +79,7 @@ class IntentMap:
                 requires=cap_data.get("requires", []),
                 docker_profiles=cap_data.get("docker_profiles", []),
                 uv_groups=cap_data.get("uv_groups", []),
+                dagster_locations=cap_data.get("dagster_locations", []),
             )
 
         intents = {}
@@ -105,6 +107,7 @@ class ResolvedEnvironment:
     intents: set[str]
     docker_profiles: set[str] = field(default_factory=set)
     uv_groups: set[str] = field(default_factory=set)
+    dagster_locations: set[str] = field(default_factory=set)
     overrides_applied: dict[str, list[str]] = field(default_factory=dict)
     unit_provenance: dict[str, str] = field(default_factory=dict)  # unit -> reason
     skip_autostart: set[str] = field(default_factory=set)  # units to include but not auto-start
@@ -121,6 +124,10 @@ class ResolvedEnvironment:
     def get_uv_groups_list(self) -> list[str]:
         """Get sorted list of uv dependency groups for consistent output."""
         return sorted(self.uv_groups)
+
+    def get_dagster_locations_list(self) -> list[str]:
+        """Get sorted list of Dagster locations for consistent output."""
+        return sorted(self.dagster_locations)
 
     def get_unit_reason(self, unit: str) -> str:
         """Get human-readable reason why a unit is included."""
@@ -199,6 +206,9 @@ class IntentResolver:
         # 4b. Capabilities → UV dependency groups
         uv_groups = self._capabilities_to_uv_groups(expanded_capabilities)
 
+        # 4c. Capabilities → Dagster locations
+        dagster_locations = self._capabilities_to_dagster_locations(expanded_capabilities)
+
         # 5. Apply include overrides
         for unit in include_units:
             if unit not in units:
@@ -230,6 +240,7 @@ class IntentResolver:
             intents=set(intents),
             docker_profiles=docker_profiles,
             uv_groups=uv_groups,
+            dagster_locations=dagster_locations,
             overrides_applied=overrides_applied,
             unit_provenance=unit_provenance,
             skip_autostart=set(skip_autostart),
@@ -332,6 +343,16 @@ class IntentResolver:
 
         return groups
 
+    def _capabilities_to_dagster_locations(self, capabilities: set[str]) -> set[str]:
+        """Map capabilities to their Dagster locations."""
+        locations: set[str] = set()
+
+        for cap_name in capabilities:
+            capability = self.intent_map.capabilities[cap_name]
+            locations.update(capability.dagster_locations)
+
+        return locations
+
     def get_available_intents(self) -> list[tuple[str, str]]:
         """Get list of available intents with descriptions."""
         return [(name, intent.description) for name, intent in sorted(self.intent_map.intents.items())]
@@ -374,6 +395,12 @@ class IntentResolver:
             lines.append("\nPython dependency groups:")
             for group in sorted(resolved.uv_groups):
                 lines.append(f"  • {group}")
+
+        # Dagster locations
+        if resolved.dagster_locations:
+            lines.append("\nDagster locations:")
+            for location in sorted(resolved.dagster_locations):
+                lines.append(f"  • {location}")
 
         # Units
         lines.append("\nProcesses to start:")

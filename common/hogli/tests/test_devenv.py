@@ -7,7 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from hogli.devenv.generator import DevenvConfig, MprocsGenerator, load_devenv_config
+import yaml
+from hogli.devenv.generator import (
+    DAGSTER_LOCATION_MODULE_MAP,
+    DagsterWorkspaceGenerator,
+    DevenvConfig,
+    MprocsGenerator,
+    load_devenv_config,
+)
 from hogli.devenv.registry import ProcessRegistry, create_mprocs_registry
 from hogli.devenv.resolver import Capability, Intent, IntentMap, IntentResolver, load_intent_map
 from parameterized import parameterized
@@ -608,3 +615,380 @@ class TestPersonhogEnvInjection:
                 assert var in shell
             else:
                 assert var not in shell
+
+
+def create_test_intent_map_with_dagster() -> IntentMap:
+    """Create a minimal intent map for testing dagster location resolution."""
+    return IntentMap(
+        version="1.0",
+        capabilities={
+            "core_infra": Capability(
+                name="core_infra",
+                description="Core infrastructure",
+                requires=[],
+            ),
+            "dagster_pipelines": Capability(
+                name="dagster_pipelines",
+                description="Dagster data pipeline orchestration",
+                requires=["core_infra"],
+                docker_profiles=[],
+                dagster_locations=["shared", "ingestion"],
+            ),
+            "dagster_experiments": Capability(
+                name="dagster_experiments",
+                description="Dagster location for experiment timeseries recalculation",
+                requires=["dagster_pipelines"],
+                docker_profiles=[],
+                dagster_locations=["experiments"],
+            ),
+            "dagster_web_analytics": Capability(
+                name="dagster_web_analytics",
+                description="Dagster location for web analytics pre-aggregation",
+                requires=["dagster_pipelines"],
+                docker_profiles=[],
+                dagster_locations=["web_analytics"],
+            ),
+        },
+        intents={
+            "experiments": Intent(
+                name="experiments",
+                description="A/B testing and experimentation",
+                capabilities=["dagster_experiments"],
+            ),
+            "web_analytics": Intent(
+                name="web_analytics",
+                description="Web analytics",
+                capabilities=["dagster_web_analytics"],
+            ),
+            "dagster": Intent(
+                name="dagster",
+                description="All Dagster locations",
+                capabilities=["dagster_pipelines", "dagster_experiments", "dagster_web_analytics"],
+            ),
+        },
+        always_required=[],
+    )
+
+
+class TestDagsterLocations:
+    """Test Dagster location resolution."""
+
+    def test_dagster_locations_collected_from_capabilities(self) -> None:
+        """dagster_locations are collected from resolved capabilities."""
+        intent_map = create_test_intent_map_with_dagster()
+        registry = MockRegistry(
+            {
+                "core_infra": [],
+                "dagster_pipelines": ["dagster"],
+                "dagster_experiments": [],
+                "dagster_web_analytics": [],
+            }
+        )
+        resolver = IntentResolver(intent_map, registry)
+
+        result = resolver.resolve(["experiments"])
+
+        # dagster_experiments requires dagster_pipelines, so we get shared, ingestion, experiments
+        assert "shared" in result.dagster_locations
+        assert "ingestion" in result.dagster_locations
+        assert "experiments" in result.dagster_locations
+        assert "web_analytics" not in result.dagster_locations
+
+    def test_dagster_baseline_locations_always_present(self) -> None:
+        """shared and ingestion are always present when any dagster capability is resolved."""
+        intent_map = create_test_intent_map_with_dagster()
+        registry = MockRegistry(
+            {
+                "core_infra": [],
+                "dagster_pipelines": ["dagster"],
+                "dagster_experiments": [],
+                "dagster_web_analytics": [],
+            }
+        )
+        resolver = IntentResolver(intent_map, registry)
+
+        result = resolver.resolve(["web_analytics"])
+
+        assert "shared" in result.dagster_locations
+        assert "ingestion" in result.dagster_locations
+        assert "web_analytics" in result.dagster_locations
+
+    def test_dagster_intent_loads_all_locations(self) -> None:
+        """The dagster intent resolves all configured locations."""
+        intent_map = create_test_intent_map_with_dagster()
+        registry = MockRegistry(
+            {
+                "core_infra": [],
+                "dagster_pipelines": ["dagster"],
+                "dagster_experiments": [],
+                "dagster_web_analytics": [],
+            }
+        )
+        resolver = IntentResolver(intent_map, registry)
+
+        result = resolver.resolve(["dagster"])
+
+        assert result.dagster_locations == {"shared", "ingestion", "experiments", "web_analytics"}
+
+    def test_no_dagster_capability_empty_locations(self) -> None:
+        """Intent without dagster capabilities resolves to empty dagster_locations."""
+        intent_map = create_test_intent_map()
+        registry = create_test_registry()
+        resolver = IntentResolver(intent_map, registry)
+
+        result = resolver.resolve(["product_analytics"])
+
+        assert result.dagster_locations == set()
+
+    @parameterized.expand(
+        [
+            (["experiments"], {"shared", "ingestion", "experiments"}),
+            (["web_analytics"], {"shared", "ingestion", "web_analytics"}),
+            (["dagster"], {"shared", "ingestion", "experiments", "web_analytics"}),
+        ]
+    )
+    def test_dagster_location_resolution_by_intent(self, intents: list[str], expected_locations: set[str]) -> None:
+        """Each intent resolves to the expected Dagster locations."""
+        intent_map = create_test_intent_map_with_dagster()
+        registry = MockRegistry(
+            {
+                "core_infra": [],
+                "dagster_pipelines": ["dagster"],
+                "dagster_experiments": [],
+                "dagster_web_analytics": [],
+            }
+        )
+        resolver = IntentResolver(intent_map, registry)
+
+        result = resolver.resolve(intents)
+
+        assert result.dagster_locations == expected_locations
+
+    def test_real_intent_map_dagster_locations(self) -> None:
+        """Real intent map resolves dagster locations for relevant intents."""
+        intent_map = load_intent_map()
+        registry = create_mprocs_registry()
+        resolver = IntentResolver(intent_map, registry)
+
+        # experiments intent should resolve experiments + baseline locations
+        result = resolver.resolve(["experiments"])
+        assert "shared" in result.dagster_locations
+        assert "ingestion" in result.dagster_locations
+        assert "experiments" in result.dagster_locations
+
+        # dagster intent loads everything
+        result = resolver.resolve(["dagster"])
+        assert result.dagster_locations == {
+            "analytics_platform",
+            "experiments",
+            "growth",
+            "ingestion",
+            "llm_analytics",
+            "posthog_ai",
+            "shared",
+            "web_analytics",
+        }
+
+    def test_explain_resolution_includes_dagster_locations(self) -> None:
+        """Explanation output includes Dagster locations section."""
+        intent_map = create_test_intent_map_with_dagster()
+        registry = MockRegistry(
+            {
+                "core_infra": [],
+                "dagster_pipelines": ["dagster"],
+                "dagster_experiments": [],
+                "dagster_web_analytics": [],
+            }
+        )
+        resolver = IntentResolver(intent_map, registry)
+
+        result = resolver.resolve(["experiments"])
+        explanation = resolver.explain_resolution(result)
+
+        assert "Dagster locations" in explanation
+        assert "experiments" in explanation
+        assert "shared" in explanation
+        assert "ingestion" in explanation
+
+
+class TestDagsterWorkspaceGenerator:
+    """Test DagsterWorkspaceGenerator."""
+
+    def _make_resolved_with_locations(self, locations: set[str]):
+        """Helper to create a ResolvedEnvironment with given dagster_locations."""
+        from hogli.devenv.resolver import ResolvedEnvironment
+
+        return ResolvedEnvironment(
+            units=set(),
+            capabilities=set(),
+            intents=set(),
+            dagster_locations=locations,
+        )
+
+    def test_generate_produces_correct_load_from_entries(self) -> None:
+        """Generator produces load_from entries for all resolved locations."""
+        generator = DagsterWorkspaceGenerator()
+        resolved = self._make_resolved_with_locations({"shared", "ingestion", "experiments"})
+
+        config = generator.generate(resolved)
+
+        assert "load_from" in config
+        modules = [entry["python_module"] for entry in config["load_from"]]
+        assert "posthog.dags.locations.shared" in modules
+        assert "posthog.dags.locations.ingestion" in modules
+        assert "posthog.dags.locations.experiments" in modules
+
+    def test_generate_entries_sorted(self) -> None:
+        """Generator produces entries in sorted location order."""
+        generator = DagsterWorkspaceGenerator()
+        resolved = self._make_resolved_with_locations({"web_analytics", "shared", "ingestion"})
+
+        config = generator.generate(resolved)
+
+        modules = [entry["python_module"] for entry in config["load_from"]]
+        assert modules == sorted(modules)
+
+    def test_generate_skips_unknown_locations(self) -> None:
+        """Generator silently skips locations not in DAGSTER_LOCATION_MODULE_MAP."""
+        generator = DagsterWorkspaceGenerator()
+        resolved = self._make_resolved_with_locations({"shared", "nonexistent_location"})
+
+        config = generator.generate(resolved)
+
+        modules = [entry["python_module"] for entry in config["load_from"]]
+        assert "posthog.dags.locations.shared" in modules
+        assert len(modules) == 1
+
+    def test_generate_empty_locations_produces_empty_load_from(self) -> None:
+        """Generator with no locations produces empty load_from list."""
+        generator = DagsterWorkspaceGenerator()
+        resolved = self._make_resolved_with_locations(set())
+
+        config = generator.generate(resolved)
+
+        assert config == {"load_from": []}
+
+    def test_save_writes_valid_yaml_with_header(self) -> None:
+        """save() writes valid YAML file with generator header comment."""
+        generator = DagsterWorkspaceGenerator()
+        resolved = self._make_resolved_with_locations({"shared", "ingestion"})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "workspace.yaml"
+            config = generator.generate(resolved)
+            generator.save(config, output_path)
+
+            assert output_path.exists()
+            content = output_path.read_text()
+            assert "Generated by hogli dev:generate" in content
+            assert "hogli dev:setup" in content
+
+            parsed = yaml.safe_load(content)
+            assert "load_from" in parsed
+            modules = [entry["python_module"] for entry in parsed["load_from"]]
+            assert "posthog.dags.locations.shared" in modules
+            assert "posthog.dags.locations.ingestion" in modules
+
+    def test_generate_and_save_roundtrip(self) -> None:
+        """generate_and_save() creates parseable workspace.yaml."""
+        generator = DagsterWorkspaceGenerator()
+        resolved = self._make_resolved_with_locations({"shared", "ingestion", "experiments"})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "workspace.yaml"
+            generator.generate_and_save(resolved, output_path)
+
+            parsed = yaml.safe_load(output_path.read_text())
+            modules = [entry["python_module"] for entry in parsed["load_from"]]
+            assert len(modules) == 3
+            assert set(modules) == {
+                "posthog.dags.locations.shared",
+                "posthog.dags.locations.ingestion",
+                "posthog.dags.locations.experiments",
+            }
+
+    def test_dagster_location_module_map_covers_all_8_locations(self) -> None:
+        """DAGSTER_LOCATION_MODULE_MAP maps all 8 known Dagster locations."""
+        expected_keys = {
+            "analytics_platform",
+            "experiments",
+            "growth",
+            "ingestion",
+            "llm_analytics",
+            "posthog_ai",
+            "shared",
+            "web_analytics",
+        }
+        assert set(DAGSTER_LOCATION_MODULE_MAP.keys()) == expected_keys
+
+
+class TestUseGeneratedWorkspace:
+    """Test MprocsGenerator._use_generated_workspace."""
+
+    def _make_resolved(self, dagster_locations: set[str]):
+        from hogli.devenv.resolver import ResolvedEnvironment
+
+        return ResolvedEnvironment(
+            units=set(),
+            capabilities=set(),
+            intents=set(),
+            dagster_locations=dagster_locations,
+        )
+
+    def test_updates_dagster_shell_command_when_locations_resolved(self) -> None:
+        """When dagster_locations is non-empty, replaces $DAGSTER_HOME path in shell."""
+        registry = MockRegistry({})
+        generator = MprocsGenerator(registry)
+        proc_config = {"shell": "dagster dev --workspace $DAGSTER_HOME/workspace.yaml -p 3000"}
+        resolved = self._make_resolved({"shared", "ingestion"})
+
+        result = generator._use_generated_workspace(proc_config, resolved)
+
+        assert "$DAGSTER_HOME/workspace.yaml" not in result["shell"]
+        assert ".posthog/.generated/workspace.yaml" in result["shell"]
+
+    def test_no_change_when_no_dagster_locations(self) -> None:
+        """When dagster_locations is empty, shell command is unchanged."""
+        registry = MockRegistry({})
+        generator = MprocsGenerator(registry)
+        original_shell = "dagster dev --workspace $DAGSTER_HOME/workspace.yaml -p 3000"
+        proc_config = {"shell": original_shell}
+        resolved = self._make_resolved(set())
+
+        result = generator._use_generated_workspace(proc_config, resolved)
+
+        assert result["shell"] == original_shell
+
+    def test_does_not_mutate_original_proc_config(self) -> None:
+        """_use_generated_workspace does not modify the original proc_config dict."""
+        registry = MockRegistry({})
+        generator = MprocsGenerator(registry)
+        proc_config = {"shell": "dagster dev --workspace $DAGSTER_HOME/workspace.yaml -p 3000"}
+        original_shell = proc_config["shell"]
+        resolved = self._make_resolved({"shared"})
+
+        generator._use_generated_workspace(proc_config, resolved)
+
+        assert proc_config["shell"] == original_shell
+
+    @parameterized.expand(
+        [
+            ({"shared", "ingestion"}, True, "with locations replaces path"),
+            (set(), False, "without locations keeps original"),
+        ]
+    )
+    def test_use_generated_workspace_parametrized(
+        self, locations: set[str], should_replace: bool, description: str
+    ) -> None:
+        """_use_generated_workspace replaces path only when locations are present."""
+        registry = MockRegistry({})
+        generator = MprocsGenerator(registry)
+        proc_config = {"shell": "dagster dev --workspace $DAGSTER_HOME/workspace.yaml"}
+        resolved = self._make_resolved(locations)
+
+        result = generator._use_generated_workspace(proc_config, resolved)
+
+        if should_replace:
+            assert ".posthog/.generated/workspace.yaml" in result["shell"], description
+        else:
+            assert "$DAGSTER_HOME/workspace.yaml" in result["shell"], description

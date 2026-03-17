@@ -119,6 +119,15 @@ def run_setup_wizard(intent_map: IntentMap, log_to_files: bool = False) -> Deven
     output_path.parent.mkdir(parents=True, exist_ok=True)
     generator.generate_and_save(resolved, output_path, config)
 
+    # Generate Dagster workspace.yaml when dagster locations are resolved
+    if resolved.dagster_locations:
+        from .generator import DagsterWorkspaceGenerator, get_generated_workspace_path
+
+        workspace_generator = DagsterWorkspaceGenerator()
+        workspace_path = get_generated_workspace_path()
+        workspace_generator.generate_and_save(resolved, workspace_path)
+        click.echo(f"  Dagster: {len(resolved.dagster_locations)} location(s) → {workspace_path}")
+
     click.echo("")
     click.echo(click.style("✓ Config saved!", fg="green"))
     click.echo(f"  Location: {output_path}")

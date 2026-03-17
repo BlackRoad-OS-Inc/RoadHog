@@ -72,6 +72,43 @@ capabilities:
         description: 'Dagster data pipeline orchestration'
         requires: [core_infra]
         docker_profiles: []
+        dagster_locations: [shared, ingestion]
+
+    dagster_experiments:
+        description: 'Dagster location for experiment timeseries recalculation'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations: [experiments]
+
+    dagster_analytics_platform:
+        description: 'Dagster location for analytics platform (sessions backfills)'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations: [analytics_platform]
+
+    dagster_growth:
+        description: 'Dagster location for growth jobs (oauth cleanup, SDK versions)'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations: [growth]
+
+    dagster_llm_analytics:
+        description: 'Dagster location for LLM analytics daily metrics'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations: [llm_analytics]
+
+    dagster_posthog_ai:
+        description: 'Dagster location for PostHog AI evaluations'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations: [posthog_ai]
+
+    dagster_web_analytics:
+        description: 'Dagster location for web analytics pre-aggregation'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations: [web_analytics]
 
     llm_gateway:
         description: 'LLM gateway for AI features'
@@ -207,7 +244,7 @@ intents:
                 celery_workers,
                 nodejs_feature_flags,
                 nodejs_cdp,
-                dagster_pipelines,
+                dagster_experiments,
                 temporal_workflows,
             ]
 
@@ -221,11 +258,12 @@ intents:
                 property_definitions,
                 temporal_workflows,
                 llm_analytics_sentiment,
+                dagster_llm_analytics,
             ]
 
     web_analytics:
         description: 'Web analytics, traffic analysis, and heatmaps'
-        capabilities: [event_ingestion, replay_storage, property_definitions, livestream]
+        capabilities: [event_ingestion, replay_storage, property_definitions, livestream, dagster_web_analytics]
 
     surveys:
         description: 'User surveys and feedback collection'
@@ -246,7 +284,15 @@ intents:
 
     ai_features:
         description: 'AI features'
-        capabilities: [event_ingestion, llm_gateway, embedding_service, property_definitions, temporal_workflows]
+        capabilities:
+            [
+                event_ingestion,
+                llm_gateway,
+                embedding_service,
+                property_definitions,
+                temporal_workflows,
+                dagster_posthog_ai,
+            ]
 
     logs:
         description: 'Log aggregation and viewing'
@@ -282,7 +328,16 @@ intents:
 
     dagster:
         description: 'Dagster for clickhouse maintenance, system workflows'
-        capabilities: [dagster_pipelines]
+        capabilities:
+            [
+                dagster_pipelines,
+                dagster_analytics_platform,
+                dagster_experiments,
+                dagster_growth,
+                dagster_llm_analytics,
+                dagster_posthog_ai,
+                dagster_web_analytics,
+            ]
 
 # Always-required processes regardless of intent
 # This is the core stack needed for any development

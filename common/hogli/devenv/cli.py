@@ -93,6 +93,15 @@ def dev_generate(
 
     generator.generate_and_save(resolved, output_path, saved_config)
 
+    # Generate Dagster workspace.yaml when dagster locations are resolved
+    if resolved.dagster_locations:
+        from .generator import DagsterWorkspaceGenerator, get_generated_workspace_path
+
+        workspace_generator = DagsterWorkspaceGenerator()
+        workspace_path = get_generated_workspace_path()
+        workspace_generator.generate_and_save(resolved, workspace_path)
+        click.echo(f"  Dagster locations: {', '.join(sorted(resolved.dagster_locations))} → {workspace_path}")
+
     click.echo("Generated mprocs config from saved config")
     click.echo(f"  Products: {', '.join(sorted(resolved.intents))}")
     click.echo(f"  Units: {len(resolved.units)} processes")
