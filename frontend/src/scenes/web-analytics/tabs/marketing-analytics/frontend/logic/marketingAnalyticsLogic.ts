@@ -64,12 +64,22 @@ function getSourceStatus(
             NEEDED_FIELDS_FOR_NATIVE_MARKETING_ANALYTICS[
                 nativeSource.source_type as keyof typeof NEEDED_FIELDS_FOR_NATIVE_MARKETING_ANALYTICS
             ] || []
-        const schemaStatuses = requiredFields
-            .map((fieldName) => {
-                const schema = findSchemaByFieldName(nativeSource.schemas, fieldName, nativeSource.source_type)
-                return schema?.status
-            })
-            .filter(Boolean)
+        const schemas = requiredFields.map((fieldName) =>
+            findSchemaByFieldName(nativeSource.schemas, fieldName, nativeSource.source_type)
+        )
+
+        // Check for tables not selected for sync (should_sync=false) or missing entirely
+        const disabledTables = schemas.filter((s) => s && !s.should_sync)
+        const missingTables = schemas.filter((s) => !s)
+        if (disabledTables.length > 0 || missingTables.length > 0) {
+            return {
+                status: MarketingSourceStatus.Warning,
+                message:
+                    'Some required tables are not selected for import. Enable them in the data warehouse source settings.',
+            }
+        }
+
+        const schemaStatuses = schemas.map((s) => s?.status).filter(Boolean)
 
         if (schemaStatuses.includes(ExternalDataSchemaStatus.Failed)) {
             return { status: ExternalDataSchemaStatus.Failed, message: 'One or more required tables failed to sync' }
