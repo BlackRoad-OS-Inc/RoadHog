@@ -14,15 +14,15 @@ test.describe('insight variables', () => {
         await expect(page.locator('.InsightCard').first()).toBeVisible()
 
         const cardForDefaultVariable = await dashboard.findCardByTitle('Variable default')
-        await expect(cardForDefaultVariable.locator('.BoldNumber')).toHaveText('10')
+        await expect(cardForDefaultVariable.locator('.BoldNumber')).toHaveText('10', { timeout: 30000 })
 
         const cardForDashboardOverride = await dashboard.findCardByTitle('Dashboard override')
-        await expect(cardForDashboardOverride.locator('.BoldNumber')).toHaveText('20')
+        await expect(cardForDashboardOverride.locator('.BoldNumber')).toHaveText('20', { timeout: 30000 })
 
         const cardForInsightOverride = await dashboard.findCardByTitle('Insight override')
-        await expect(cardForInsightOverride.locator('.BoldNumber')).toHaveText('30')
+        await expect(cardForInsightOverride.locator('.BoldNumber')).toHaveText('30', { timeout: 30000 })
 
         const cardForURLOverride = await dashboard.findCardByTitle('Temporary override')
-        await expect(cardForURLOverride.locator('.BoldNumber')).toHaveText('40')
+        await expect(cardForURLOverride.locator('.BoldNumber')).toHaveText('40', { timeout: 30000 })
     })
 })

@@ -105,9 +105,13 @@ test.describe('Dashboards', () => {
         })
 
         await test.step('duplicate the tile', async () => {
-            const titleLocator = dashboard.insightCards.first().getByTestId('insight-card-title')
-            await expect(titleLocator).not.toContainText('Loading')
-            const title = await titleLocator.textContent()
+            await dashboard.waitForInsightCardLoaded()
+            const title = await dashboard.insightCards
+                .first()
+                .getByTestId('insight-card-title')
+                .locator('span')
+                .first()
+                .textContent()
             await dashboard.openFirstTileMenu()
             await dashboard.selectTileMenuOption('Duplicate')
 
@@ -226,6 +230,7 @@ test.describe('Dashboards', () => {
         })
 
         await test.step('open the insight from the dashboard', async () => {
+            await dashboard.waitForInsightCardLoaded()
             await dashboard.openFirstTileMenu()
             await dashboard.selectTileMenuOption('Edit')
             await expect(page).toHaveURL(/edit/)

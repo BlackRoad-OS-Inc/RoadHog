@@ -186,35 +186,67 @@ export class DashboardPage {
     }
 
     async findCardByTitle(title: string): Promise<Locator> {
-        const count = await this.insightCards.count()
+        // Cards may still be loading their titles when this is called.
+        // Retry the scan until the card is found or the timeout expires.
+        let found: Locator | null = null
 
-        for (let i = 0; i < count; i++) {
-            const card = this.insightCards.nth(i)
-            await card.scrollIntoViewIfNeeded()
-            const titleText = await card
-                .locator('[data-attr="insight-card-title"]')
-                .textContent({ timeout: 5000 })
-                .catch(() => null)
+        await expect(async () => {
+            const count = await this.insightCards.count()
 
-            if (titleText?.includes(title)) {
-                return card
+            for (let i = 0; i < count; i++) {
+                const card = this.insightCards.nth(i)
+                await card.scrollIntoViewIfNeeded()
+                const titleText = await card
+                    .locator('[data-attr="insight-card-title"]')
+                    .textContent({ timeout: 5000 })
+                    .catch(() => null)
+
+                if (titleText?.includes(title)) {
+                    found = card
+                    return
+                }
             }
-        }
 
-        throw new Error(`Could not find InsightCard with title "${title}"`)
+            throw new Error(`Could not find InsightCard with title "${title}"`)
+        }).toPass({ timeout: 30000 })
+
+        return found!
+    }
+
+    async waitForInsightCardLoaded(): Promise<void> {
+        // The insight-card-title h4 includes a "Loading" tooltip as a child
+        // when the card's query is still running. Wait for that to disappear.
+        const firstCard = this.insightCards.first()
+        await expect(firstCard).toBeVisible()
+        await expect(firstCard.getByTestId('insight-card-title').getByText('Loading')).not.toBeVisible({
+            timeout: 30000,
+        })
     }
 
     async openFirstTileMenu(): Promise<void> {
-        const card = this.insightCards.first()
-        await card.scrollIntoViewIfNeeded()
-        await card.hover()
-        await card.getByTestId('more-button').click()
+        // Dismiss any previously open popover so its DOM doesn't interfere
+        // with the new click target.
+        await this.page.keyboard.press('Escape')
+        await expect(this.page.locator('.Popover'))
+            .not.toBeVisible({ timeout: 3000 })
+            .catch(() => {})
+
+        // The card can re-render while loading (detaching the more-button from
+        // the DOM mid-click). Retry the whole hover → click sequence until the
+        // popover is open.
+        await expect(async () => {
+            const card = this.insightCards.first()
+            await card.scrollIntoViewIfNeeded()
+            await card.hover()
+            await card.getByTestId('more-button').click({ timeout: 3000 })
+            await expect(this.page.locator('.Popover')).toBeVisible({ timeout: 3000 })
+        }).toPass({ timeout: 30000 })
     }
 
     async selectTileMenuOption(option: string): Promise<void> {
-        const editLink = this.page
-            .locator('.Popover')
-            .getByRole(option === 'Edit' ? 'link' : 'button', { name: option })
+        const popover = this.page.locator('.Popover')
+        await expect(popover).toBeVisible()
+        const editLink = popover.getByRole(option === 'Edit' ? 'link' : 'button', { name: option })
         await editLink.click()
     }
 }
