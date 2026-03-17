@@ -26,6 +26,7 @@ from posthog.temporal.common.client import async_connect
 from posthog.temporal.common.schedule import a_create_schedule, a_schedule_exists, a_update_schedule
 from posthog.temporal.delete_recordings.types import PurgeDeletedMetadataInput
 from posthog.temporal.ducklake.compaction_types import DucklakeCompactionInput
+from posthog.temporal.ducklake.duckling_backfill_inputs import DucklingDiscoveryInputs
 from posthog.temporal.enforce_max_replay_retention.types import EnforceMaxReplayRetentionInput
 from posthog.temporal.experiments.schedule import (
     create_experiment_regular_metrics_schedules,
@@ -349,6 +350,56 @@ async def create_purge_deleted_recording_metadata_schedule(client: Client):
         )
 
 
+async def create_duckling_events_daily_backfill_schedule(client: Client):
+    """Create or update the schedule for daily duckling events backfill.
+
+    Runs hourly to discover teams needing yesterday's events backfilled.
+    """
+    schedule = Schedule(
+        action=ScheduleActionStartWorkflow(
+            "duckling-backfill-discovery",
+            DucklingDiscoveryInputs(data_type="events"),
+            id="duckling-events-daily-backfill-schedule",
+            task_queue=settings.DUCKLING_BACKFILL_TASK_QUEUE,
+            retry_policy=common.RetryPolicy(
+                maximum_attempts=3,
+                initial_interval=timedelta(minutes=5),
+            ),
+        ),
+        spec=ScheduleSpec(intervals=[ScheduleIntervalSpec(every=timedelta(hours=1))]),
+    )
+
+    if await a_schedule_exists(client, "duckling-events-daily-backfill-schedule"):
+        await a_update_schedule(client, "duckling-events-daily-backfill-schedule", schedule)
+    else:
+        await a_create_schedule(client, "duckling-events-daily-backfill-schedule", schedule, trigger_immediately=False)
+
+
+async def create_duckling_persons_daily_backfill_schedule(client: Client):
+    """Create or update the schedule for daily duckling persons backfill.
+
+    Runs hourly to discover teams needing yesterday's persons backfilled.
+    """
+    schedule = Schedule(
+        action=ScheduleActionStartWorkflow(
+            "duckling-backfill-discovery",
+            DucklingDiscoveryInputs(data_type="persons"),
+            id="duckling-persons-daily-backfill-schedule",
+            task_queue=settings.DUCKLING_BACKFILL_TASK_QUEUE,
+            retry_policy=common.RetryPolicy(
+                maximum_attempts=3,
+                initial_interval=timedelta(minutes=5),
+            ),
+        ),
+        spec=ScheduleSpec(intervals=[ScheduleIntervalSpec(every=timedelta(hours=1))]),
+    )
+
+    if await a_schedule_exists(client, "duckling-persons-daily-backfill-schedule"):
+        await a_update_schedule(client, "duckling-persons-daily-backfill-schedule", schedule)
+    else:
+        await a_create_schedule(client, "duckling-persons-daily-backfill-schedule", schedule, trigger_immediately=False)
+
+
 schedules = [
     create_sync_vectors_schedule,
     create_run_quota_limiting_schedule,
@@ -367,6 +418,8 @@ schedules = [
     create_all_realtime_cohort_calculation_schedules,
     create_ingestion_acceptance_test_schedule,
     create_health_check_schedules,
+    create_duckling_events_daily_backfill_schedule,
+    create_duckling_persons_daily_backfill_schedule,
 ]
 
 if settings.EE_AVAILABLE:

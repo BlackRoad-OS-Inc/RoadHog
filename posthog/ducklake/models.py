@@ -102,3 +102,34 @@ class DuckgresServer(CreatedMetaFields, UpdatedMetaFields, UUIDModel):
         db_table = "posthog_duckgresserver"
         verbose_name = "Duckgres server"
         verbose_name_plural = "Duckgres servers"
+
+
+class DucklingBackfillRun(CreatedMetaFields, UpdatedMetaFields, UUIDModel):
+    """Tracks the status of duckling backfill runs per team/data_type/partition.
+
+    Each row represents one partition of data (e.g., events for 2024-01-15) being
+    backfilled to a customer's duckling. The unique constraint on
+    (team, data_type, partition_key) ensures idempotent processing.
+    """
+
+    team = models.ForeignKey(
+        "posthog.Team",
+        on_delete=models.CASCADE,
+        related_name="duckling_backfill_runs",
+    )
+    data_type = models.CharField(max_length=20)  # "events" or "persons"
+    partition_key = models.CharField(max_length=50)  # "2024-01-15" or "2024-01"
+    status = models.CharField(max_length=20, default="pending")  # pending/running/completed/failed
+    workflow_id = models.CharField(max_length=255, blank=True, default="")
+    error_message = models.TextField(blank=True, default="")
+    records_exported = models.IntegerField(default=0)
+    bytes_exported = models.BigIntegerField(default=0)
+
+    class Meta:
+        db_table = "posthog_ducklingbackfillrun"
+        unique_together = [("team", "data_type", "partition_key")]
+        verbose_name = "Duckling backfill run"
+        verbose_name_plural = "Duckling backfill runs"
+        indexes = [
+            models.Index(fields=["data_type", "status"], name="idx_ducklingbackfill_type_stat"),
+        ]

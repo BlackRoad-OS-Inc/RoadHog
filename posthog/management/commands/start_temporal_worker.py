@@ -51,6 +51,8 @@ from posthog.temporal.dlq_replay import (
 )
 from posthog.temporal.ducklake import (
     ACTIVITIES as DUCKLAKE_COPY_ACTIVITIES,
+    DUCKLING_BACKFILL_ACTIVITIES,
+    DUCKLING_BACKFILL_WORKFLOWS,
     WORKFLOWS as DUCKLAKE_COPY_WORKFLOWS,
 )
 from posthog.temporal.enforce_max_replay_retention import (
@@ -210,6 +212,11 @@ _task_queue_specs = [
         settings.DUCKLAKE_TASK_QUEUE,
         DUCKLAKE_COPY_WORKFLOWS,
         DUCKLAKE_COPY_ACTIVITIES,
+    ),
+    (
+        settings.DUCKLING_BACKFILL_TASK_QUEUE,
+        DUCKLING_BACKFILL_WORKFLOWS,
+        DUCKLING_BACKFILL_ACTIVITIES,
     ),
     (
         settings.ANALYTICS_PLATFORM_TASK_QUEUE,
