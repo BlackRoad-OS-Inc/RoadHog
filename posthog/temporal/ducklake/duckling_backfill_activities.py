@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+from django.db import models
 from django.utils import timezone
 
 import duckdb
@@ -26,6 +27,9 @@ LOGGER = get_logger(__name__)
 # DuckDB memory limit — leave headroom for the Temporal worker process
 DUCKDB_MEMORY_LIMIT = "4GB"
 
+# Stop retrying a partition after this many failed attempts
+MAX_BACKFILL_ATTEMPTS = 3
+
 
 @activity.defn
 async def discover_duckling_teams_activity(inputs: DucklingDiscoveryInputs) -> list[DucklingDiscoveryResult]:
@@ -43,25 +47,23 @@ async def discover_duckling_teams_activity(inputs: DucklingDiscoveryInputs) -> l
 
     yesterday = (timezone.now() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
 
-    catalogs = await database_sync_to_async(lambda: list(DuckLakeCatalog.objects.values_list("team_id", flat=True)))()
-
-    # Batch query: find all teams that already completed this partition
-    completed_team_ids = await database_sync_to_async(
-        lambda: set(
-            DucklingBackfillRun.objects.filter(
-                team_id__in=catalogs,
-                data_type=inputs.data_type,
-                partition_key=yesterday,
-                status="completed",
+    # Single query: teams with a catalog but no completed or max-retried backfill for this partition
+    team_ids = await database_sync_to_async(
+        lambda: list(
+            DuckLakeCatalog.objects.exclude(
+                team_id__in=DucklingBackfillRun.objects.filter(
+                    data_type=inputs.data_type,
+                    partition_key=yesterday,
+                )
+                .filter(
+                    models.Q(status="completed") | models.Q(attempts__gte=MAX_BACKFILL_ATTEMPTS),
+                )
+                .values("team_id")
             ).values_list("team_id", flat=True)
         )
     )()
 
-    results = [
-        DucklingDiscoveryResult(team_id=team_id, partition_key=yesterday)
-        for team_id in catalogs
-        if team_id not in completed_team_ids
-    ]
+    results = [DucklingDiscoveryResult(team_id=team_id, partition_key=yesterday) for team_id in team_ids]
 
     logger.info("Discovered teams for daily backfill", count=len(results), date=yesterday)
     return results
@@ -326,22 +328,32 @@ async def update_backfill_run_status_activity(inputs: DucklingUpdateStatusInputs
     bind_contextvars(team_id=inputs.team_id, data_type=inputs.data_type, partition_key=inputs.partition_key)
     logger = LOGGER.bind()
 
+    from django.db.models import F
+
     from posthog.ducklake.models import DucklingBackfillRun
     from posthog.sync import database_sync_to_async
 
-    await database_sync_to_async(
+    defaults: dict[str, object] = {
+        "status": inputs.status,
+        "workflow_id": inputs.workflow_id,
+        "error_message": inputs.error_message,
+        "records_exported": inputs.records_exported,
+        "bytes_exported": inputs.bytes_exported,
+    }
+
+    run, created = await database_sync_to_async(
         lambda: DucklingBackfillRun.objects.update_or_create(
             team_id=inputs.team_id,
             data_type=inputs.data_type,
             partition_key=inputs.partition_key,
-            defaults={
-                "status": inputs.status,
-                "workflow_id": inputs.workflow_id,
-                "error_message": inputs.error_message,
-                "records_exported": inputs.records_exported,
-                "bytes_exported": inputs.bytes_exported,
-            },
+            defaults=defaults,
         )
     )()
+
+    # Increment attempts when a new run starts
+    if inputs.status == "running" and not created:
+        await database_sync_to_async(
+            lambda: DucklingBackfillRun.objects.filter(pk=run.pk).update(attempts=F("attempts") + 1)
+        )()
 
     logger.info("Updated backfill run status", status=inputs.status)

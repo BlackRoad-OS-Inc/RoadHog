@@ -26,6 +26,7 @@ class Migration(migrations.Migration):
                 ("data_type", models.CharField(max_length=20)),
                 ("partition_key", models.CharField(max_length=50)),
                 ("status", models.CharField(default="pending", max_length=20)),
+                ("attempts", models.IntegerField(default=0)),
                 ("workflow_id", models.CharField(blank=True, default="", max_length=255)),
                 ("error_message", models.TextField(blank=True, default="")),
                 ("records_exported", models.IntegerField(default=0)),
