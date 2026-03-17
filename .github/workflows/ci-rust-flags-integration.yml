@@ -23,7 +23,7 @@ concurrency:
 
 env:
     SECRET_KEY: '6b01eee4f945ca25045b5aab440b953461b81b72' # unsafe - for testing only
-    DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/posthog'
+    DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/test_posthog'
     REDIS_URL: 'redis://localhost:6379/'
     TEST: 1
     UV_HTTP_TIMEOUT: 300
@@ -40,7 +40,7 @@ jobs:
                 env:
                     POSTGRES_USER: posthog
                     POSTGRES_PASSWORD: posthog
-                    POSTGRES_DB: posthog
+                    POSTGRES_DB: test_posthog
                 ports:
                     - 5432:5432
                 options: >-
@@ -91,12 +91,12 @@ jobs:
             - name: Install Python dependencies
               run: UV_PROJECT_ENVIRONMENT=$pythonLocation uv sync --frozen --dev
 
-            - name: Set up Django database
+            - name: Set up test database schema
               run: |
-                  python manage.py setup_test_environment
+                  python manage.py migrate --run-syncdb
               env:
                   DEBUG: '1'
-                  TEST: '1'
+                  DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/test_posthog'
 
             - name: Build Rust flags service
               working-directory: rust
@@ -119,8 +119,8 @@ jobs:
               env:
                   BIND_HOST: '127.0.0.1'
                   BIND_PORT: '3001'
-                  READ_DATABASE_URL: postgres://posthog:posthog@localhost:5432/posthog
-                  WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/posthog
+                  READ_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog
+                  WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog
                   REDIS_URL: redis://localhost:6379/
 
             - name: Run integration tests
