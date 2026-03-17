@@ -11,16 +11,14 @@ class PushPlatform(models.TextChoices):
     IOS = "ios", "iOS"
 
 
-class PushProvider(models.TextChoices):
-    FCM = "fcm", "fcm"
-    APNS = "apns", "apns"
-
-
 class PushSubscription(UUIDModel):
     """
     Stores push notification tokens for devices.
     Tokens are stored here (not as person properties) for security - person properties
-    are readable via API, but FCM tokens should not be exposed.
+    are readable via API, but push tokens should not be exposed.
+
+    The integration FK points to an Integration of kind "firebase" or "apple-push",
+    which holds the provider credentials needed to deliver the notification.
     """
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -29,11 +27,10 @@ class PushSubscription(UUIDModel):
     token = EncryptedTextField()
     token_hash = models.CharField(max_length=64)
     platform = models.CharField(choices=PushPlatform.choices, max_length=16)
-    provider = models.CharField(choices=PushProvider.choices, max_length=16)
+    integration = models.ForeignKey("posthog.Integration", on_delete=models.CASCADE)
     is_active = models.BooleanField(default=True)
     last_successfully_used_at = models.DateTimeField(blank=True, null=True)
     disabled_reason = models.CharField(blank=True, max_length=128, null=True)
-    fcm_project_id = models.CharField(blank=True, max_length=256, null=True)
     team = models.ForeignKey("posthog.Team", on_delete=models.CASCADE)
 
     objects: models.Manager["PushSubscription"]
@@ -41,7 +38,7 @@ class PushSubscription(UUIDModel):
     class Meta:
         indexes = [
             models.Index(fields=["team", "token_hash"]),
-            models.Index(fields=["team", "distinct_id", "platform", "provider", "is_active"]),
+            models.Index(fields=["team", "distinct_id", "platform", "is_active"]),
             models.Index(
                 fields=["team", "distinct_id", "is_active", "last_successfully_used_at", "created_at"],
                 name="workflows_ps_used_created_idx",
@@ -74,12 +71,11 @@ class PushSubscription(UUIDModel):
         distinct_id: str,
         token: str,
         platform: PushPlatform,
-        provider: PushProvider,
-        fcm_project_id: str | None = None,
+        integration_id: int,
     ) -> "PushSubscription":
         """
         Create or update a push subscription token.
-        If a subscription with the same team/token exists, updates it.
+        If a subscription with the same team/distinct_id/token exists, updates it.
         """
         token_hash = cls._hash_token(token)
 
@@ -90,10 +86,9 @@ class PushSubscription(UUIDModel):
             defaults={
                 "token": token,
                 "platform": platform,
-                "provider": provider,
+                "integration_id": integration_id,
                 "is_active": True,
                 "disabled_reason": None,
-                "fcm_project_id": fcm_project_id,
             },
         )
 
@@ -107,7 +102,7 @@ class PushSubscription(UUIDModel):
         platform: PushPlatform | None = None,
     ) -> list["PushSubscription"]:
         """Get all active push subscriptions for a distinct_id."""
-        qs = cls.objects.filter(team_id=team_id, distinct_id=distinct_id, is_active=True)
+        qs = cls.objects.filter(team_id=team_id, distinct_id=distinct_id, is_active=True).select_related("integration")
         if platform:
             qs = qs.filter(platform=platform)
         return list(qs)
@@ -115,7 +110,7 @@ class PushSubscription(UUIDModel):
     @classmethod
     def deactivate_token(cls, team_id: int, token: str, reason: str | None = None) -> int:
         """
-        Deactivate a specific token (e.g., when FCM reports it as invalid).
+        Deactivate a specific token (e.g., when the provider reports it as invalid).
         Returns the number of subscriptions deactivated.
         """
         token_hash = cls._hash_token(token)

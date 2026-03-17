@@ -26,14 +26,16 @@ class Migration(migrations.Migration):
                     "platform",
                     models.CharField(choices=[("android", "Android"), ("ios", "iOS")], max_length=16),
                 ),
-                (
-                    "provider",
-                    models.CharField(choices=[("fcm", "fcm"), ("apns", "apns")], max_length=16),
-                ),
                 ("is_active", models.BooleanField(default=True)),
                 ("last_successfully_used_at", models.DateTimeField(blank=True, null=True)),
                 ("disabled_reason", models.CharField(blank=True, max_length=128, null=True)),
-                ("fcm_project_id", models.CharField(blank=True, max_length=256, null=True)),
+                (
+                    "integration",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="posthog.integration",
+                    ),
+                ),
                 (
                     "team",
                     models.ForeignKey(
@@ -50,7 +52,7 @@ class Migration(migrations.Migration):
         migrations.AddIndex(
             model_name="pushsubscription",
             index=models.Index(
-                fields=["team", "distinct_id", "platform", "provider", "is_active"],
+                fields=["team", "distinct_id", "platform", "is_active"],
                 name="workflows_p_team_id_90c92e_idx",
             ),
         ),
