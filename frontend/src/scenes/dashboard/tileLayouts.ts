@@ -238,10 +238,10 @@ export const calculateLayouts = (
 
 export function calculateAutoLayoutTiles(
     tiles: DashboardTile<QueryBasedInsightModel>[],
-    columns: 1 | 2
+    columns: 1 | 2 | 3
 ): Array<{ id: number; layouts: { sm: TileLayout } }> {
     const smColumnCount = BREAKPOINT_COLUMN_COUNTS.sm
-    const tileWidth = columns === 1 ? smColumnCount : Math.floor(smColumnCount / 2)
+    const tileWidth = columns === 1 ? smColumnCount : Math.floor(smColumnCount / columns)
 
     const calculated = calculateLayouts(tiles)
     const calculatedSm = (calculated.sm || []) as unknown as Array<{ i: string; h: number }>
@@ -256,8 +256,10 @@ export function calculateAutoLayoutTiles(
         const height = tile.layouts?.sm?.h ?? calculatedHeightById[tile.id] ?? 5
 
         let columnIndex = 0
-        if (columns === 2) {
-            columnIndex = columnHeights[0] <= columnHeights[1] ? 0 : 1
+        for (let index = 1; index < columns; index++) {
+            if (columnHeights[index] < columnHeights[columnIndex]) {
+                columnIndex = index
+            }
         }
 
         const x = columnIndex * tileWidth

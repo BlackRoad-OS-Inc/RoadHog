@@ -64,7 +64,7 @@ export function EditModeActions(): JSX.Element {
                               : 'Not privileged to edit this dashboard'
                     }
                 >
-                    Save
+                    Save Layout
                 </LemonButton>
             </AppShortcut>
         </>

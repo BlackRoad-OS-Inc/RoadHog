@@ -358,7 +358,7 @@ export const eventUsageLogic = kea<eventUsageLogicType>([
             layoutZoom: number,
             source: 'button' | 'shortcut'
         ) => ({ dashboard, layoutZoom, source }),
-        reportDashboardAutoLayoutChanged: (dashboardId: number | null | undefined, columns: 1 | 2) => ({
+        reportDashboardAutoLayoutChanged: (dashboardId: number | null | undefined, columns: 1 | 2 | 3) => ({
             dashboardId,
             columns,
         }),

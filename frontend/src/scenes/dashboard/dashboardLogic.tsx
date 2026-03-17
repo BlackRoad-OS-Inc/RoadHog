@@ -285,7 +285,7 @@ export const dashboardLogic = kea<dashboardLogicType>([
          */
         updateLayouts: (layouts: ResponsiveLayouts) => ({ layouts }),
         updateContainerWidth: (containerWidth: number, columns: number) => ({ containerWidth, columns }),
-        autoLayoutTiles: (columns: 1 | 2) => ({ columns }),
+        autoLayoutTiles: (columns: 1 | 2 | 3) => ({ columns }),
         updateTileColor: (tileId: number, color: InsightColor | null) => ({ tileId, color }),
         toggleTileDescription: (tileId: number) => ({ tileId }),
         setTileProperty: (tileId: number, properties: Partial<Pick<DashboardTile, 'color' | 'show_description'>>) => ({
@@ -1711,6 +1711,9 @@ export const dashboardLogic = kea<dashboardLogicType>([
             } else if (values.autoRefresh.enabled) {
                 actions.resetInterval()
             }
+        },
+        autoLayoutTiles: ({ columns }) => {
+            eventUsageLogic.actions.reportDashboardAutoLayoutChanged(values.dashboard?.id ?? props.id, columns)
         },
         loadDashboardFailure: () => {
             const { action, dashboardQueryId, startTime } = values.dashboardLoadData

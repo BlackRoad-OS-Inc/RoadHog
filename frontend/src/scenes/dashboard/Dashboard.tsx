@@ -3,14 +3,14 @@ import './Dashboard.scss'
 import { BindLogic, useActions, useMountedLogic, useValues } from 'kea'
 
 import { IconThumbsDown, IconThumbsUp } from '@posthog/icons'
-import { LemonBanner, LemonButton, LemonMenu } from '@posthog/lemon-ui'
+import { LemonBanner, LemonButton } from '@posthog/lemon-ui'
 
 import { AccessDenied } from 'lib/components/AccessDenied'
 import { NotFound } from 'lib/components/NotFound'
 import { useFileSystemLogView } from 'lib/hooks/useFileSystemLogView'
 import { useOnMountEffect } from 'lib/hooks/useOnMountEffect'
 import { cn } from 'lib/utils/css-classes'
-import { DashboardEventSource, eventUsageLogic } from 'lib/utils/eventUsageLogic'
+import { DashboardEventSource } from 'lib/utils/eventUsageLogic'
 import { DashboardFilterBar } from 'scenes/dashboard/DashboardFilters'
 import { DashboardItems } from 'scenes/dashboard/DashboardItems'
 import { DashboardLogicProps, dashboardLogic } from 'scenes/dashboard/dashboardLogic'
@@ -27,8 +27,8 @@ import { teamLogic } from '../teamLogic'
 import { AddInsightToDashboardModal } from './addInsightToDashboardModal/AddInsightToDashboardModal'
 import { addInsightToDashboardLogic } from './addInsightToDashboardModalLogic'
 import { DashboardHeader } from './DashboardHeader'
+import { DashboardLayoutConfig } from './DashboardLayoutConfig'
 import { DashboardOverridesBanner } from './DashboardOverridesBanner'
-import { DashboardZoomControl } from './DashboardZoomControl'
 import { EmptyDashboardComponent } from './EmptyDashboardComponent'
 
 interface DashboardProps {
@@ -94,9 +94,9 @@ function DashboardScene({ backTo }: { backTo?: { url: string; name: string } }):
         applyFilters,
         setDashboardMode,
         setLayoutZoom,
-        autoLayoutTiles,
+        autoLayoutTiles: autoLayoutTilesAction,
     } = useActions(dashboardLogic)
-    const { reportDashboardAutoLayoutChanged } = useActions(eventUsageLogic)
+    const autoLayoutTiles = (columns: 1 | 2 | 3): void => autoLayoutTilesAction(columns)
     const { addInsightToDashboardModalVisible } = useValues(addInsightToDashboardLogic)
 
     useFileSystemLogView({
@@ -200,53 +200,17 @@ function DashboardScene({ backTo }: { backTo?: { url: string; name: string } }):
                     )}
 
                     <SceneStickyBar showBorderBottom={false} className="flex">
-                        <DashboardFilterBar backTo={backTo} />
-                        {dashboardMode === DashboardMode.Edit &&
-                            canEditDashboard &&
-                            [
-                                DashboardPlacement.Dashboard,
-                                DashboardPlacement.ProjectHomepage,
-                                DashboardPlacement.Builtin,
-                            ].includes(placement) && (
-                                <DashboardZoomControl layoutZoom={layoutZoom} setLayoutZoom={setLayoutZoom} />
-                            )}
-                        {dashboardMode === DashboardMode.Edit && (
-                            <LemonMenu
-                                items={[
-                                    {
-                                        label: '1 column',
-                                        'data-attr': 'dashboard-auto-layout-1-col',
-                                        onClick: () => {
-                                            autoLayoutTiles(1)
-                                            reportDashboardAutoLayoutChanged(dashboard?.id, 1)
-                                        },
-                                    },
-                                    {
-                                        label: '2 columns',
-                                        'data-attr': 'dashboard-auto-layout-2-col',
-                                        onClick: () => {
-                                            autoLayoutTiles(2)
-                                            reportDashboardAutoLayoutChanged(dashboard?.id, 2)
-                                        },
-                                    },
-                                ]}
-                                placement="bottom-end"
-                                fallbackPlacements={['bottom-start', 'bottom']}
-                            >
-                                <LemonButton
-                                    size="small"
-                                    type="secondary"
-                                    data-attr="dashboard-auto-layout-button"
-                                    disabled={currentLayoutSize === 'xs'}
-                                    tooltip={
-                                        currentLayoutSize === 'xs'
-                                            ? 'Layout editing is disabled on smaller screens.'
-                                            : undefined
-                                    }
-                                >
-                                    Auto layout
-                                </LemonButton>
-                            </LemonMenu>
+                        {dashboardMode === DashboardMode.Edit ? (
+                            <DashboardLayoutConfig
+                                canEditDashboard={canEditDashboard}
+                                placement={placement}
+                                layoutZoom={layoutZoom}
+                                setLayoutZoom={setLayoutZoom}
+                                currentLayoutSize={currentLayoutSize}
+                                autoLayoutTiles={autoLayoutTiles}
+                            />
+                        ) : (
+                            <DashboardFilterBar backTo={backTo} />
                         )}
                     </SceneStickyBar>
 

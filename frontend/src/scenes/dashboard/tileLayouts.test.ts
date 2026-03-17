@@ -97,6 +97,24 @@ describe('calculateAutoLayoutTiles', () => {
         // Third tile should go into the (now) shorter first column, below tile 1.
         expect(byId[3]).toMatchObject({ x: 0, y: 2, w: 6 })
     })
+
+    it('balances tiles between three columns by shortest column height', () => {
+        const tiles: DashboardTile<QueryBasedInsightModel>[] = [
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 1),
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 2),
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 3),
+            textTileWithLayout({} as Record<DashboardLayoutSize, TileLayout>, 4),
+        ]
+
+        const layouts = calculateAutoLayoutTiles(tiles, 3)
+        const byId = Object.fromEntries(layouts.map((l) => [l.id, l.layouts.sm]))
+
+        expect(byId[1]).toMatchObject({ x: 0, y: 0, w: 4 })
+        expect(byId[2]).toMatchObject({ x: 4, y: 0, w: 4 })
+        expect(byId[3]).toMatchObject({ x: 8, y: 0, w: 4 })
+        // Next tile should go into the shortest column again (left-most on tie).
+        expect(byId[4]).toMatchObject({ x: 0, y: 2, w: 4 })
+    })
 })
 
 describe('calculateDuplicateLayout', () => {

@@ -456,6 +456,28 @@ describe('dashboardLogic', () => {
             const restoredTileLayouts = logic.values.dashboard?.tiles.find((t) => t.id === firstTile.id)?.layouts
             expect(restoredTileLayouts).toEqual(originalLayouts)
         })
+
+        it('captures auto layout changes', async () => {
+            await expectLogic(logic).toFinishAllListeners()
+
+            const reportAutoLayoutChangedSpy = jest.spyOn(eventUsageLogic.actions, 'reportDashboardAutoLayoutChanged')
+
+            await expectLogic(logic, () => {
+                logic.actions.autoLayoutTiles(3)
+            }).toDispatchActions(['autoLayoutTiles'])
+
+            expect(reportAutoLayoutChangedSpy).toHaveBeenCalledWith(5, 3)
+        })
+
+        it('captures auto layout changes with dashboard id fallback before load', async () => {
+            const freshLogic = dashboardLogic({ id: 5 })
+            const reportAutoLayoutChangedSpy = jest.spyOn(eventUsageLogic.actions, 'reportDashboardAutoLayoutChanged')
+
+            freshLogic.mount()
+            freshLogic.actions.autoLayoutTiles(2)
+
+            expect(reportAutoLayoutChangedSpy).toHaveBeenCalledWith(5, 2)
+        })
     })
 
     describe('moving between dashboards', () => {

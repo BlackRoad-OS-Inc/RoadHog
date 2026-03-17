@@ -24,30 +24,28 @@ export function DashboardZoomControl({ layoutZoom, setLayoutZoom }: DashboardZoo
     }
 
     return (
-        <div className="flex items-center gap-2 text-sm text-muted hidden md:flex">
-            <AppShortcut
-                name="DashboardLayoutZoomToggle"
-                keybind={[['z']]}
-                intent="Toggle dashboard layout zoom while editing"
-                interaction="click"
-                scope={Scene.Dashboard}
-                disabled={isSmallLayout}
+        <AppShortcut
+            name="DashboardLayoutZoomToggle"
+            keybind={[['z']]}
+            intent="Toggle dashboard layout zoom while editing"
+            interaction="click"
+            scope={Scene.Dashboard}
+            disabled={isSmallLayout}
+        >
+            <LemonButton
+                type="secondary"
+                active={layoutZoom < 1}
+                onClick={() => {
+                    const nextZoom = layoutZoom < 1 ? 1 : 0.25
+                    setLayoutZoom(nextZoom)
+                    eventUsageLogic.actions.reportDashboardLayoutZoomChanged(dashboard ?? null, nextZoom, 'button')
+                }}
+                disabledReason={isSmallLayout ? 'Layout editing is disabled on smaller screens.' : undefined}
+                tooltip="Collapse/Expand view. Makes it easier to edit the layout for busier dashboards."
+                size="small"
             >
-                <LemonButton
-                    size="small"
-                    type="secondary"
-                    active={layoutZoom < 1}
-                    onClick={() => {
-                        const nextZoom = layoutZoom < 1 ? 1 : 0.25
-                        setLayoutZoom(nextZoom)
-                        eventUsageLogic.actions.reportDashboardLayoutZoomChanged(dashboard ?? null, nextZoom, 'button')
-                    }}
-                    disabledReason={isSmallLayout ? 'Layout editing is disabled on smaller screens.' : undefined}
-                    tooltip="Collapse/Expand view. Makes it easier to edit the layout for busier dashboards."
-                >
-                    {layoutZoom < 1 ? 'Expand view' : 'Collapse view'}
-                </LemonButton>
-            </AppShortcut>
-        </div>
+                {layoutZoom < 1 ? 'Expand view' : 'Collapse view'}
+            </LemonButton>
+        </AppShortcut>
     )
 }
