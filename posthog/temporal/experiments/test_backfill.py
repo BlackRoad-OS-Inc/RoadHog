@@ -53,7 +53,7 @@ class TestBackfillExperimentMetric(BaseTest):
 
         with (
             patch("posthog.temporal.experiments.activities.close_old_connections"),
-            patch("posthog.temporal.experiments.activities.temporalio.activity.heartbeat"),
+            patch("posthog.temporal.experiments.activities.HeartbeaterSync"),
             patch("posthog.temporal.experiments.activities.ExperimentQueryRunner") as mock_query_runner_class,
             patch(
                 "posthog.temporal.experiments.activities.remove_step_sessions_from_experiment_result"

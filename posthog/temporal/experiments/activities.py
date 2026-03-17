@@ -21,6 +21,7 @@ from posthog.models.experiment import (
     ExperimentTimeseriesRecalculation,
 )
 from posthog.sync import database_sync_to_async
+from posthog.temporal.common.heartbeat_sync import HeartbeaterSync
 from posthog.temporal.experiments.models import (
     ExperimentRegularMetricInput,
     ExperimentRegularMetricResult,
@@ -742,56 +743,54 @@ def _backfill_experiment_metric_sync(recalculation_id: str) -> dict[str, Any]:
     fingerprint = recalculation_request.fingerprint
 
     days_processed = 0
-    total_days = (end_date - start_date).days + 1
 
-    while current_date <= end_date:
-        try:
-            end_of_day_team_tz = datetime.combine(current_date + timedelta(days=1), time(0, 0, 0)).replace(
-                tzinfo=team_tz
-            )
-            query_to_utc = end_of_day_team_tz.astimezone(ZoneInfo("UTC"))
+    with HeartbeaterSync(logger=logger):
+        while current_date <= end_date:
+            try:
+                end_of_day_team_tz = datetime.combine(current_date + timedelta(days=1), time(0, 0, 0)).replace(
+                    tzinfo=team_tz
+                )
+                query_to_utc = end_of_day_team_tz.astimezone(ZoneInfo("UTC"))
 
-            query_runner = ExperimentQueryRunner(
-                query=experiment_query,
-                team=experiment.team,
-                override_end_date=query_to_utc,
-                workload=Workload.OFFLINE,
-            )
-            result = query_runner._calculate()
-            result = remove_step_sessions_from_experiment_result(result)
+                query_runner = ExperimentQueryRunner(
+                    query=experiment_query,
+                    team=experiment.team,
+                    override_end_date=query_to_utc,
+                    workload=Workload.OFFLINE,
+                )
+                result = query_runner._calculate()
+                result = remove_step_sessions_from_experiment_result(result)
 
-            ExperimentMetricResultModel.objects.update_or_create(
-                experiment_id=experiment.id,
-                metric_uuid=recalculation_request.metric["uuid"],
-                query_to=query_to_utc,
-                defaults={
-                    "fingerprint": fingerprint,
-                    "query_from": experiment.start_date,
-                    "status": ExperimentMetricResultModel.Status.COMPLETED,
-                    "result": result.model_dump(),
-                    "query_id": None,
-                    "completed_at": datetime.now(ZoneInfo("UTC")),
-                    "error_message": None,
-                },
-            )
+                ExperimentMetricResultModel.objects.update_or_create(
+                    experiment_id=experiment.id,
+                    metric_uuid=recalculation_request.metric["uuid"],
+                    query_to=query_to_utc,
+                    defaults={
+                        "fingerprint": fingerprint,
+                        "query_from": experiment.start_date,
+                        "status": ExperimentMetricResultModel.Status.COMPLETED,
+                        "result": result.model_dump(),
+                        "query_id": None,
+                        "completed_at": datetime.now(ZoneInfo("UTC")),
+                        "error_message": None,
+                    },
+                )
 
-            recalculation_request.last_successful_date = current_date
-            recalculation_request.save(update_fields=["last_successful_date"])
-            days_processed += 1
+                recalculation_request.last_successful_date = current_date
+                recalculation_request.save(update_fields=["last_successful_date"])
+                days_processed += 1
 
-            temporalio.activity.heartbeat(f"Processed day {days_processed}/{total_days}: {current_date}")
+            except Exception:
+                logger.exception(
+                    "Timeseries recalculation failed",
+                    recalculation_id=recalculation_id,
+                    failed_date=str(current_date),
+                )
+                recalculation_request.status = ExperimentTimeseriesRecalculation.Status.FAILED
+                recalculation_request.save(update_fields=["status"])
+                raise
 
-        except Exception:
-            logger.exception(
-                "Timeseries recalculation failed",
-                recalculation_id=recalculation_id,
-                failed_date=str(current_date),
-            )
-            recalculation_request.status = ExperimentTimeseriesRecalculation.Status.FAILED
-            recalculation_request.save(update_fields=["status"])
-            raise
-
-        current_date += timedelta(days=1)
+            current_date += timedelta(days=1)
 
     recalculation_request.status = ExperimentTimeseriesRecalculation.Status.COMPLETED
     recalculation_request.save(update_fields=["status"])
