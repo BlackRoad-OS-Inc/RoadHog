@@ -1,5 +1,5 @@
 import { useActions, useValues } from 'kea'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { IconEye, IconHide, IconPin, IconPinFilled } from '@posthog/icons'
 import { LemonButton, LemonCheckbox, LemonModal, LemonSelect } from '@posthog/lemon-ui'
@@ -31,14 +31,21 @@ export function MarketingAnalyticsColumnConfigModal({ query: rawQuery }: { query
     const [draftOrderBy, setDraftOrderBy] = useState<[string, string][] | undefined>(marketingQuery?.orderBy)
     const [draftPinnedColumns, setDraftPinnedColumns] = useState<string[]>(rawQuery?.pinnedColumns || [])
 
-    // Sync draft state when the modal opens or the underlying query changes while modal is closed
+    // Keep a ref to the latest query values so the open-effect can read them without being a dependency
+    const latestQueryRef = useRef({ marketingQuery, sortedColumns, rawQuery })
+    useEffect(() => {
+        latestQueryRef.current = { marketingQuery, sortedColumns, rawQuery }
+    })
+
+    // Sync draft state when the modal opens
     useEffect(() => {
         if (columnConfigModalVisible) {
-            setDraftSelect(marketingQuery?.select || sortedColumns)
-            setDraftOrderBy(marketingQuery?.orderBy)
-            setDraftPinnedColumns(rawQuery?.pinnedColumns || [])
+            const { marketingQuery: mq, sortedColumns: sc, rawQuery: rq } = latestQueryRef.current
+            setDraftSelect(mq?.select || sc)
+            setDraftOrderBy(mq?.orderBy)
+            setDraftPinnedColumns(rq?.pinnedColumns || [])
         }
-    }, [columnConfigModalVisible]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [columnConfigModalVisible])
 
     // Derived state from draft
     const [currentSortColumn, currentSortDirection] = useMemo(
@@ -76,10 +83,6 @@ export function MarketingAnalyticsColumnConfigModal({ query: rawQuery }: { query
         } as DataTableNode)
         hideColumnConfigModal()
     }, [rawQuery, marketingQuery, draftSelect, draftOrderBy, draftPinnedColumns, setQuery, hideColumnConfigModal])
-
-    const handleClose = useCallback(() => {
-        hideColumnConfigModal()
-    }, [hideColumnConfigModal])
 
     const clearOrderBy = useCallback(() => {
         setDraftOrderBy(undefined)
@@ -194,7 +197,7 @@ export function MarketingAnalyticsColumnConfigModal({ query: rawQuery }: { query
     return (
         <LemonModal
             isOpen={columnConfigModalVisible}
-            onClose={handleClose}
+            onClose={hideColumnConfigModal}
             title="Configure columns"
             width={600}
             footer={
@@ -214,7 +217,7 @@ export function MarketingAnalyticsColumnConfigModal({ query: rawQuery }: { query
                         Reset to defaults
                     </LemonButton>
                     <div className="flex items-center gap-1">
-                        <LemonButton type="secondary" onClick={handleClose}>
+                        <LemonButton type="secondary" onClick={hideColumnConfigModal}>
                             Cancel
                         </LemonButton>
                         <LemonButton
