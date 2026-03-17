@@ -122,6 +122,12 @@ MOCK_COST_DATA: dict[str, ModelCost] = {
         "supports_vision": True,
         "mode": "chat",
     },
+    "us.meta.llama3-2-90b-instruct-v1:0": {
+        "litellm_provider": "bedrock",
+        "max_input_tokens": 128000,
+        "supports_vision": False,
+        "mode": "chat",
+    },
     "gemini-2.0-flash": {
         "litellm_provider": "vertex_ai",
         "max_input_tokens": 1048576,
@@ -298,6 +304,7 @@ class TestProviderFiltering:
                 assert providers == {"bedrock"}
                 model_ids = {m.id for m in models}
                 assert "us.anthropic.claude-sonnet-4-5-20250929-v1:0" in model_ids
+                assert "us.meta.llama3-2-90b-instruct-v1:0" not in model_ids
 
 
 class TestIsModelAvailable:
@@ -346,3 +353,4 @@ class TestIsModelAvailable:
                 return_value=create_mock_settings(openai=False, anthropic=False, gemini=False, bedrock=True),
             ):
                 assert is_model_available("us.anthropic.claude-sonnet-4-5-20250929-v1:0", "llm_gateway") is True
+                assert is_model_available("us.meta.llama3-2-90b-instruct-v1:0", "llm_gateway") is False

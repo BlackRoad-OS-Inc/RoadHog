@@ -28,6 +28,12 @@ _PROVIDER_TO_API_KEY: Final[dict[str, tuple[str, str]]] = {
     "gemini": ("gemini_api_key", "GEMINI_API_KEY"),
 }
 
+_BEDROCK_ANTHROPIC_MODEL_PREFIXES: Final[tuple[str, ...]] = (
+    "anthropic.",
+    "us.anthropic.",
+    "eu.anthropic.",
+)
+
 
 def _has_config_value(value: object) -> bool:
     return isinstance(value, str) and value != ""
@@ -69,6 +75,14 @@ def _normalize_provider(provider: str) -> str:
 def _is_configured_provider(provider: str, configured_providers: frozenset[str]) -> bool:
     normalized_provider = _normalize_provider(provider)
     return provider in configured_providers or normalized_provider in configured_providers
+
+
+# DISCLAIMER: We only support Anthropic models on Bedrock right now
+def _supports_bedrock_messages_endpoint(model_id: str, provider: str) -> bool:
+    normalized_provider = _normalize_provider(provider)
+    if normalized_provider != "bedrock":
+        return True
+    return model_id.startswith(_BEDROCK_ANTHROPIC_MODEL_PREFIXES)
 
 
 class ModelRegistryService:
@@ -116,6 +130,8 @@ class ModelRegistryService:
                 continue
             if not _is_chat_model(cost_data):
                 continue
+            if not _supports_bedrock_messages_endpoint(raw_model_id, provider):
+                continue
             if allowed_models is not None and raw_model_id not in allowed_models:
                 continue
             existing = models_by_id.get(raw_model_id)
@@ -144,6 +160,9 @@ class ModelRegistryService:
         if cost_data is None:
             return False
         provider = cost_data.get("litellm_provider", "")
+
+        if not _supports_bedrock_messages_endpoint(model_id, provider):
+            return False
 
         return _is_configured_provider(provider, configured_providers) and _is_chat_model(cost_data)
 
