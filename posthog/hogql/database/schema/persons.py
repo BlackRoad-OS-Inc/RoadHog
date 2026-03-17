@@ -158,12 +158,9 @@ def select_from_persons_table(
         if filter is not None:
             cast(ast.SelectQuery, cast(ast.CompareOperation, select.where).right).where = filter
 
-        # Push ORDER BY + LIMIT into the inner deduplication subquery so
-        # ClickHouse can stop early instead of deduplicating every person.
-        # Only safe when there's no outer WHERE/PREWHERE -- an outer filter
-        # runs after deduplication, so a premature inner LIMIT would exclude
-        # valid rows (e.g. cohort members missed because the LIMIT grabbed
-        # non-matching rows first).
+        # Push ORDER BY + LIMIT into the inner deduplication subquery so ClickHouse can stop early.
+        # Skip when there's an outer WHERE -- a premature inner LIMIT would exclude valid rows
+        # before the filter runs (e.g. cohort members dropped because LIMIT grabbed other rows first).
         can_push_to_inner = (
             node.select_from
             and node.select_from.type
@@ -183,8 +180,8 @@ def select_from_persons_table(
 
                 order_by_without_virtual_fields = []
                 for order_by in right_select.order_by:
-                    # Virtual fields (e.g. $virt_mrr) require a join that only
-                    # exists in the outer query, so skip them here.
+                    # Skip virtual field order_by expressions - they'll be handled by the outer query as they require
+                    # a join with revenue analytics table
                     if not _is_virtual_field_requiring_join(order_by.expr):
                         order_by.expr = ast.Call(
                             name="argMax", args=[order_by.expr, ast.Field(chain=["raw_persons", "version"])]
