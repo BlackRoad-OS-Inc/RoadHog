@@ -12970,6 +12970,8 @@ export namespace Schemas {
 
     export interface FeatureFlagGroupType {
       /** @nullable */
+      aggregation_group_type_index?: number | null;
+      /** @nullable */
       description?: string | null;
       /** @nullable */
       properties?: (EventPropertyFilter | PersonPropertyFilter | ElementPropertyFilter | EventMetadataPropertyFilter | SessionPropertyFilter | CohortPropertyFilter | RecordingPropertyFilter | LogEntryPropertyFilter | GroupPropertyFilter | FeaturePropertyFilter | FlagPropertyFilter | HogQLPropertyFilter | EmptyPropertyFilter | DataWarehousePropertyFilter | DataWarehousePersonPropertyFilter | ErrorTrackingIssueFilter | LogPropertyFilter | RevenueAnalyticsPropertyFilter)[] | null;
@@ -14261,6 +14263,11 @@ export namespace Schemas {
        * @nullable
        */
       variant?: string | null;
+      /**
+       * Group type index for this condition set. None means person-level aggregation.
+       * @nullable
+       */
+      aggregation_group_type_index?: number | null;
     }
 
     export interface FeatureFlagMultivariateVariantSchema {

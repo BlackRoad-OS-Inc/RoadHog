@@ -11693,6 +11693,7 @@ class FeatureFlagGroupType(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    aggregation_group_type_index: int | None = None
     description: str | None = None
     properties: (
         list[
