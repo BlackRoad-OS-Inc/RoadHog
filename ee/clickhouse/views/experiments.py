@@ -1,6 +1,8 @@
+import asyncio
 from enum import Enum
 from typing import Any, Literal
 
+from django.conf import settings
 from django.db.models import Case, F, Prefetch, Q, QuerySet, Value, When
 from django.db.models.functions import Now
 
@@ -504,7 +506,24 @@ class EnterpriseExperimentsViewSet(
 
         service = ExperimentService(team=self.team, user=request.user)
         result = service.request_timeseries_recalculation(experiment, metric=metric, fingerprint=fingerprint)
-        status_code = 200 if result.pop("is_existing", False) else 201
+        is_existing = result.pop("is_existing", False)
+
+        if not is_existing:
+            from posthog.temporal.common.client import sync_connect
+            from posthog.temporal.experiments.models import ExperimentTimeseriesRecalculationWorkflowInputs
+
+            temporal = sync_connect()
+            recalculation_id = str(result["id"])
+            asyncio.run(
+                temporal.start_workflow(
+                    "experiment-timeseries-recalculation-workflow",
+                    ExperimentTimeseriesRecalculationWorkflowInputs(recalculation_id=recalculation_id),
+                    id=f"experiment-recalculation-{recalculation_id}",
+                    task_queue=settings.GENERAL_PURPOSE_TASK_QUEUE,
+                )
+            )
+
+        status_code = 200 if is_existing else 201
         return Response(result, status=status_code)
 
     @action(methods=["GET"], detail=False, url_path="stats", required_scopes=["experiment:read"])
