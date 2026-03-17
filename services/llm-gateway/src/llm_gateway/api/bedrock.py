@@ -57,6 +57,7 @@ def ensure_bedrock_configured(settings: Any) -> None:
     )
 
 
+# The Bedrock CountTokens API requires a max_tokens field, but it's ignored in the calculation—tokens are counted from the input only.
 def count_tokens_with_bedrock(
     messages: list[dict[str, Any]], model: str, aws_region_name: str, max_tokens: int = 4096
 ) -> int:
@@ -67,7 +68,7 @@ def count_tokens_with_bedrock(
         "max_tokens": max_tokens,
         "messages": messages,
     }
-    # The CountTokens API doesn't accept regional model prefixes
+    # CountTokens API does not support regional model prefixes ("us.anthropic.", "eu.anthropic.")
     model = model.replace("us.anthropic.", "anthropic.").replace("eu.anthropic.", "anthropic.")
 
     response = bedrock_runtime_client.count_tokens(
@@ -85,7 +86,6 @@ async def _handle_bedrock_messages(
     product: str = "llm_gateway",
 ) -> dict[str, Any] | StreamingResponse:
     settings = get_settings()
-    settings.bedrock_region_name = "us-east-1"  # @TODO: make real
     ensure_bedrock_configured(settings)
 
     raw_data = body.model_dump(exclude_none=True)
@@ -95,6 +95,7 @@ async def _handle_bedrock_messages(
         logger.warning("bedrock_dropped_fields", dropped_keys=sorted(dropped_keys))
     data = {k: v for k, v in raw_data.items() if k in _BEDROCK_ALLOWED_BODY_FIELDS}
 
+    # Bedrock supports Anthropic beta features via the anthropic-beta property
     anthropic_beta = request.headers.get("anthropic-beta")
     if anthropic_beta:
         data["anthropic_beta"] = [h.strip() for h in anthropic_beta.split(",") if h.strip()]

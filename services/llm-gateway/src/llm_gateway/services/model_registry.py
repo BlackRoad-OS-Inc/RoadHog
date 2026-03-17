@@ -61,6 +61,16 @@ def _is_chat_model(cost_data: ModelCost) -> bool:
     return mode in ("chat", "completion", "")
 
 
+def _normalize_provider(provider: str) -> str:
+    """Present LiteLLM's Bedrock variants as a single provider."""
+    return "bedrock" if provider == "bedrock_converse" else provider
+
+
+def _is_configured_provider(provider: str, configured_providers: frozenset[str]) -> bool:
+    normalized_provider = _normalize_provider(provider)
+    return provider in configured_providers or normalized_provider in configured_providers
+
+
 class ModelRegistryService:
     """Singleton service for model discovery using LiteLLM data."""
 
@@ -84,26 +94,25 @@ class ModelRegistryService:
             return None
         return ModelInfo(
             id=model_id,
-            provider=cost_data.get("litellm_provider", "unknown"),
+            provider=_normalize_provider(cost_data.get("litellm_provider", "unknown")),
             context_window=cost_data.get("max_input_tokens") or 0,
             supports_vision=bool(cost_data.get("supports_vision", False)),
             supports_streaming=True,
         )
 
-    # @TODO: need to use the bedrock_converse provider until LiteLLM supports the Anthropic models for the regular Bedrock provider
     def get_available_models(self, product: str) -> list[ModelInfo]:
         """Get raw provider models available to a product."""
         config = get_product_config(product)
         configured_providers = _get_configured_providers()
         allowed_models = config.allowed_models if config else None
-        all_litellm_models = (
-            ModelCostService.get_instance().get_all_models()
-        )  # this is a 3MB file; seems slow to iterate through
+
+        # Fetch all chat models from LiteLLM, filtered by configured providers
+        all_litellm_models = ModelCostService.get_instance().get_all_models()
         models_by_id: dict[str, ModelInfo] = {}
         for raw_model_id in sorted(all_litellm_models.keys()):
             cost_data = all_litellm_models[raw_model_id]
             provider = cost_data.get("litellm_provider", "")
-            if provider not in configured_providers:
+            if not _is_configured_provider(provider, configured_providers):
                 continue
             if not _is_chat_model(cost_data):
                 continue
@@ -112,7 +121,7 @@ class ModelRegistryService:
             existing = models_by_id.get(raw_model_id)
             candidate = ModelInfo(
                 id=raw_model_id,
-                provider=provider,
+                provider=_normalize_provider(provider),
                 context_window=cost_data.get("max_input_tokens") or 0,
                 supports_vision=bool(cost_data.get("supports_vision", False)),
                 supports_streaming=True,
@@ -135,7 +144,8 @@ class ModelRegistryService:
         if cost_data is None:
             return False
         provider = cost_data.get("litellm_provider", "")
-        return provider in configured_providers and _is_chat_model(cost_data)
+
+        return _is_configured_provider(provider, configured_providers) and _is_chat_model(cost_data)
 
 
 def get_available_models(product: str) -> list[ModelInfo]:
