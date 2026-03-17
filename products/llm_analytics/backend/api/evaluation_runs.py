@@ -16,7 +16,7 @@ from posthog.api.routing import TeamAndOrgViewSetMixin
 from posthog.clickhouse.client import query_with_columns
 from posthog.event_usage import report_user_action
 from posthog.hogql_queries.ai.ai_table_resolver import is_ai_events_enabled
-from posthog.hogql_queries.ai.utils import HEAVY_COLUMN_TO_PROPERTY, merge_heavy_properties
+from posthog.hogql_queries.ai.utils import HEAVY_COLUMN_NAMES, HEAVY_COLUMN_TO_PROPERTY, merge_heavy_properties
 from posthog.permissions import AccessControlPermission
 from posthog.temporal.common.client import sync_connect
 from posthog.temporal.llm_analytics.run_evaluation import RunEvaluationInputs
@@ -88,6 +88,7 @@ class EvaluationRunViewSet(TeamAndOrgViewSetMixin, viewsets.ViewSet):
         used_ai_events = False
 
         if is_ai_events_enabled(self.team):
+            heavy_cols = ",\n                    ".join(HEAVY_COLUMN_NAMES)
             query_result = query_with_columns(
                 f"""
                 SELECT
@@ -98,12 +99,7 @@ class EvaluationRunViewSet(TeamAndOrgViewSetMixin, viewsets.ViewSet):
                     team_id,
                     distinct_id,
                     person_id,
-                    input,
-                    output,
-                    output_choices,
-                    input_state,
-                    output_state,
-                    tools
+                    {heavy_cols}
                 FROM ai_events
                 WHERE {" AND ".join(where_clauses)}
                 LIMIT 1

@@ -18,6 +18,10 @@ HEAVY_COLUMN_TO_PROPERTY: dict[str, str] = {
     "tools": "$ai_tools",
 }
 
+# Ordered tuple of heavy column names. Used for unpacking event tuples from ClickHouse.
+# Keep in sync with the SQL tuple in trace_query_runner.py _build_query().
+HEAVY_COLUMN_NAMES: tuple[str, ...] = tuple(HEAVY_COLUMN_TO_PROPERTY.keys())
+
 
 def merge_heavy_properties(
     properties_json: str,
