@@ -1,15 +1,26 @@
+import json
 import asyncio
 import logging
+from pathlib import Path
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
-from products.signals.backend.report_generation.research import run_multi_turn_research
+from products.signals.backend.report_generation.research import ReportResearchOutput, run_multi_turn_research
 from products.signals.backend.temporal.types import SignalData
 from products.tasks.backend.services.custom_prompt_runner import resolve_sandbox_context_for_local_dev
 
 logger = logging.getLogger(__name__)
 
-# Simulated signals from 3 related GitHub issues about funnel enhancements
+DEFAULT_REPOSITORY = "posthog/posthog"
+DEFAULT_FIXTURE_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "report_generation"
+    / "fixtures"
+    / "analyze_report_funnel_research_output.json"
+)
+SYNTHETIC_REPORT_ID = "test-funnel-report-001"
+
+# Simulated signals from related GitHub issues about funnel enhancements.
 TEST_SIGNALS = [
     SignalData(
         signal_id="test-funnel-compare-42606",
@@ -74,8 +85,8 @@ TEST_SIGNALS = [
         content=(
             "Bug report: Customer reports that their onboarding funnel conversion rate dropped "
             "significantly in the last two weeks but they haven't shipped any product changes. "
-            "The funnel goes: page view on /signup → custom event 'user_signed_up' → "
-            "custom event 'onboarding_completed'. They suspect a tracking regression — possibly "
+            "The funnel goes: page view on /signup -> custom event 'user_signed_up' -> "
+            "custom event 'onboarding_completed'. They suspect a tracking regression - possibly "
             "the 'onboarding_completed' event stopped firing or its volume dropped. "
             "Needs investigation of actual event volumes in the events table to confirm or deny."
         ),
@@ -90,21 +101,56 @@ TEST_SIGNALS = [
     ),
 ]
 
-TEST_TITLE = "Funnel insights lack time-based comparison and statistical options"
-TEST_SUMMARY = (
-    "Multiple users are requesting enhanced funnel analytics capabilities. "
-    "Key gaps include: (1) no ability to compare conversion rates across arbitrary time periods, "
-    "(2) dynamic bin widths in Time to Convert histograms make trend tracking unreliable, and "
-    "(3) only average conversion time is available — median and percentile options (P50, P90, P99) "
-    "are missing, and (4) a customer reports a potential tracking regression with their onboarding "
-    "funnel conversion dropping without any product changes. The first three requests come from "
-    "the product-analytics/funnels area with Zendesk support ticket backing. The fourth is a "
-    "Zendesk bug report requiring data investigation to confirm."
+UPDATE_SIGNAL = SignalData(
+    signal_id="test-funnel-time-to-convert-reporting-43310",
+    content=(
+        "Feature request: Another customer wants funnel Time to Convert reports to be stable across recurring "
+        "weekly reviews. They asked for percentile summaries like P50 and P95 plus fixed histogram bucket sizes "
+        "when comparing onboarding funnel performance month over month. Right now the average-only summary and "
+        "shifting histogram bins make the report hard to trust for trend analysis."
+    ),
+    source_product="github_issues",
+    source_type="enhancement",
+    source_id="43310",
+    weight=0.6,
+    timestamp="2025-12-13T09:41:05Z",
+    extra={
+        "labels": ["feature/funnels", "team/product-analytics"],
+        "url": "https://github.com/PostHog/posthog/issues/43310",
+    },
 )
 
 
+def load_previous_report_fixture() -> tuple[str, ReportResearchOutput]:
+    path = DEFAULT_FIXTURE_PATH
+    try:
+        payload = json.loads(path.read_text())
+    except FileNotFoundError as exc:
+        raise CommandError(f"Fixture not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise CommandError(f"Fixture is not valid JSON: {path}: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise CommandError(f"Fixture root must be a JSON object: {path}")
+
+    result_payload = payload.get("result")
+    if result_payload is None:
+        raise CommandError(f"Fixture missing 'result': {path}")
+
+    try:
+        previous_report_research = ReportResearchOutput.model_validate(result_payload)
+    except Exception as exc:
+        raise CommandError(f"Fixture result is not a valid ReportResearchOutput: {path}: {exc}") from exc
+
+    report_id = payload.get("report_id")
+    if not isinstance(report_id, str) or not report_id:
+        report_id = SYNTHETIC_REPORT_ID
+
+    return report_id, previous_report_research
+
+
 class Command(BaseCommand):
-    help = "Test the report research agent via sandbox against simulated funnel enhancement signals."
+    help = "Test the report research agent in either fresh research or update mode."
 
     def _flushing_write(self, msg: str) -> None:
         self.stdout.write(msg)
@@ -112,10 +158,15 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "mode",
+            choices=["research", "update"],
+            help="Run a fresh research pass or update an existing researched report.",
+        )
+        parser.add_argument(
             "--repository",
             type=str,
-            default="posthog/posthog",
-            help="GitHub repository in org/repo format (default: posthog/posthog)",
+            default=DEFAULT_REPOSITORY,
+            help=f"GitHub repository in org/repo format (default: {DEFAULT_REPOSITORY})",
         )
         parser.add_argument(
             "--verbose",
@@ -124,8 +175,25 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        mode = options["mode"]
         verbose = options["verbose"]
         repository = options["repository"]
+
+        title: str | None = None
+        summary: str | None = None
+        signals = list(TEST_SIGNALS)
+        previous_report_id: str | None = None
+        previous_report_research: ReportResearchOutput | None = None
+
+        if mode == "update":
+            previous_report_id, previous_report_research = load_previous_report_fixture()
+            title = previous_report_research.title
+            summary = previous_report_research.summary
+            signals.append(UPDATE_SIGNAL)
+            self.stdout.write(f"Loaded previous research fixture: {DEFAULT_FIXTURE_PATH}")
+            self.stdout.write(f"Previous report ID: {previous_report_id}")
+            self.stdout.write(f"Previous title: {previous_report_research.title}")
+            self.stdout.write("")
 
         try:
             context = resolve_sandbox_context_for_local_dev(repository)
@@ -133,16 +201,18 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(str(e)))
             return
 
-        self.stdout.write(f"Report title: {TEST_TITLE}")
-        self.stdout.write(f"Signals: {len(TEST_SIGNALS)}")
+        self.stdout.write(f"Mode: {mode}")
+        self.stdout.write(f"Signals: {len(signals)}")
         self.stdout.write("")
 
         result = asyncio.run(
             run_multi_turn_research(
-                TEST_SIGNALS,
+                signals,
                 context,
-                title=TEST_TITLE,
-                summary=TEST_SUMMARY,
+                title=title,
+                summary=summary,
+                previous_report_id=previous_report_id,
+                previous_report_research=previous_report_research,
                 branch="master",
                 verbose=verbose,
                 output_fn=self._flushing_write,
@@ -151,6 +221,8 @@ class Command(BaseCommand):
 
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("=== Research Result ==="))
+        self.stdout.write(f"Title: {result.title}")
+        self.stdout.write(f"Summary: {result.summary}")
         self.stdout.write(f"Actionability: {result.actionability.actionability}")
         self.stdout.write(f"Already addressed: {result.actionability.already_addressed}")
         self.stdout.write(f"Actionability explanation: {result.actionability.explanation}")
