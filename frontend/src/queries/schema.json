@@ -12115,7 +12115,19 @@
                             "$ref": "#/definitions/HogQLQuery"
                         },
                         {
-                            "$ref": "#/definitions/InsightQueryNode"
+                            "$ref": "#/definitions/TrendsQuery"
+                        },
+                        {
+                            "$ref": "#/definitions/RetentionQuery"
+                        },
+                        {
+                            "$ref": "#/definitions/LifecycleQuery"
+                        },
+                        {
+                            "$ref": "#/definitions/WebStatsTableQuery"
+                        },
+                        {
+                            "$ref": "#/definitions/WebOverviewQuery"
                         }
                     ]
                 },

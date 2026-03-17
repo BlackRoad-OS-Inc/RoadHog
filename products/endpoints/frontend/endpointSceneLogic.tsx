@@ -21,7 +21,7 @@ export interface EndpointSceneLogicProps {
 }
 
 // Query types that support user-configurable breakdown filtering
-const BREAKDOWN_SUPPORTED_QUERY_TYPES = new Set([NodeKind.TrendsQuery, NodeKind.FunnelsQuery, NodeKind.RetentionQuery])
+const BREAKDOWN_SUPPORTED_QUERY_TYPES = new Set([NodeKind.TrendsQuery, NodeKind.RetentionQuery])
 
 function getSingleBreakdownProperty(breakdownFilter: any): string | null {
     if (breakdownFilter?.breakdown) {

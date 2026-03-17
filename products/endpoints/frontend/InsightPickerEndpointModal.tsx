@@ -1,7 +1,7 @@
 import { useActions, useValues } from 'kea'
 import { BindLogic } from 'kea'
 
-import { IconEndpoints, IconFunnels, IconPlus, IconRetention, IconTrends } from '@posthog/icons'
+import { IconEndpoints, IconPlus, IconRetention, IconTrends } from '@posthog/icons'
 
 import { LemonButton } from 'lib/lemon-ui/LemonButton'
 import { LemonModal } from 'lib/lemon-ui/LemonModal'
@@ -21,7 +21,6 @@ import { insightPickerEndpointModalLogic } from './insightPickerEndpointModalLog
 
 const QUICK_CREATE_TYPES = [
     { type: InsightType.TRENDS, icon: IconTrends, label: 'Trend' },
-    { type: InsightType.FUNNELS, icon: IconFunnels, label: 'Funnel' },
     { type: InsightType.RETENTION, icon: IconRetention, label: 'Retention' },
 ]
 
@@ -40,11 +39,18 @@ export function InsightPickerEndpointModal({ tabId }: InsightPickerEndpointModal
             : (selectedInsight.query as HogQLQuery | InsightQueryNode)
         : null
 
+    const UNSUPPORTED_INSIGHT_TYPES = new Set([
+        InsightType.FUNNELS,
+        InsightType.PATHS,
+        InsightType.STICKINESS,
+        InsightType.JSON,
+        InsightType.HOG,
+    ])
+
     const additionalTypes = Object.entries(INSIGHT_TYPES_METADATA).filter(
         ([type, meta]) =>
             meta.inMenu &&
-            type !== InsightType.JSON &&
-            type !== InsightType.HOG &&
+            !UNSUPPORTED_INSIGHT_TYPES.has(type as InsightType) &&
             !QUICK_CREATE_TYPES.some((qt) => qt.type === type)
     )
 

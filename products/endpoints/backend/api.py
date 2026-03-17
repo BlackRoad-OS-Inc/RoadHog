@@ -1084,7 +1084,7 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
         return None, None
 
     # Query types that support user-configurable breakdown filtering
-    BREAKDOWN_SUPPORTED_QUERY_TYPES = {"TrendsQuery", "FunnelsQuery", "RetentionQuery"}
+    BREAKDOWN_SUPPORTED_QUERY_TYPES = {"TrendsQuery", "RetentionQuery"}
 
     def _get_allowed_variables(self, query: dict, is_materialized: bool, version: EndpointVersion) -> set[str]:
         """Get the set of allowed variable names for this endpoint."""
@@ -1158,23 +1158,17 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
 
         Different insight types store breakdowns in different columns:
         - TrendsQuery, RetentionQuery: `breakdown_value` Array column
-        - FunnelsQuery: `final_prop` Array column
-        - LifecycleQuery, StickinessQuery, PathsQuery: No breakdown support
+        - LifecycleQuery: No breakdown support
 
-        Both breakdown_value and final_prop are Array(Nullable(String)) columns,
+        breakdown_value is an Array(Nullable(String)) column,
         so we use has() for array containment check.
         """
-        if query_kind == "FunnelsQuery":
-            return ast.Call(
-                name="has",
-                args=[ast.Field(chain=["final_prop"]), ast.Constant(value=value)],
-            )
-        elif query_kind in ("TrendsQuery", "RetentionQuery"):
+        if query_kind in ("TrendsQuery", "RetentionQuery"):
             return ast.Call(
                 name="has",
                 args=[ast.Field(chain=["breakdown_value"]), ast.Constant(value=value)],
             )
-        elif query_kind in ("LifecycleQuery", "StickinessQuery", "PathsQuery"):
+        elif query_kind == "LifecycleQuery":
             logger.warning(
                 "Query type does not support breakdown filtering",
                 query_kind=query_kind,

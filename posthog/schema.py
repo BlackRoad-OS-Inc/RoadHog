@@ -18848,18 +18848,9 @@ class EndpointRequest(BaseModel):
         description="Whether this endpoint's query results are materialized to S3",
     )
     name: str | None = None
-    query: (
-        HogQLQuery
-        | TrendsQuery
-        | FunnelsQuery
-        | RetentionQuery
-        | PathsQuery
-        | StickinessQuery
-        | LifecycleQuery
-        | WebStatsTableQuery
-        | WebOverviewQuery
-        | None
-    ) = None
+    query: HogQLQuery | TrendsQuery | RetentionQuery | LifecycleQuery | WebStatsTableQuery | WebOverviewQuery | None = (
+        None
+    )
     sync_frequency: DataWarehouseSyncInterval | None = Field(
         default=None,
         description="How frequently should the underlying materialized view be updated",

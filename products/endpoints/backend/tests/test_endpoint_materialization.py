@@ -12,7 +12,7 @@ from parameterized import parameterized
 from rest_framework import status
 from rest_framework.response import Response
 
-from posthog.schema import DataWarehouseSyncInterval, PathsFilter, PathsQuery, PathType, RetentionQuery
+from posthog.schema import DataWarehouseSyncInterval, RetentionQuery
 
 from posthog.constants import RETENTION_FIRST_EVER_OCCURRENCE, TREND_FILTER_TYPE_EVENTS
 from posthog.settings.temporal import DATA_MODELING_TASK_QUEUE
@@ -278,14 +278,7 @@ class TestEndpointMaterialization(ClickhouseTestMixin, APIBaseTest):
         self.assertEqual(saved_query.query["kind"], "HogQLQuery")
         self.assertIsInstance(saved_query.query["query"], str)
 
-    def test_can_materialize_stickiness_query(self):
-        _create_event(
-            team=self.team,
-            event="$pageview",
-            distinct_id="user1",
-        )
-        flush_persons_and_events()
-
+    def test_cannot_materialize_stickiness_query(self):
         endpoint = create_endpoint_with_version(
             name="test_stickiness_query",
             team=self.team,
@@ -298,23 +291,9 @@ class TestEndpointMaterialization(ClickhouseTestMixin, APIBaseTest):
             created_by=self.user,
         )
         version = endpoint.versions.first()
-
-        response = self.client.patch(
-            f"/api/environments/{self.team.id}/endpoints/{endpoint.name}/",
-            {
-                "is_materialized": True,
-                "sync_frequency": DataWarehouseSyncInterval.FIELD_12HOUR,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
-        version.refresh_from_db()
-        self.assertIsNotNone(version.saved_query)
-        saved_query = version.saved_query
-        assert saved_query is not None
-        assert saved_query.query is not None
-        self.assertEqual(saved_query.query["kind"], "HogQLQuery")
+        can_materialize, reason = version.can_materialize()
+        self.assertFalse(can_materialize)
+        self.assertIn("StickinessQuery", reason)
 
     def test_can_materialize_retention_query(self):
         _create_event(
@@ -362,43 +341,22 @@ class TestEndpointMaterialization(ClickhouseTestMixin, APIBaseTest):
         assert saved_query.query is not None
         self.assertEqual(saved_query.query["kind"], "HogQLQuery")
 
-    def test_can_materialize_paths_query(self):
-        _create_event(
-            team=self.team,
-            event="$pageview",
-            distinct_id="user1",
-        )
-        flush_persons_and_events()
-
+    def test_cannot_materialize_paths_query(self):
         endpoint = create_endpoint_with_version(
             name="test_paths_query",
             team=self.team,
-            query=PathsQuery(
-                pathsFilter=PathsFilter(
-                    includeEventTypes=[PathType.FIELD_PAGEVIEW, PathType.FIELD_SCREEN],
-                    excludeEvents=["logout", "https://example.com"],  # URL should be filtered out
-                )
-            ).model_dump(),
+            query={
+                "kind": "PathsQuery",
+                "pathsFilter": {
+                    "includeEventTypes": ["$pageview"],
+                },
+            },
             created_by=self.user,
         )
         version = endpoint.versions.first()
-
-        response = self.client.patch(
-            f"/api/environments/{self.team.id}/endpoints/{endpoint.name}/",
-            {
-                "is_materialized": True,
-                "sync_frequency": DataWarehouseSyncInterval.FIELD_12HOUR,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
-        version.refresh_from_db()
-        self.assertIsNotNone(version.saved_query)
-        saved_query = version.saved_query
-        assert saved_query is not None
-        assert saved_query.query is not None
-        self.assertEqual(saved_query.query["kind"], "HogQLQuery")
+        can_materialize, reason = version.can_materialize()
+        self.assertFalse(can_materialize)
+        self.assertIn("PathsQuery", reason)
 
     def test_materialization_status_in_response(self):
         """Test that materialization status is included in endpoint response."""
