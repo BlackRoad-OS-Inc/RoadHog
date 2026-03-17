@@ -95,7 +95,7 @@ export function DashboardItems(): JSX.Element {
         'dashboard-edit-mode': dashboardMode === DashboardMode.Edit,
     })
 
-    const { width, containerRef, mounted } = useContainerWidth()
+    const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true })
 
     useEffect(() => {
         if (!mounted || !containerRef.current) {
