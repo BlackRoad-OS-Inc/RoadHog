@@ -106,6 +106,9 @@ test.describe('Dashboards', () => {
 
         await test.step('duplicate the tile', async () => {
             await dashboard.waitForInsightCardLoaded()
+            // The h4[insight-card-title] contains two children: a span with
+            // the actual title, then a "Loading" tooltip. Read the first span
+            // to get the clean title text without the loading indicator.
             const title = await dashboard.insightCards
                 .first()
                 .getByTestId('insight-card-title')

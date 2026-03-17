@@ -186,55 +186,34 @@ export class DashboardPage {
     }
 
     async findCardByTitle(title: string): Promise<Locator> {
-        // Cards may still be loading their titles when this is called.
-        // Retry the scan until the card is found or the timeout expires.
-        let found: Locator | null = null
-
-        await expect(async () => {
-            const count = await this.insightCards.count()
-
-            for (let i = 0; i < count; i++) {
-                const card = this.insightCards.nth(i)
-                await card.scrollIntoViewIfNeeded()
-                const titleText = await card
-                    .locator('[data-attr="insight-card-title"]')
-                    .textContent({ timeout: 5000 })
-                    .catch(() => null)
-
-                if (titleText?.includes(title)) {
-                    found = card
-                    return
-                }
-            }
-
-            throw new Error(`Could not find InsightCard with title "${title}"`)
-        }).toPass({ timeout: 30000 })
-
-        return found!
+        // Cards render InsightLoadingState while their queries run, so the
+        // title element may not exist yet. Use a simple locator-based
+        // approach: find a card whose title contains the target text.
+        // Playwright auto-retries the locator chain until the timeout.
+        const card = this.insightCards.filter({
+            has: this.page.locator('[data-attr="insight-card-title"]', { hasText: title }),
+        })
+        await expect(card.first()).toBeVisible({ timeout: 60000 })
+        return card.first()
     }
 
     async waitForInsightCardLoaded(): Promise<void> {
-        // The insight-card-title h4 includes a "Loading" tooltip as a child
-        // when the card's query is still running. Wait for that to disappear.
+        // When a card's query is running the component renders
+        // InsightLoadingState instead of CardMeta, so the title element
+        // doesn't exist in the DOM at all. Wait for the title to appear,
+        // which means the query has finished and the full card is rendered.
         const firstCard = this.insightCards.first()
         await expect(firstCard).toBeVisible()
-        await expect(firstCard.getByTestId('insight-card-title').getByText('Loading')).not.toBeVisible({
-            timeout: 30000,
-        })
+        await expect(firstCard.getByTestId('insight-card-title')).toBeVisible({ timeout: 60000 })
     }
 
     async openFirstTileMenu(): Promise<void> {
-        // Dismiss any previously open popover so its DOM doesn't interfere
-        // with the new click target.
-        await this.page.keyboard.press('Escape')
-        await expect(this.page.locator('.Popover'))
-            .not.toBeVisible({ timeout: 3000 })
-            .catch(() => {})
-
-        // The card can re-render while loading (detaching the more-button from
-        // the DOM mid-click). Retry the whole hover → click sequence until the
-        // popover is open.
+        // The card can re-render while loading (detaching the more-button
+        // from the DOM mid-click). Retry the whole sequence until the
+        // popover is open. Each iteration dismisses stale popovers first
+        // so a toggled-open menu from a previous attempt doesn't interfere.
         await expect(async () => {
+            await this.page.keyboard.press('Escape')
             const card = this.insightCards.first()
             await card.scrollIntoViewIfNeeded()
             await card.hover()
