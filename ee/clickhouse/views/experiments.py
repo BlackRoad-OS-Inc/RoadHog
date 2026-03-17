@@ -30,6 +30,8 @@ from posthog.models.signals import model_activity_signal, mutable_receiver
 from posthog.models.team.team import Team
 from posthog.rbac.access_control_api_mixin import AccessControlViewSetMixin
 from posthog.rbac.user_access_control import UserAccessControlSerializerMixin
+from posthog.temporal.common.client import sync_connect
+from posthog.temporal.experiments.models import ExperimentTimeseriesRecalculationWorkflowInputs
 from posthog.utils import str_to_bool
 
 from products.experiments.backend.experiment_service import ExperimentService
@@ -509,9 +511,6 @@ class EnterpriseExperimentsViewSet(
         is_existing = result.pop("is_existing", False)
 
         if not is_existing:
-            from posthog.temporal.common.client import sync_connect
-            from posthog.temporal.experiments.models import ExperimentTimeseriesRecalculationWorkflowInputs
-
             temporal = sync_connect()
             recalculation_id = str(result["id"])
             asyncio.run(
