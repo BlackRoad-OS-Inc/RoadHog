@@ -7,7 +7,6 @@ from posthog.temporal.health_checks.framework import HealthCheck
 from posthog.temporal.health_checks.models import HealthCheckResult
 
 from products.data_warehouse.backend.models.external_data_schema import ExternalDataSchema
-from products.data_warehouse.backend.models.external_data_source import ExternalDataSource
 
 
 class ExternalDataFailureCheck(HealthCheck):
@@ -27,6 +26,7 @@ class ExternalDataFailureCheck(HealthCheck):
             .filter(
                 Q(status=ExternalDataSchema.Status.FAILED)
                 | Q(status=ExternalDataSchema.Status.BILLING_LIMIT_REACHED)
+                | Q(status=ExternalDataSchema.Status.BILLING_LIMIT_TOO_LOW)
                 | Q(should_sync=False, latest_error__isnull=False)
             )
             .select_related("source")
@@ -43,25 +43,6 @@ class ExternalDataFailureCheck(HealthCheck):
                         "pipeline_name": schema.name,
                         "source_type": schema.source.source_type if schema.source else "unknown",
                         "error": error[:500],
-                    },
-                    hash_keys=["pipeline_type", "pipeline_id"],
-                )
-            )
-
-        failed_sources = ExternalDataSource.objects.filter(
-            team_id__in=team_ids,
-            deleted=False,
-            status=ExternalDataSource.Status.ERROR,
-        )
-
-        for source in failed_sources:
-            issues.setdefault(source.team_id, []).append(
-                HealthCheckResult(
-                    severity=HealthIssue.Severity.WARNING,
-                    payload={
-                        "pipeline_type": "external_data_source",
-                        "pipeline_id": str(source.id),
-                        "source_type": source.source_type,
                     },
                     hash_keys=["pipeline_type", "pipeline_id"],
                 )
