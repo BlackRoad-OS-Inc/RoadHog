@@ -24,11 +24,12 @@ Before diving in, a few PostHog data model basics:
 3. [Billing & subscriptions](#3-billing--subscriptions)
 4. [Usage reporting](#4-usage-reporting)
 5. [Invoice lifecycle](#5-invoice-lifecycle)
-6. [Feature flag & experiment sync](#6-feature-flag--experiment-sync)
-7. [SSO (single sign-on)](#7-sso-single-sign-on)
-8. [Uninstall flow](#8-uninstall-flow)
-9. [Contacting Vercel support](#9-contacting-vercel-support)
-10. [Key files reference](#10-key-files-reference)
+6. [Payment failure & collections](#6-payment-failure--collections)
+7. [Feature flag & experiment sync](#7-feature-flag--experiment-sync)
+8. [SSO (single sign-on)](#8-sso-single-sign-on)
+9. [Uninstall flow](#9-uninstall-flow)
+10. [Contacting Vercel support](#10-contacting-vercel-support)
+11. [Key files reference](#11-key-files-reference)
 
 ---
 
@@ -313,7 +314,96 @@ The "invoice paid" webhook from Vercel:
 
 ---
 
-## 6. Feature flag & experiment sync
+## 6. Payment failure & collections
+
+When a Vercel customer's payment fails, Vercel handles the initial retry and dunning communication. PostHog only needs to act after the retry window expires.
+
+```mermaid
+sequenceDiagram
+    participant Vercel as Vercel
+    participant PH as PostHog
+    participant Customer
+
+    Note over Vercel: Invoice payment fails
+    Vercel->>PH: Webhook: marketplace.invoice.notpaid
+    Vercel->>Customer: Payment failure emails (dunning)
+    Note over Vercel: 15-day retry window begins
+
+    alt Customer pays during retry
+        Vercel->>PH: Webhook: marketplace.invoice.paid
+        Note over PH: No action needed
+    else Retry window elapses
+        Vercel->>PH: Webhook: marketplace.invoice.overdue
+        PH->>Vercel: PATCH installation status: "suspended"
+        PH->>Customer: Notification (email via Get Account Information)
+        Note over PH: Wait at least 15 more days\nbefore any destructive action
+    end
+
+    alt Customer pays after suspension
+        PH->>Vercel: PATCH installation status: "resumed"
+        PH->>PH: Restore service
+    end
+```
+
+### Webhook events
+
+| Event                         | Fired when                                  | Docs                                                                                     |
+| ----------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `marketplace.invoice.notpaid` | Invoice payment fails                       | [Vercel docs](https://vercel.com/docs/webhooks/webhooks-api#marketplace.invoice.notpaid) |
+| `marketplace.invoice.overdue` | 15-day retry window elapses without payment | [Vercel docs](https://vercel.com/docs/webhooks/webhooks-api#marketplace.invoice.overdue) |
+
+During the 15-day retry window, Vercel owns all customer-facing payment failure communication. We do not need to send any dunning emails during that period.
+
+### Recommended response after `overdue`
+
+Once the `marketplace.invoice.overdue` webhook fires:
+
+1. **Suspend the installation** - graceful, recoverable degradation (not data deletion)
+2. **Notify the customer** - use the [Get Account Information](https://vercel.com/docs/integrations/create-integration/marketplace-api/reference/vercel/get-account-information) endpoint to get contact info and send an email
+3. **Wait at least 15 additional days** before any destructive action (deleting data, removing resources). Degradation alone may prompt payment.
+
+### Suspension API
+
+Suspend an entire installation:
+
+```http
+PATCH /v1/installations/:integrationConfigurationId
+{ "status": "suspended" }
+```
+
+Suspend individual resources:
+
+```http
+PATCH /v1/installations/:integrationConfigurationId/resources/:resourceId
+{ "status": "suspended" }
+```
+
+Add a notification banner (optional, shown in the Vercel dashboard):
+
+```json
+{
+  "notification": {
+    "level": "error",
+    "title": "Account suspended",
+    "message": "Your invoice is past due. Please update your payment method.",
+    "href": "https://your-billing-page.example.com"
+  }
+}
+```
+
+`level` supports `info`, `warn`, or `error`. Send `notification: null` to clear.
+
+To resume after payment, set `{ "status": "resumed" }`. Valid statuses: `ready`, `pending`, `onboarding`, `suspended`, `resumed`, `uninstalled`, `error`.
+
+Suspension status is for **display only** within Vercel. To actually block access, you must also stop serving the customer on the PostHog side.
+
+### Tracking unpaid invoices
+
+Track invoice status via the webhook lifecycle events (`notpaid` -> `overdue` -> `paid`). Alternatively, query the [get-invoice endpoint](https://vercel.com/docs/integrations/create-integration/marketplace-api/reference/vercel/get-invoice) against stored invoice IDs.
+
+---
+
+## 7. Feature flag & experiment sync
 
 PostHog automatically syncs feature flags and experiments to Vercel's experimentation platform via Django signals.
 
@@ -342,7 +432,7 @@ sequenceDiagram
 
 ---
 
-## 7. SSO (single sign-on)
+## 8. SSO (single sign-on)
 
 Vercel users can SSO into PostHog without a separate login.
 
@@ -371,7 +461,7 @@ sequenceDiagram
 
 ---
 
-## 8. Uninstall flow
+## 9. Uninstall flow
 
 There are two uninstall paths depending on how the integration was installed:
 
@@ -425,13 +515,13 @@ For connectable integrations (linked existing accounts), the webhook handler sim
 
 ---
 
-## 9. Contacting Vercel support
+## 10. Contacting Vercel support
 
 For integration or billing issues that need Vercel's involvement, post in the shared Slack channel [#posthog-vercel](https://posthog.slack.com/archives/C08LYBQ58N5) with a :ticket: reaction on the message. This flags it for the Vercel team to pick up.
 
 ---
 
-## 10. Key files reference
+## 11. Key files reference
 
 ### PostHog repo (`posthog/`)
 
