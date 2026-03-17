@@ -1,0 +1,226 @@
+name: Enable Feature Flags PR Canary
+
+# Build the feature-flags Docker image from the PR head commit and dispatch
+# the canary deployment to the charts repo, which handles the ArgoCD rollout
+# using a two-phase deployment approach.
+#
+# This replaces the need to manually trigger rust-docker-build.yml followed
+# by the charts repo canary workflow.
+#
+# Trigger options:
+# 1. Add the 'canary-flags' label to a PR
+# 2. Push new commits to a PR that already has the 'canary-flags' label
+# 3. Manually via workflow_dispatch with PR number and options
+#
+# Requirements:
+# - PR must be approved
+
+on:
+    pull_request:
+        types: [labeled, synchronize]
+    workflow_dispatch:
+        inputs:
+            pr_number:
+                description: 'PR number'
+                required: true
+                type: string
+            canary_weight:
+                description: 'Traffic weight for canary (1-10, or "auto" to match per-pod traffic of the stable fleet)'
+                required: false
+                type: string
+                default: 'auto'
+            target_environment:
+                description: 'Target environment for the canary'
+                required: false
+                type: choice
+                options:
+                    - dev
+                    - prod-us
+                    - prod-eu
+                default: 'dev'
+
+jobs:
+    build_and_enable:
+        name: Build feature-flags image and enable canary
+        if: |
+            github.repository == 'PostHog/posthog' && (
+                github.event_name == 'workflow_dispatch' ||
+                contains(github.event.pull_request.labels.*.name, 'canary-flags')
+            )
+        runs-on: depot-ubuntu-22.04
+        permissions:
+            id-token: write
+            contents: read
+            packages: write
+
+        steps:
+            - name: Resolve PR info and validate approval
+              id: pr_info
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      let prNumber, canaryWeight, targetEnvironment;
+
+                      if (context.eventName === 'workflow_dispatch') {
+                          prNumber = parseInt(context.payload.inputs.pr_number);
+                          canaryWeight = context.payload.inputs.canary_weight || 'auto';
+                          targetEnvironment = context.payload.inputs.target_environment || 'dev';
+                      } else {
+                          prNumber = context.payload.pull_request.number;
+                          canaryWeight = 'auto';
+                          targetEnvironment = 'dev';
+                      }
+
+                      if (isNaN(prNumber) || prNumber <= 0) {
+                          core.setFailed(`Invalid PR number: ${prNumber}`);
+                          return;
+                      }
+
+                      const pr = await github.rest.pulls.get({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          pull_number: prNumber
+                      });
+
+                      const reviews = await github.rest.pulls.listReviews({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          pull_number: prNumber
+                      });
+
+                      const approved = reviews.data.some(r => r.state === 'APPROVED');
+                      if (!approved) {
+                          core.setFailed(`PR #${prNumber} must be approved before enabling canary`);
+                          return;
+                      }
+
+                      const shortSha = pr.data.head.sha.substring(0, 7);
+
+                      core.setOutput('pr_number', prNumber.toString());
+                      core.setOutput('pr_head_sha', pr.data.head.sha);
+                      core.setOutput('canary_weight', canaryWeight);
+                      core.setOutput('target_environment', targetEnvironment);
+                      core.setOutput('image_tag', `sha-${shortSha}`);
+
+                      console.log(`PR #${prNumber} is approved. Author: ${pr.data.user.login}, SHA: ${pr.data.head.sha}`);
+
+            - name: Validate canary inputs
+              env:
+                  CANARY_WEIGHT: ${{ steps.pr_info.outputs.canary_weight }}
+                  TARGET_ENVIRONMENT: ${{ steps.pr_info.outputs.target_environment }}
+              run: |
+                  if [ "$CANARY_WEIGHT" != "auto" ]; then
+                    if ! [[ "$CANARY_WEIGHT" =~ ^[0-9]+$ ]]; then
+                      echo "::error::Canary weight must be 'auto' or numeric, got: $CANARY_WEIGHT"
+                      exit 1
+                    fi
+                    if [ "$CANARY_WEIGHT" -lt 1 ] || [ "$CANARY_WEIGHT" -gt 10 ]; then
+                      echo "::error::Canary weight must be between 1 and 10, got: $CANARY_WEIGHT"
+                      exit 1
+                    fi
+                  fi
+
+                  case "$TARGET_ENVIRONMENT" in
+                    dev|prod-us|prod-eu) ;;
+                    *)
+                      echo "::error::Invalid target environment: $TARGET_ENVIRONMENT. Must be one of: dev, prod-us, prod-eu"
+                      exit 1
+                      ;;
+                  esac
+
+                  echo "Validated: weight=${CANARY_WEIGHT}, environment=${TARGET_ENVIRONMENT}"
+
+            - name: Check Out Repo
+              uses: actions/checkout@v6
+              with:
+                  ref: ${{ steps.pr_info.outputs.pr_head_sha }}
+                  sparse-checkout: |
+                      rust/
+                      proto/
+                  sparse-checkout-cone-mode: false
+
+            - name: Copy proto files into rust build context
+              run: cp -r proto rust/proto
+
+            - name: Set up Depot CLI
+              uses: depot/setup-action@b0b1ea4f69e92ebf5dea3f8713a1b0c37b2126a5 # v1.6.0
+
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+              with:
+                  image: tonistiigi/binfmt:latest
+                  platforms: all
+
+            - name: Login to ghcr.io
+              uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+                  logout: false
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+            - name: Retrieve sccache configuration
+              id: sccache
+              run: |
+                  echo "endpoint=$SCCACHE_WEBDAV_ENDPOINT" >> "$GITHUB_OUTPUT"
+                  echo "::add-mask::$SCCACHE_WEBDAV_TOKEN"
+                  echo "token=$SCCACHE_WEBDAV_TOKEN" >> "$GITHUB_OUTPUT"
+
+            - name: Build and push feature-flags image
+              id: docker_build
+              uses: depot/build-push-action@5f3b3c2e5a00f0093de47f657aeaefcedff27d18 # v1.17.0
+              with:
+                  project: vglf58qgzw
+                  context: ./rust/
+                  file: ./rust/Dockerfile
+                  push: true
+                  tags: ghcr.io/posthog/posthog/feature-flags:${{ steps.pr_info.outputs.image_tag }}
+                  platforms: linux/arm64,linux/amd64
+                  build-args: |
+                      SCCACHE_LOG=debug
+                      SCCACHE_NO_DAEMON=1
+                      BIN=feature-flags
+                  secrets: |
+                      SCCACHE_WEBDAV_ENDPOINT=${{ steps.sccache.outputs.endpoint }}
+                      SCCACHE_WEBDAV_TOKEN=${{ steps.sccache.outputs.token }}
+
+            - name: Get deployer token
+              id: deployer
+              uses: getsentry/action-github-app-token@d4b5da6c5e37703f8c3b3e43abb5705b46e159cc # v3.0.0
+              with:
+                  app_id: ${{ secrets.GH_APP_CHARTS_DEPLOYER_APP_ID }}
+                  private_key: ${{ secrets.GH_APP_CHARTS_DEPLOYER_PRIVATE_KEY }}
+
+            - name: Dispatch canary deployment to charts repo
+              uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
+              with:
+                  token: ${{ steps.deployer.outputs.token }}
+                  repository: PostHog/charts
+                  event-type: enable-canary-flags
+                  client-payload: |
+                      {
+                        "pr_number": "${{ steps.pr_info.outputs.pr_number }}",
+                        "image_tag": "${{ steps.pr_info.outputs.image_tag }}",
+                        "canary_weight": "${{ steps.pr_info.outputs.canary_weight }}",
+                        "target_environment": "${{ steps.pr_info.outputs.target_environment }}",
+                        "started_by": "${{ github.actor }}"
+                      }
+
+            - name: Summary
+              env:
+                  PR_NUMBER: ${{ steps.pr_info.outputs.pr_number }}
+                  IMAGE_TAG: ${{ steps.pr_info.outputs.image_tag }}
+                  CANARY_WEIGHT: ${{ steps.pr_info.outputs.canary_weight }}
+                  TARGET_ENVIRONMENT: ${{ steps.pr_info.outputs.target_environment }}
+              run: |
+                  echo "## Canary Flags - Build & Dispatch" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "- **PR**: #${PR_NUMBER}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Image**: ghcr.io/posthog/posthog/feature-flags:${IMAGE_TAG}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Weight**: ${CANARY_WEIGHT}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Environment**: ${TARGET_ENVIRONMENT}" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "Deployment dispatched to the [charts repo canary workflow](https://github.com/PostHog/charts/actions/workflows/pr-canary-flags-enable.yml)." >> $GITHUB_STEP_SUMMARY
