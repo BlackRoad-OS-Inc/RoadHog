@@ -1,4 +1,4 @@
-interface SystemTableDefaults {
+export interface SystemTableDefaults {
     timestamp_field: string
     id_field: string
     distinct_id_field: string

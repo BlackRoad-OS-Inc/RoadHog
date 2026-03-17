@@ -826,3 +826,24 @@ class TestTrendsSystemTableQuery(ClickhouseTestMixin, BaseTest):
 
         assert len(response.results) == 1
         assert response.hogql is not None
+
+    def test_system_table_with_timestamp_field_override(self):
+        """Verify that a non-default timestamp field (e.g. updated_at) resolves correctly."""
+        trends_query = TrendsQuery(
+            kind="TrendsQuery",
+            dateRange=DateRange(date_from="2024-01-01", date_to="2025-01-01"),
+            series=[
+                DataWarehouseNode(
+                    id="system.insights",
+                    table_name="system.insights",
+                    id_field="id",
+                    distinct_id_field="id",
+                    timestamp_field="updated_at",
+                )
+            ],
+        )
+
+        response = TrendsQueryRunner(team=self.team, query=trends_query).calculate()
+
+        assert len(response.results) == 1
+        assert response.hogql is not None
