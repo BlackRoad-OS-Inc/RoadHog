@@ -15,6 +15,22 @@ class ProductConfig:
     allow_api_keys: bool = True
 
 
+BEDROCK_MODELS = frozenset(
+    {
+        # US variations
+        "us.anthropic.claude-opus-4-5-20251101-v1:0",
+        "us.anthropic.claude-opus-4-6",
+        "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "us.anthropic.claude-sonnet-4-6",
+        "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        # EU variations
+        "eu.anthropic.claude-opus-4-6",
+        "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "eu.anthropic.claude-sonnet-4-6",
+        "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+    }
+)
+
 # OAuth application IDs per region
 POSTHOG_CODE_US_APP_ID = "019a3066-4aa2-0000-ca70-48ecdcc519cf"
 POSTHOG_CODE_EU_APP_ID = "019a3067-5be7-0000-33c7-c6743eb59a79"
@@ -38,15 +54,11 @@ PRODUCTS: Final[dict[str, ProductConfig]] = {
                 "claude-sonnet-4-5",
                 "claude-sonnet-4-6",
                 "claude-haiku-4-5",
-                "bedrock/anthropic.claude-opus-4-5-20250929-v1:0",
-                "bedrock/anthropic.claude-opus-4-6-v1:0",
-                "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
-                "bedrock/anthropic.claude-sonnet-4-6-v1:0",
-                "bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
                 "gpt-5.3-codex",
                 "gpt-5.2",
                 "gpt-5-mini",
             }
+            | BEDROCK_MODELS
         ),
         allow_api_keys=False,
     ),
@@ -58,14 +70,11 @@ PRODUCTS: Final[dict[str, ProductConfig]] = {
                 "claude-opus-4-6",
                 "claude-sonnet-4-5",
                 "claude-haiku-4-5",
-                "bedrock/anthropic.claude-opus-4-5-20250929-v1:0",
-                "bedrock/anthropic.claude-opus-4-6-v1:0",
-                "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
-                "bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
                 "gpt-5.3-codex",
                 "gpt-5.2",
                 "gpt-5-mini",
             }
+            | BEDROCK_MODELS
         ),
         allow_api_keys=False,
     ),
@@ -81,7 +90,7 @@ PRODUCTS: Final[dict[str, ProductConfig]] = {
     ),
     "slack-twig": ProductConfig(
         allowed_application_ids=None,
-        allowed_models=frozenset({"claude-haiku-4-5", "bedrock/anthropic.claude-haiku-4-5-20251001-v1:0"}),
+        allowed_models=frozenset({"claude-haiku-4-5"}),
         allow_api_keys=True,
     ),
     "growth": ProductConfig(

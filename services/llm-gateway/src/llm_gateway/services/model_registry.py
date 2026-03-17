@@ -46,15 +46,12 @@ def _get_configured_providers() -> frozenset[str]:
     settings = get_settings()
     configured = set()
     for provider, (settings_attr, env_var) in _PROVIDER_TO_API_KEY.items():
-        settings_value = getattr(settings, settings_attr, None)
-        env_value = os.environ.get(env_var)
-        if _has_config_value(settings_value) or _has_config_value(env_value):
+        if getattr(settings, settings_attr, None) or os.environ.get(env_var):
             configured.add(provider)
     if _is_bedrock_configured(settings):
         configured.add("bedrock")
-        configured.add(
-            "bedrock_converse"
-        )  # Need to use bedrock_converse for model lookups in LiteLLM until they support bedrock provider lookups
+        # Need to use bedrock_converse for model lookups in LiteLLM until they support bedrock provider lookups
+        configured.add("bedrock_converse")
     return frozenset(configured)
 
 
@@ -94,14 +91,10 @@ class ModelRegistryService:
         )
 
     # @TODO: need to use the bedrock_converse provider until LiteLLM supports the Anthropic models for the regular Bedrock provider
-    def get_available_models(self, product: str, provider_filter: str | None = None) -> list[ModelInfo]:
-        """Get raw provider models available to a product, optionally filtered by provider."""
+    def get_available_models(self, product: str) -> list[ModelInfo]:
+        """Get raw provider models available to a product."""
         config = get_product_config(product)
         configured_providers = _get_configured_providers()
-        if provider_filter is not None:
-            if provider_filter not in configured_providers:
-                return []
-            configured_providers = frozenset({provider_filter})
         allowed_models = config.allowed_models if config else None
         all_litellm_models = (
             ModelCostService.get_instance().get_all_models()
@@ -145,8 +138,8 @@ class ModelRegistryService:
         return provider in configured_providers and _is_chat_model(cost_data)
 
 
-def get_available_models(product: str, provider_filter: str | None = None) -> list[ModelInfo]:
-    return ModelRegistryService.get_instance().get_available_models(product, provider_filter)
+def get_available_models(product: str) -> list[ModelInfo]:
+    return ModelRegistryService.get_instance().get_available_models(product)
 
 
 def is_model_available(model_id: str, product: str) -> bool:

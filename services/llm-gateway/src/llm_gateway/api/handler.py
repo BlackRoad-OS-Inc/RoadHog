@@ -59,8 +59,6 @@ async def handle_llm_request(
     settings = get_settings()
     start_time = time.monotonic()
 
-    logger.info("inside handle_llm_request")
-
     set_request_context(
         RequestContext(
             request_id=get_request_id(),
@@ -77,15 +75,6 @@ async def handle_llm_request(
         provider=provider_config.name,
         model=model,
     )
-
-    logger.info(f"provider_config: {provider_config}")
-    logger.info(f"request_data: {request_data}")
-    logger.info(f"user: {user}")
-    logger.info(f"model: {model}")
-    logger.info(f"is_streaming: {is_streaming}")
-    logger.info(f"start_time: {start_time}")
-    logger.info(f"timeout: {settings.streaming_timeout}")
-    logger.info(f"product: {product}")
 
     if is_streaming:
         return await _handle_streaming_request(
@@ -150,7 +139,6 @@ async def _handle_streaming_request(
     timeout: float,
     product: str = "llm_gateway",
 ) -> StreamingResponse:
-    logger.info("inside _handle_streaming_request")
     CONCURRENT_REQUESTS.labels(provider=provider_config.name, model=model, product=product).inc()
     try:
         llm_response = await asyncio.wait_for(llm_call(**request_data), timeout=timeout)
@@ -177,7 +165,6 @@ async def _handle_streaming_request(
             detail={"error": {"message": "Request timed out", "type": "timeout_error", "code": None}},
         ) from None
     except Exception as e:
-        logger.info(f"exception in _handle_streaming_request: {e}")
         CONCURRENT_REQUESTS.labels(provider=provider_config.name, model=model, product=product).dec()
         PROVIDER_ERRORS.labels(provider=provider_config.name, error_type=type(e).__name__, product=product).inc()
         capture_exception(e, {"provider": provider_config.name, "model": model, "streaming": True})
