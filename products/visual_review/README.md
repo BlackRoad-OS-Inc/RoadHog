@@ -29,38 +29,53 @@ No sync problems, no "baseline service went down", no mystery diffs from someone
 
 ## The flow
 
+By default, Storybook and Playwright CI run in **check mode** — snapshots must match the committed baselines or the test fails. This prevents unintentional snapshot updates from landing on unrelated PRs.
+
+To opt in to auto-updates, add the `update-snapshots` label to your PR and re-run CI (or push a new commit). In update mode, changed snapshots are committed back to the PR branch automatically. Only `mendral-app[bot]` gets update mode without the label.
+
 ```text
 Developer pushes PR
        │
        ▼
-CI captures screenshots, runs `vr submit`
-  - scan directory for PNGs
-  - hash each (RGBA bitmap → SHA-256)
-  - read baseline YAML from repo
-  - POST /runs with manifest
-  - receive presigned S3 upload URLs (only for hashes the backend doesn't have)
-  - upload directly to S3
-  - POST /runs/{id}/complete
+CI detects snapshot mode
+  - Fork PR → always check mode
+  - `update-snapshots` label present → update mode
+  - Trusted bot (mendral-app[bot]) → update mode
+  - Otherwise → check mode (default)
        │
-       ▼
-Backend queues async diff (Celery)
-  - download baseline + current from S3
-  - pixel diff with per-channel threshold (Pillow)
-  - upload diff overlay artifact
-  - mark run completed
-  - post GitHub Check (pass/fail)
-       │
-       ▼
-Developer opens the web UI
-  - runs list, filterable by review state (needs review / clean / processing / stale)
-  - run detail: thumbnail strip of changed snapshots, side-by-side diff viewer
-  - click "Approve" → POST /runs/{id}/approve
-       │
-       ▼
-Backend commits updated .snapshots.yml to PR branch (GitHub API)
-       │
-       ▼
-CI re-runs → hashes match → check passes → PR ready to merge
+       ┌──────────────┴──────────────┐
+       ▼                             ▼
+  CHECK MODE                    UPDATE MODE
+  Snapshots must match.         CI captures screenshots, runs `vr submit`
+  Test fails if they don't.       - scan directory for PNGs
+  A PR comment explains how       - hash each (RGBA bitmap → SHA-256)
+  to add the label if the         - read baseline YAML from repo
+  changes are intentional.        - POST /runs with manifest
+       │                           - receive presigned S3 upload URLs
+       │                           - upload directly to S3
+       │                           - POST /runs/{id}/complete
+       │                             │
+       │                             ▼
+       │                    Backend queues async diff (Celery)
+       │                      - download baseline + current from S3
+       │                      - pixel diff with per-channel threshold (Pillow)
+       │                      - upload diff overlay artifact
+       │                      - mark run completed
+       │                      - post GitHub Check (pass/fail)
+       │                             │
+       │                             ▼
+       │                    Developer opens the web UI
+       │                      - runs list, filterable by review state
+       │                      - run detail: thumbnail strip, side-by-side diff viewer
+       │                      - click "Approve" → POST /runs/{id}/approve
+       │                             │
+       │                             ▼
+       │                    Backend commits updated .snapshots.yml to PR branch (GitHub API)
+       │                             │
+       └─────────────────────────────┘
+                      │
+                      ▼
+         CI re-runs → hashes match → check passes → PR ready to merge
 ```
 
 Summary counts (changed/new/removed) are computed synchronously at run creation via hash comparison — the UI always has numbers even before async diffs finish.
