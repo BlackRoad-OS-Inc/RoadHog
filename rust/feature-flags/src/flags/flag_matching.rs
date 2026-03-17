@@ -1312,7 +1312,6 @@ impl FeatureFlagMatcher {
                         });
                     }
                     // if no match, continue to normal conditions
-                } else {
                 }
             }
         }
@@ -1516,10 +1515,8 @@ impl FeatureFlagMatcher {
                 };
                 if !self.evaluate_cohort_filters(&cohort_filters, merged_properties, cohorts)? {
                     return Ok((false, FeatureFlagMatchReason::NoConditionMatch));
-                } else {
                 }
             }
-        } else {
         }
 
         self.check_rollout(
@@ -1949,11 +1946,7 @@ impl FeatureFlagMatcher {
         let realtime_cohort_ids: Vec<CohortId> = if self.enable_realtime_cohort_evaluation {
             cohorts
                 .iter()
-                .filter(|c| {
-                    let uses_realtime = c.uses_realtime_membership();
-                    if uses_realtime {}
-                    uses_realtime
-                })
+                .filter(|c| c.uses_realtime_membership())
                 .map(|c| c.id)
                 .collect()
         } else {

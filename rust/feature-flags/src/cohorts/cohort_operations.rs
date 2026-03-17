@@ -201,7 +201,7 @@ impl InnerCohortProperty {
     ) -> Result<bool, FlagError> {
         match self.prop_type {
             CohortPropertyType::OR => {
-                for (i, cohort_values) in self.values.iter().enumerate() {
+                for cohort_values in &self.values {
                     if evaluate_cohort_values(cohort_values, target_properties, cohort_matches)? {
                         return Ok(true);
                     }
@@ -209,7 +209,7 @@ impl InnerCohortProperty {
                 Ok(false)
             }
             CohortPropertyType::AND => {
-                for (i, cohort_values) in self.values.iter().enumerate() {
+                for cohort_values in &self.values {
                     if !evaluate_cohort_values(cohort_values, target_properties, cohort_matches)? {
                         return Ok(false);
                     }
@@ -231,7 +231,7 @@ fn evaluate_cohort_values(
 ) -> Result<bool, FlagError> {
     match values.prop_type.as_str() {
         "OR" => {
-            for (i, filter) in values.values.iter().enumerate() {
+            for filter in &values.values {
                 if filter.is_cohort() {
                     // Handle cohort membership check
                     if apply_cohort_membership_logic(std::slice::from_ref(filter), cohort_matches)?
@@ -250,7 +250,7 @@ fn evaluate_cohort_values(
             Ok(false)
         }
         "AND" | "property" => {
-            for (i, filter) in values.values.iter().enumerate() {
+            for filter in &values.values {
                 if filter.is_cohort() {
                     // Handle cohort membership check with negation
                     let cohort_result = apply_cohort_membership_logic(
@@ -284,18 +284,16 @@ fn evaluate_property_with_negation(
     filter: &PropertyFilter,
     target_properties: &HashMap<String, Value>,
 ) -> bool {
-    let property_value = target_properties.get(&filter.key);
+    let _property_value = target_properties.get(&filter.key);
 
     let property_result = match_property(filter, target_properties, false).unwrap_or(false);
 
     // Apply negation if specified
-    let final_result = if filter.negation.unwrap_or(false) {
+    if filter.negation.unwrap_or(false) {
         !property_result
     } else {
         property_result
-    };
-
-    final_result
+    }
 }
 
 /// Evaluates a single cohort against target properties and existing evaluation results.
@@ -316,7 +314,7 @@ fn evaluate_single_cohort(
     // Parse and evaluate using the hierarchical structure
     let cohort_property: CohortProperty = match serde_json::from_value(filters.clone()) {
         Ok(prop) => prop,
-        Err(e) => {
+        Err(_e) => {
             return Ok(false);
         }
     };
