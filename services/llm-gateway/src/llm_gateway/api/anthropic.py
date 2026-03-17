@@ -74,19 +74,19 @@ async def _handle_count_tokens(
     status_code = "200"
     data = body.model_dump(exclude_none=True)
 
-    try:
-        api_key = settings.anthropic_api_key
-        if not api_key:
-            raise HTTPException(
-                status_code=503,
-                detail={"error": {"message": "Anthropic API key not configured", "type": "configuration_error"}},
-            )
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": ANTHROPIC_API_VERSION,
-            "content-type": "application/json",
-        }
+    api_key = settings.anthropic_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": {"message": "Anthropic API key not configured", "type": "configuration_error"}},
+        )
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": ANTHROPIC_API_VERSION,
+        "content-type": "application/json",
+    }
 
+    try:
         async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
             response = await client.post(
                 ANTHROPIC_COUNT_TOKENS_URL,
