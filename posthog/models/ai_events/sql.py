@@ -8,7 +8,7 @@ WRITABLE_TABLE_NAME = f"writable_{TABLE_BASE_NAME}"
 KAFKA_TABLE_NAME = f"kafka_{TABLE_BASE_NAME}_json"
 MV_NAME = f"{TABLE_BASE_NAME}_json_mv"
 
-SHARDING_KEY = "cityHash64(concat(toString(team_id), '-', trace_id, '-', toString(toDate(timestamp))))"
+SHARDING_KEY = "cityHash64(concat(toString(team_id), '-', coalesce(trace_id, ''), '-', toString(toDate(timestamp))))"
 
 # Heavy AI properties that are stored in dedicated columns and stripped from the properties JSON
 # in the materialized view to avoid duplicating large data.
@@ -77,82 +77,90 @@ CREATE TABLE IF NOT EXISTS {table_name}
     team_id Int64,
     distinct_id String,
     person_id UUID,
-    properties String DEFAULT '' CODEC(ZSTD(3)),
+    properties String,
     retention_days Int16 DEFAULT 30,
 
     -- Trace structure
-    trace_id String DEFAULT '',
-    session_id String DEFAULT '',
-    parent_id String DEFAULT '',
-    span_id String DEFAULT '',
-    span_type LowCardinality(String) DEFAULT '',
-    generation_id String DEFAULT '',
+    trace_id Nullable(String),
+    session_id Nullable(String),
+    parent_id Nullable(String),
+    span_id Nullable(String),
+    span_type LowCardinality(Nullable(String)),
+    generation_id Nullable(String),
 
     -- Names
-    span_name String DEFAULT '',
-    trace_name String DEFAULT '',
-    prompt_name String DEFAULT '',
+    span_name Nullable(String),
+    trace_name Nullable(String),
+    prompt_name Nullable(String),
 
     -- Model info
-    model LowCardinality(String) DEFAULT '',
-    provider LowCardinality(String) DEFAULT '',
-    framework LowCardinality(String) DEFAULT '',
+    model LowCardinality(Nullable(String)),
+    provider LowCardinality(Nullable(String)),
+    framework LowCardinality(Nullable(String)),
 
     -- Token counts
-    total_tokens Int64 DEFAULT 0,
-    input_tokens Int64 DEFAULT 0,
-    output_tokens Int64 DEFAULT 0,
-    text_input_tokens Int64 DEFAULT 0,
-    text_output_tokens Int64 DEFAULT 0,
-    image_input_tokens Int64 DEFAULT 0,
-    image_output_tokens Int64 DEFAULT 0,
-    audio_input_tokens Int64 DEFAULT 0,
-    audio_output_tokens Int64 DEFAULT 0,
-    video_input_tokens Int64 DEFAULT 0,
-    video_output_tokens Int64 DEFAULT 0,
-    reasoning_tokens Int64 DEFAULT 0,
-    cache_read_input_tokens Int64 DEFAULT 0,
-    cache_creation_input_tokens Int64 DEFAULT 0,
-    web_search_count Int64 DEFAULT 0,
+    total_tokens Nullable(Int64),
+    input_tokens Nullable(Int64),
+    output_tokens Nullable(Int64),
+    text_input_tokens Nullable(Int64),
+    text_output_tokens Nullable(Int64),
+    image_input_tokens Nullable(Int64),
+    image_output_tokens Nullable(Int64),
+    audio_input_tokens Nullable(Int64),
+    audio_output_tokens Nullable(Int64),
+    video_input_tokens Nullable(Int64),
+    video_output_tokens Nullable(Int64),
+    reasoning_tokens Nullable(Int64),
+    cache_read_input_tokens Nullable(Int64),
+    cache_creation_input_tokens Nullable(Int64),
+    web_search_count Nullable(Int64),
 
     -- Costs
-    input_cost_usd Float64 DEFAULT 0,
-    output_cost_usd Float64 DEFAULT 0,
-    total_cost_usd Float64 DEFAULT 0,
-    request_cost_usd Float64 DEFAULT 0,
-    web_search_cost_usd Float64 DEFAULT 0,
-    audio_cost_usd Float64 DEFAULT 0,
-    image_cost_usd Float64 DEFAULT 0,
-    video_cost_usd Float64 DEFAULT 0,
+    input_cost_usd Nullable(Float64),
+    output_cost_usd Nullable(Float64),
+    total_cost_usd Nullable(Float64),
+    request_cost_usd Nullable(Float64),
+    web_search_cost_usd Nullable(Float64),
+    audio_cost_usd Nullable(Float64),
+    image_cost_usd Nullable(Float64),
+    video_cost_usd Nullable(Float64),
 
     -- Timing
-    latency Float64 DEFAULT 0,
-    time_to_first_token Float64 DEFAULT 0,
+    latency Nullable(Float64),
+    time_to_first_token Nullable(Float64),
 
     -- Errors
-    is_error UInt8 DEFAULT 0,
-    error String DEFAULT '',
-    error_type LowCardinality(String) DEFAULT '',
-    error_normalized String DEFAULT '',
+    is_error UInt8,
+    error Nullable(String),
+    error_type LowCardinality(Nullable(String)),
+    error_normalized Nullable(String),
 
     -- Heavy columns (large content)
-    input String DEFAULT '' CODEC(ZSTD(3)),
-    output String DEFAULT '' CODEC(ZSTD(3)),
-    output_choices String DEFAULT '' CODEC(ZSTD(3)),
-    input_state String DEFAULT '' CODEC(ZSTD(3)),
-    output_state String DEFAULT '' CODEC(ZSTD(3)),
-    tools String DEFAULT '' CODEC(ZSTD(3)),
+    input Nullable(String),
+    output Nullable(String),
+    output_choices Nullable(String),
+    input_state Nullable(String),
+    output_state Nullable(String),
+    tools Nullable(String),
 
     -- Materialized preview columns (extract last input message / first output choice)
+    -- assumeNotNull is needed because JSONExtractArrayRaw returns Array(String)
+    -- which cannot exist inside Nullable context, but we guard with IS NULL first.
     input_preview String MATERIALIZED if(
-        JSONType(input) = 'Array',
-        left(JSONExtractArrayRaw(input)[length(JSONExtractArrayRaw(input))], 200),
-        left(input, 200)
+        input IS NULL, '',
+        if(
+            JSONType(assumeNotNull(input)) = 'Array',
+            left(JSONExtractArrayRaw(assumeNotNull(input))[length(JSONExtractArrayRaw(assumeNotNull(input)))], 200),
+            left(assumeNotNull(input), 200)
+        )
     ),
     output_choices_preview String MATERIALIZED if(
-        JSONType(output_choices) = 'Array',
-        left(JSONExtractArrayRaw(output_choices)[1], 200),
-        left(output_choices, 200)
+        output_choices IS NULL, '',
+        if(
+            JSONType(assumeNotNull(output_choices)) = 'Array',
+            left(JSONExtractArrayRaw(assumeNotNull(output_choices))[1], 200),
+            left(assumeNotNull(output_choices), 200)
+        )
     ),
 
     -- Kafka metadata
@@ -182,7 +190,7 @@ def AI_EVENTS_DATA_TABLE_SQL():
         AI_EVENTS_TABLE_BASE_SQL
         + """
 PARTITION BY (toStartOfDay(timestamp), retention_days)
-ORDER BY (team_id, trace_id, timestamp)
+ORDER BY (team_id, coalesce(trace_id, ''), timestamp)
 TTL toDateTime(timestamp) + toIntervalDay(retention_days)
 SETTINGS ttl_only_drop_parts = 1
 """
@@ -240,67 +248,67 @@ AS SELECT
     {stripped_properties} AS properties,
 
     -- Trace structure
-    JSONExtractString(src.properties, '$ai_trace_id') AS trace_id,
-    JSONExtractString(src.properties, '$ai_session_id') AS session_id,
-    JSONExtractString(src.properties, '$ai_parent_id') AS parent_id,
-    JSONExtractString(src.properties, '$ai_span_id') AS span_id,
-    JSONExtractString(src.properties, '$ai_span_type') AS span_type,
-    JSONExtractString(src.properties, '$ai_generation_id') AS generation_id,
+    JSONExtract(src.properties, '$ai_trace_id', 'Nullable(String)') AS trace_id,
+    JSONExtract(src.properties, '$ai_session_id', 'Nullable(String)') AS session_id,
+    JSONExtract(src.properties, '$ai_parent_id', 'Nullable(String)') AS parent_id,
+    JSONExtract(src.properties, '$ai_span_id', 'Nullable(String)') AS span_id,
+    JSONExtract(src.properties, '$ai_span_type', 'Nullable(String)') AS span_type,
+    JSONExtract(src.properties, '$ai_generation_id', 'Nullable(String)') AS generation_id,
 
     -- Names
-    JSONExtractString(src.properties, '$ai_span_name') AS span_name,
-    JSONExtractString(src.properties, '$ai_trace_name') AS trace_name,
-    JSONExtractString(src.properties, '$ai_prompt_name') AS prompt_name,
+    JSONExtract(src.properties, '$ai_span_name', 'Nullable(String)') AS span_name,
+    JSONExtract(src.properties, '$ai_trace_name', 'Nullable(String)') AS trace_name,
+    JSONExtract(src.properties, '$ai_prompt_name', 'Nullable(String)') AS prompt_name,
 
     -- Model info
-    JSONExtractString(src.properties, '$ai_model') AS model,
-    JSONExtractString(src.properties, '$ai_provider') AS provider,
-    JSONExtractString(src.properties, '$ai_framework') AS framework,
+    JSONExtract(src.properties, '$ai_model', 'Nullable(String)') AS model,
+    JSONExtract(src.properties, '$ai_provider', 'Nullable(String)') AS provider,
+    JSONExtract(src.properties, '$ai_framework', 'Nullable(String)') AS framework,
 
     -- Token counts
-    JSONExtractInt(src.properties, '$ai_total_tokens') AS total_tokens,
-    JSONExtractInt(src.properties, '$ai_input_tokens') AS input_tokens,
-    JSONExtractInt(src.properties, '$ai_output_tokens') AS output_tokens,
-    JSONExtractInt(src.properties, '$ai_text_input_tokens') AS text_input_tokens,
-    JSONExtractInt(src.properties, '$ai_text_output_tokens') AS text_output_tokens,
-    JSONExtractInt(src.properties, '$ai_image_input_tokens') AS image_input_tokens,
-    JSONExtractInt(src.properties, '$ai_image_output_tokens') AS image_output_tokens,
-    JSONExtractInt(src.properties, '$ai_audio_input_tokens') AS audio_input_tokens,
-    JSONExtractInt(src.properties, '$ai_audio_output_tokens') AS audio_output_tokens,
-    JSONExtractInt(src.properties, '$ai_video_input_tokens') AS video_input_tokens,
-    JSONExtractInt(src.properties, '$ai_video_output_tokens') AS video_output_tokens,
-    JSONExtractInt(src.properties, '$ai_reasoning_tokens') AS reasoning_tokens,
-    JSONExtractInt(src.properties, '$ai_cache_read_input_tokens') AS cache_read_input_tokens,
-    JSONExtractInt(src.properties, '$ai_cache_creation_input_tokens') AS cache_creation_input_tokens,
-    JSONExtractInt(src.properties, '$ai_web_search_count') AS web_search_count,
+    JSONExtract(src.properties, '$ai_total_tokens', 'Nullable(Int64)') AS total_tokens,
+    JSONExtract(src.properties, '$ai_input_tokens', 'Nullable(Int64)') AS input_tokens,
+    JSONExtract(src.properties, '$ai_output_tokens', 'Nullable(Int64)') AS output_tokens,
+    JSONExtract(src.properties, '$ai_text_input_tokens', 'Nullable(Int64)') AS text_input_tokens,
+    JSONExtract(src.properties, '$ai_text_output_tokens', 'Nullable(Int64)') AS text_output_tokens,
+    JSONExtract(src.properties, '$ai_image_input_tokens', 'Nullable(Int64)') AS image_input_tokens,
+    JSONExtract(src.properties, '$ai_image_output_tokens', 'Nullable(Int64)') AS image_output_tokens,
+    JSONExtract(src.properties, '$ai_audio_input_tokens', 'Nullable(Int64)') AS audio_input_tokens,
+    JSONExtract(src.properties, '$ai_audio_output_tokens', 'Nullable(Int64)') AS audio_output_tokens,
+    JSONExtract(src.properties, '$ai_video_input_tokens', 'Nullable(Int64)') AS video_input_tokens,
+    JSONExtract(src.properties, '$ai_video_output_tokens', 'Nullable(Int64)') AS video_output_tokens,
+    JSONExtract(src.properties, '$ai_reasoning_tokens', 'Nullable(Int64)') AS reasoning_tokens,
+    JSONExtract(src.properties, '$ai_cache_read_input_tokens', 'Nullable(Int64)') AS cache_read_input_tokens,
+    JSONExtract(src.properties, '$ai_cache_creation_input_tokens', 'Nullable(Int64)') AS cache_creation_input_tokens,
+    JSONExtract(src.properties, '$ai_web_search_count', 'Nullable(Int64)') AS web_search_count,
 
     -- Costs
-    JSONExtractFloat(src.properties, '$ai_input_cost_usd') AS input_cost_usd,
-    JSONExtractFloat(src.properties, '$ai_output_cost_usd') AS output_cost_usd,
-    JSONExtractFloat(src.properties, '$ai_total_cost_usd') AS total_cost_usd,
-    JSONExtractFloat(src.properties, '$ai_request_cost_usd') AS request_cost_usd,
-    JSONExtractFloat(src.properties, '$ai_web_search_cost_usd') AS web_search_cost_usd,
-    JSONExtractFloat(src.properties, '$ai_audio_cost_usd') AS audio_cost_usd,
-    JSONExtractFloat(src.properties, '$ai_image_cost_usd') AS image_cost_usd,
-    JSONExtractFloat(src.properties, '$ai_video_cost_usd') AS video_cost_usd,
+    JSONExtract(src.properties, '$ai_input_cost_usd', 'Nullable(Float64)') AS input_cost_usd,
+    JSONExtract(src.properties, '$ai_output_cost_usd', 'Nullable(Float64)') AS output_cost_usd,
+    JSONExtract(src.properties, '$ai_total_cost_usd', 'Nullable(Float64)') AS total_cost_usd,
+    JSONExtract(src.properties, '$ai_request_cost_usd', 'Nullable(Float64)') AS request_cost_usd,
+    JSONExtract(src.properties, '$ai_web_search_cost_usd', 'Nullable(Float64)') AS web_search_cost_usd,
+    JSONExtract(src.properties, '$ai_audio_cost_usd', 'Nullable(Float64)') AS audio_cost_usd,
+    JSONExtract(src.properties, '$ai_image_cost_usd', 'Nullable(Float64)') AS image_cost_usd,
+    JSONExtract(src.properties, '$ai_video_cost_usd', 'Nullable(Float64)') AS video_cost_usd,
 
     -- Timing
-    JSONExtractFloat(src.properties, '$ai_latency') AS latency,
-    JSONExtractFloat(src.properties, '$ai_time_to_first_token') AS time_to_first_token,
+    JSONExtract(src.properties, '$ai_latency', 'Nullable(Float64)') AS latency,
+    JSONExtract(src.properties, '$ai_time_to_first_token', 'Nullable(Float64)') AS time_to_first_token,
 
     -- Errors
     if(JSONExtractString(src.properties, '$ai_is_error') = 'true', 1, 0) AS is_error,
-    JSONExtractString(src.properties, '$ai_error') AS error,
-    JSONExtractString(src.properties, '$ai_error_type') AS error_type,
-    JSONExtractString(src.properties, '$ai_error_normalized') AS error_normalized,
+    JSONExtract(src.properties, '$ai_error', 'Nullable(String)') AS error,
+    JSONExtract(src.properties, '$ai_error_type', 'Nullable(String)') AS error_type,
+    JSONExtract(src.properties, '$ai_error_normalized', 'Nullable(String)') AS error_normalized,
 
     -- Heavy columns
-    JSONExtractRaw(src.properties, '$ai_input') AS input,
-    JSONExtractRaw(src.properties, '$ai_output') AS output,
-    JSONExtractRaw(src.properties, '$ai_output_choices') AS output_choices,
-    JSONExtractRaw(src.properties, '$ai_input_state') AS input_state,
-    JSONExtractRaw(src.properties, '$ai_output_state') AS output_state,
-    JSONExtractRaw(src.properties, '$ai_tools') AS tools,
+    nullIf(JSONExtractRaw(src.properties, '$ai_input'), '') AS input,
+    nullIf(JSONExtractRaw(src.properties, '$ai_output'), '') AS output,
+    nullIf(JSONExtractRaw(src.properties, '$ai_output_choices'), '') AS output_choices,
+    nullIf(JSONExtractRaw(src.properties, '$ai_input_state'), '') AS input_state,
+    nullIf(JSONExtractRaw(src.properties, '$ai_output_state'), '') AS output_state,
+    nullIf(JSONExtractRaw(src.properties, '$ai_tools'), '') AS tools,
 
     -- Kafka metadata
     _timestamp,

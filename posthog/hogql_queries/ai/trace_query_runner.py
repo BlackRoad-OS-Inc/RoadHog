@@ -107,7 +107,7 @@ class TraceQueryRunner(TraceMapperMixin, AnalyticsQueryRunner[TraceQueryResponse
                              )
                         -- Otherwise sum the direct children of the trace
                         ELSE sumIf(latency,
-                                   parent_id = ''
+                                   parent_id IS NULL
                                    OR parent_id = trace_id
                              )
                     END, 2

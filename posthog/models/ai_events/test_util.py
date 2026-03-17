@@ -99,16 +99,25 @@ def bulk_create_ai_events(events: list[dict[str, Any]]) -> None:
             )""".format(i=index)
         )
 
-        def _prop(name: str, default: Any = "", _props: dict = properties) -> Any:
-            return _props.get(name, default)
-
-        def _prop_str(name: str, _props: dict = properties) -> str:
+        def _prop_str(name: str, _props: dict = properties) -> str | None:
             val = _props.get(name)
             if val is None:
-                return ""
+                return None
             if isinstance(val, (dict, list)):
                 return json.dumps(val)
             return str(val)
+
+        def _prop_int(name: str, _props: dict = properties) -> int | None:
+            val = _props.get(name)
+            if val is None:
+                return None
+            return int(val)
+
+        def _prop_float(name: str, _props: dict = properties) -> float | None:
+            val = _props.get(name)
+            if val is None:
+                return None
+            return float(val)
 
         params.update(
             {
@@ -131,32 +140,32 @@ def bulk_create_ai_events(events: list[dict[str, Any]]) -> None:
                 f"model_{index}": _prop_str("$ai_model"),
                 f"provider_{index}": _prop_str("$ai_provider"),
                 f"framework_{index}": _prop_str("$ai_framework"),
-                f"total_tokens_{index}": int(_prop("$ai_total_tokens", 0) or 0),
-                f"input_tokens_{index}": int(_prop("$ai_input_tokens", 0) or 0),
-                f"output_tokens_{index}": int(_prop("$ai_output_tokens", 0) or 0),
-                f"text_input_tokens_{index}": int(_prop("$ai_text_input_tokens", 0) or 0),
-                f"text_output_tokens_{index}": int(_prop("$ai_text_output_tokens", 0) or 0),
-                f"image_input_tokens_{index}": int(_prop("$ai_image_input_tokens", 0) or 0),
-                f"image_output_tokens_{index}": int(_prop("$ai_image_output_tokens", 0) or 0),
-                f"audio_input_tokens_{index}": int(_prop("$ai_audio_input_tokens", 0) or 0),
-                f"audio_output_tokens_{index}": int(_prop("$ai_audio_output_tokens", 0) or 0),
-                f"video_input_tokens_{index}": int(_prop("$ai_video_input_tokens", 0) or 0),
-                f"video_output_tokens_{index}": int(_prop("$ai_video_output_tokens", 0) or 0),
-                f"reasoning_tokens_{index}": int(_prop("$ai_reasoning_tokens", 0) or 0),
-                f"cache_read_input_tokens_{index}": int(_prop("$ai_cache_read_input_tokens", 0) or 0),
-                f"cache_creation_input_tokens_{index}": int(_prop("$ai_cache_creation_input_tokens", 0) or 0),
-                f"web_search_count_{index}": int(_prop("$ai_web_search_count", 0) or 0),
-                f"input_cost_usd_{index}": float(_prop("$ai_input_cost_usd", 0) or 0),
-                f"output_cost_usd_{index}": float(_prop("$ai_output_cost_usd", 0) or 0),
-                f"total_cost_usd_{index}": float(_prop("$ai_total_cost_usd", 0) or 0),
-                f"request_cost_usd_{index}": float(_prop("$ai_request_cost_usd", 0) or 0),
-                f"web_search_cost_usd_{index}": float(_prop("$ai_web_search_cost_usd", 0) or 0),
-                f"audio_cost_usd_{index}": float(_prop("$ai_audio_cost_usd", 0) or 0),
-                f"image_cost_usd_{index}": float(_prop("$ai_image_cost_usd", 0) or 0),
-                f"video_cost_usd_{index}": float(_prop("$ai_video_cost_usd", 0) or 0),
-                f"latency_{index}": float(_prop("$ai_latency", 0) or 0),
-                f"time_to_first_token_{index}": float(_prop("$ai_time_to_first_token", 0) or 0),
-                f"is_error_{index}": 1 if _prop_str("$ai_is_error") == "true" else 0,
+                f"total_tokens_{index}": _prop_int("$ai_total_tokens"),
+                f"input_tokens_{index}": _prop_int("$ai_input_tokens"),
+                f"output_tokens_{index}": _prop_int("$ai_output_tokens"),
+                f"text_input_tokens_{index}": _prop_int("$ai_text_input_tokens"),
+                f"text_output_tokens_{index}": _prop_int("$ai_text_output_tokens"),
+                f"image_input_tokens_{index}": _prop_int("$ai_image_input_tokens"),
+                f"image_output_tokens_{index}": _prop_int("$ai_image_output_tokens"),
+                f"audio_input_tokens_{index}": _prop_int("$ai_audio_input_tokens"),
+                f"audio_output_tokens_{index}": _prop_int("$ai_audio_output_tokens"),
+                f"video_input_tokens_{index}": _prop_int("$ai_video_input_tokens"),
+                f"video_output_tokens_{index}": _prop_int("$ai_video_output_tokens"),
+                f"reasoning_tokens_{index}": _prop_int("$ai_reasoning_tokens"),
+                f"cache_read_input_tokens_{index}": _prop_int("$ai_cache_read_input_tokens"),
+                f"cache_creation_input_tokens_{index}": _prop_int("$ai_cache_creation_input_tokens"),
+                f"web_search_count_{index}": _prop_int("$ai_web_search_count"),
+                f"input_cost_usd_{index}": _prop_float("$ai_input_cost_usd"),
+                f"output_cost_usd_{index}": _prop_float("$ai_output_cost_usd"),
+                f"total_cost_usd_{index}": _prop_float("$ai_total_cost_usd"),
+                f"request_cost_usd_{index}": _prop_float("$ai_request_cost_usd"),
+                f"web_search_cost_usd_{index}": _prop_float("$ai_web_search_cost_usd"),
+                f"audio_cost_usd_{index}": _prop_float("$ai_audio_cost_usd"),
+                f"image_cost_usd_{index}": _prop_float("$ai_image_cost_usd"),
+                f"video_cost_usd_{index}": _prop_float("$ai_video_cost_usd"),
+                f"latency_{index}": _prop_float("$ai_latency"),
+                f"time_to_first_token_{index}": _prop_float("$ai_time_to_first_token"),
+                f"is_error_{index}": 1 if str(_prop_str("$ai_is_error") or "") == "true" else 0,
                 f"error_{index}": _prop_str("$ai_error"),
                 f"error_type_{index}": _prop_str("$ai_error_type"),
                 f"error_normalized_{index}": _prop_str("$ai_error_normalized"),
