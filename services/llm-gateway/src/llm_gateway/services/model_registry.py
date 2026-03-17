@@ -52,6 +52,9 @@ def _get_configured_providers() -> frozenset[str]:
             configured.add(provider)
     if _is_bedrock_configured(settings):
         configured.add("bedrock")
+        configured.add(
+            "bedrock_converse"
+        )  # Need to use bedrock_converse for model lookups in LiteLLM until they support bedrock provider lookups
     return frozenset(configured)
 
 
@@ -90,6 +93,7 @@ class ModelRegistryService:
             supports_streaming=True,
         )
 
+    # @TODO: need to use the bedrock_converse provider until LiteLLM supports the Anthropic models for the regular Bedrock provider
     def get_available_models(self, product: str, provider_filter: str | None = None) -> list[ModelInfo]:
         """Get raw provider models available to a product, optionally filtered by provider."""
         config = get_product_config(product)
@@ -99,7 +103,9 @@ class ModelRegistryService:
                 return []
             configured_providers = frozenset({provider_filter})
         allowed_models = config.allowed_models if config else None
-        all_litellm_models = ModelCostService.get_instance().get_all_models()
+        all_litellm_models = (
+            ModelCostService.get_instance().get_all_models()
+        )  # this is a 3MB file; seems slow to iterate through
         models_by_id: dict[str, ModelInfo] = {}
         for raw_model_id in sorted(all_litellm_models.keys()):
             cost_data = all_litellm_models[raw_model_id]

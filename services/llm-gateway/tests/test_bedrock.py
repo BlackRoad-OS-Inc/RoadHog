@@ -65,10 +65,10 @@ class TestBedrockMessagesEndpoint:
         }
 
     @patch("llm_gateway.api.bedrock_router.get_settings")
-    @patch("llm_gateway.api.bedrock_router.litellm.anthropic_messages")
+    @patch("llm_gateway.api.bedrock_router.litellm.acompletion")
     def test_maps_anthropic_model_to_bedrock(
         self,
-        mock_anthropic: MagicMock,
+        mock_acompletion: MagicMock,
         mock_get_settings: MagicMock,
         authenticated_client: TestClient,
         mock_anthropic_response: dict,
@@ -79,7 +79,7 @@ class TestBedrockMessagesEndpoint:
 
         mock_response = MagicMock()
         mock_response.model_dump = MagicMock(return_value=mock_anthropic_response)
-        mock_anthropic.return_value = mock_response
+        mock_acompletion.return_value = mock_response
 
         response = authenticated_client.post(
             "/bedrock/v1/messages",
@@ -88,15 +88,15 @@ class TestBedrockMessagesEndpoint:
         )
 
         assert response.status_code == 200
-        call_kwargs = mock_anthropic.call_args.kwargs
+        call_kwargs = mock_acompletion.call_args.kwargs
         assert call_kwargs["model"] == "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0"
         assert call_kwargs["aws_region_name"] == "us-east-1"
 
     @patch("llm_gateway.api.bedrock_router.get_settings")
-    @patch("llm_gateway.api.bedrock_router.litellm.anthropic_messages")
+    @patch("llm_gateway.api.bedrock_router.litellm.acompletion")
     def test_product_route_supported(
         self,
-        mock_anthropic: MagicMock,
+        mock_acompletion: MagicMock,
         mock_get_settings: MagicMock,
         authenticated_client: TestClient,
         mock_anthropic_response: dict,
@@ -107,7 +107,7 @@ class TestBedrockMessagesEndpoint:
 
         mock_response = MagicMock()
         mock_response.model_dump = MagicMock(return_value=mock_anthropic_response)
-        mock_anthropic.return_value = mock_response
+        mock_acompletion.return_value = mock_response
 
         response = authenticated_client.post(
             "/wizard/bedrock/v1/messages",
@@ -115,6 +115,120 @@ class TestBedrockMessagesEndpoint:
             headers={"Authorization": "Bearer phx_test_key"},
         )
         assert response.status_code == 200
+
+    @patch("llm_gateway.api.bedrock_router.get_settings")
+    @patch("llm_gateway.api.bedrock_router.litellm.acompletion")
+    def test_valid_function_tools_pass_through(
+        self,
+        mock_acompletion: MagicMock,
+        mock_get_settings: MagicMock,
+        authenticated_client: TestClient,
+        mock_anthropic_response: dict,
+    ) -> None:
+        mock_settings = MagicMock()
+        mock_settings.bedrock_region_name = "us-east-1"
+        mock_get_settings.return_value = mock_settings
+
+        mock_response = MagicMock()
+        mock_response.model_dump = MagicMock(return_value=mock_anthropic_response)
+        mock_acompletion.return_value = mock_response
+
+        body = {
+            "model": "claude-sonnet-4-5",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "tools": [
+                {
+                    "name": "get_weather",
+                    "description": "Get weather by city",
+                    "input_schema": {"type": "object", "properties": {"city": {"type": "string"}}},
+                }
+            ],
+        }
+        response = authenticated_client.post(
+            "/bedrock/v1/messages",
+            json=body,
+            headers={"Authorization": "Bearer phx_test_key"},
+        )
+
+        assert response.status_code == 200
+        call_kwargs = mock_acompletion.call_args.kwargs
+        assert call_kwargs["tools"] == body["tools"]
+
+    @pytest.mark.parametrize(
+        "tools,expected_message",
+        [
+            pytest.param(
+                [{"name": "", "description": "desc", "input_schema": {"type": "object"}}],
+                "`name` must be a non-empty string",
+                id="empty_name",
+            ),
+            pytest.param(
+                [{"name": "bad name", "description": "desc", "input_schema": {"type": "object"}}],
+                "`name` must match [a-zA-Z0-9_-]+",
+                id="invalid_name_pattern",
+            ),
+            pytest.param(
+                [{"name": "get_weather", "description": "", "input_schema": {"type": "object"}}],
+                "`description` must be a non-empty string",
+                id="empty_description",
+            ),
+            pytest.param(
+                [{"name": "get_weather", "description": "desc", "input_schema": {}}],
+                "`input_schema` must be a non-empty object",
+                id="empty_input_schema",
+            ),
+            pytest.param(
+                [{"type": "computer_20241022"}],
+                "only function-style tools are supported by this endpoint",
+                id="unsupported_server_tool_shape",
+            ),
+        ],
+    )
+    @patch("llm_gateway.api.bedrock_router.get_settings")
+    @patch("llm_gateway.api.bedrock_router.litellm.acompletion")
+    def test_invalid_tools_return_400_and_do_not_call_litellm(
+        self,
+        mock_acompletion: MagicMock,
+        mock_get_settings: MagicMock,
+        authenticated_client: TestClient,
+        tools: list[dict[str, Any]],
+        expected_message: str,
+    ) -> None:
+        mock_settings = MagicMock()
+        mock_settings.bedrock_region_name = "us-east-1"
+        mock_get_settings.return_value = mock_settings
+
+        response = authenticated_client.post(
+            "/bedrock/v1/messages",
+            json={"model": "claude-sonnet-4-5", "messages": [{"role": "user", "content": "Hello"}], "tools": tools},
+            headers={"Authorization": "Bearer phx_test_key"},
+        )
+
+        assert response.status_code == 400
+        assert expected_message in response.json()["error"]["message"]
+        mock_acompletion.assert_not_called()
+
+    @patch("llm_gateway.api.bedrock_router.get_settings")
+    @patch("llm_gateway.api.bedrock_router.litellm.acompletion")
+    def test_non_list_tools_return_400_and_do_not_call_litellm(
+        self,
+        mock_acompletion: MagicMock,
+        mock_get_settings: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        mock_settings = MagicMock()
+        mock_settings.bedrock_region_name = "us-east-1"
+        mock_get_settings.return_value = mock_settings
+
+        response = authenticated_client.post(
+            "/bedrock/v1/messages",
+            json={"model": "claude-sonnet-4-5", "messages": [{"role": "user", "content": "Hello"}], "tools": {}},
+            headers={"Authorization": "Bearer phx_test_key"},
+        )
+
+        assert response.status_code == 400
+        assert "`tools` must be a list" in response.json()["error"]["message"]
+        mock_acompletion.assert_not_called()
 
     @patch("llm_gateway.api.bedrock_router.get_settings")
     def test_requires_bedrock_region(

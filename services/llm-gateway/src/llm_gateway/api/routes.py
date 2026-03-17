@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from llm_gateway.api.anthropic import anthropic_router
-from llm_gateway.api.bedrock_router import bedrock_router
+from llm_gateway.api.bedrock import bedrock_router
 from llm_gateway.api.models import models_router
 from llm_gateway.api.openai import openai_router
 
