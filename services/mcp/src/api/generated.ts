@@ -11742,7 +11742,7 @@ export namespace Schemas {
       is_materialized?: boolean | null;
       /** @nullable */
       name?: string | null;
-      query?: HogQLQuery | TrendsQuery | FunnelsQuery | RetentionQuery | PathsQuery | StickinessQuery | LifecycleQuery | WebStatsTableQuery | WebOverviewQuery | null;
+      query?: HogQLQuery | TrendsQuery | RetentionQuery | LifecycleQuery | WebStatsTableQuery | WebOverviewQuery | null;
       /** How frequently should the underlying materialized view be updated */
       sync_frequency?: DataWarehouseSyncInterval | null;
       /**
