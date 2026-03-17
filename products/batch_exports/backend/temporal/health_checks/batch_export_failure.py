@@ -16,7 +16,6 @@ BATCH_EXPORT_MIN_FAILURES = 3
 FAILURE_STATUSES = [
     BatchExportRun.Status.FAILED,
     BatchExportRun.Status.FAILED_RETRYABLE,
-    BatchExportRun.Status.FAILED_BILLING,
     BatchExportRun.Status.TIMEDOUT,
     BatchExportRun.Status.TERMINATED,
 ]
