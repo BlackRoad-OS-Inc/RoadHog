@@ -28,7 +28,9 @@ else
     echo "🐧 Linux detected, binding to Docker bridge gateway: $HOST_BIND"
 fi
 
-python ${DEBUG:+ -m debugpy --listen 127.0.0.1:5678} -m granian \
+echo "🚀 Starting backend on $HOST_BIND:${BACKEND_PORT:-8000} with debug=${DEBUG:-false}"
+
+python ${DEBUG:+ -m debugpy --listen 127.0.0.1:${DEBUGPY_PORT:-5678}} -m granian \
     --interface asgi \
     posthog.asgi:application \
     --reload \

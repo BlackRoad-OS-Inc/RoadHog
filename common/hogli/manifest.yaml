@@ -742,6 +742,10 @@ utilities:
             while lsof -iTCP:$LIVESTREAM_PORT -sTCP:LISTEN >/dev/null 2>&1; do
                 LIVESTREAM_PORT=$((LIVESTREAM_PORT + 1))
             done
+            DEBUGPY_PORT=5678
+            while lsof -iTCP:$DEBUGPY_PORT -sTCP:LISTEN >/dev/null 2>&1; do
+                DEBUGPY_PORT=$((DEBUGPY_PORT + 1))
+            done
 
             # DB 0 = main REDIS_URL, DB 1 = main FLAGS_REDIS_URL.
             # Worktrees use consecutive pairs starting at DB 2: REDIS=2N, FLAGS=2N+1.
@@ -786,6 +790,7 @@ utilities:
                 -e '/^TEMPORAL_NAMESPACE=/d' \
                 -e '/^BACKEND_PORT=/d' \
                 -e '/^LIVESTREAM_PORT=/d' \
+                -e '/^DEBUGPY_PORT=/d' \
                 -e '/^# Worktree-isolated/d' \
                 "$ENV_FILE"
 
@@ -813,6 +818,7 @@ utilities:
                 echo "TEMPORAL_NAMESPACE=${TEMPORAL_NAMESPACE}"
                 echo "BACKEND_PORT=${BACKEND_PORT}"
                 echo "LIVESTREAM_PORT=${LIVESTREAM_PORT}"
+                echo "DEBUGPY_PORT=${DEBUGPY_PORT}"
             } >> "$ENV_FILE"
 
             echo "Creating worktree databases…"
@@ -856,6 +862,7 @@ utilities:
             echo "   Temporal:    namespace ${TEMPORAL_NAMESPACE}"
             echo "   Backend:     port ${BACKEND_PORT}"
             echo "   Livestream:  port ${LIVESTREAM_PORT}"
+            echo "   Debugpy:     port ${DEBUGPY_PORT}"
             echo ""
             echo "Next: cd $WORKTREE_PATH && hogli worktree:init"
         description: Patch a worktree's .env with isolated database names and create

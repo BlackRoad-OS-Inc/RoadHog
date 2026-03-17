@@ -191,7 +191,7 @@
             "request": "attach",
             "connect": {
                 "host": "localhost",
-                "port": 5678
+                "port": "${env:DEBUGPY_PORT}"
             },
             "pathMappings": [
                 {
