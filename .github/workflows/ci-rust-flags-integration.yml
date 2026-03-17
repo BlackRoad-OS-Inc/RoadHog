@@ -88,24 +88,15 @@ jobs:
                   workspaces: rust
                   save-if: ${{ github.ref == 'refs/heads/master' }}
 
-            - name: Install sqlx-cli
-              uses: ./.github/actions/setup-sqlx-cli
-
             - name: Install Python dependencies
               run: UV_PROJECT_ENVIRONMENT=$pythonLocation uv sync --frozen --dev
 
             - name: Set up Django database
               run: |
-                  python manage.py migrate --run-syncdb
+                  python manage.py setup_test_environment
               env:
                   DEBUG: '1'
-
-            - name: Run sqlx migrations for Rust
-              working-directory: rust
-              env:
-                  DATABASE_URL: postgres://posthog:posthog@localhost:5432/posthog
-              run: |
-                  cargo sqlx database setup --source feature-flags/migrations
+                  TEST: '1'
 
             - name: Build Rust flags service
               working-directory: rust
