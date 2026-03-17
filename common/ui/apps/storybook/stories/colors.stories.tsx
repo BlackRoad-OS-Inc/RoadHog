@@ -26,7 +26,7 @@ function ColorSwatchValue({ className, name, tailwindClass, value }: ColorSwatch
     return (
         <div className="flex gap-2 items-center">
             <div
-                className={`size-16 border flex items-center justify-center ${className}`}
+                className={`size-16 border flex items-center justify-center ${className} rounded-sm`}
                 style={{ backgroundColor: value }}
             >
                 {name.includes('foreground') ? <span className="text-xs mx-auto">Aa</span> : null}
@@ -42,16 +42,13 @@ function ColorSwatchValue({ className, name, tailwindClass, value }: ColorSwatch
 
 function ColorSwatch({ name, items, usages }: ColorSwatchItem): React.ReactElement {
     return (
-        <div className="flex flex-col gap-1 mb-4">
+        <div className="flex flex-col gap-4 mb-8">
             {name}
-            <div className="flex">
-                <div className="flex flex-col flex-1 gap-2" title={`Light: ${items[0].value}`}>
-                    {items[0] && <ColorSwatchValue {...items[0]} />}
-                    {items[1] && <ColorSwatchValue {...items[1]} />}
-                </div>
+            <div className="grid grid-cols-[300px_300px] gap-2">
+                {items[0] && <ColorSwatchValue {...items[0]} />}
+                {items[1] && <ColorSwatchValue {...items[1]} />}
             </div>
             <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground font-mono">Usages:</span>
                 {usages?.map((usage) => (
                     <span key={usage} className="text-xs text-muted-foreground font-mono">
                         {usage}
@@ -181,6 +178,25 @@ export const AllColors: Story = {
                             },
                         ]}
                         usages={['Muted background of the app']}
+                    />
+
+                    <ColorSwatch
+                        name="Accent"
+                        items={[
+                            {
+                                className: 'bg-accent',
+                                name: 'accent',
+                                tailwindClass: 'bg-accent',
+                                value: semanticColors.accent[0],
+                            },
+                            {
+                                className: 'text-accent-foreground',
+                                name: 'accent-foreground',
+                                tailwindClass: 'text-accent-foreground',
+                                value: semanticColors['accent-foreground'][0],
+                            },
+                        ]}
+                        usages={['Accent (used for hover states, etc.)`']}
                     />
 
                     <div className="p-2 font-mono bg-muted text-muted-foreground">

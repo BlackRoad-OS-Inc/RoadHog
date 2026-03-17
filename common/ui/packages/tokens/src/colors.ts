@@ -19,7 +19,7 @@ export const semanticColors: Record<string, ColorTuple> = {
     popover: ['oklch(1 0 0)', 'hsl(235 8% 15%)', 'bg-popover'],
     'popover-foreground': ['oklch(0.13 0.028 262)', 'oklch(0.967 0.003 265)', 'text-popover-foreground'],
 
-    primary: ['black', 'white', 'bg-primary'],
+    primary: ['oklch(0.6514 0.2137 37.89)', 'oklch(0.8325 0.1611 84.54)', 'bg-primary'],
     'primary-foreground': ['oklch(1 0 0)', 'oklch(0.13 0.028 262)', 'text-primary-foreground'],
 
     secondary: ['oklch(0.967 0.001 286.375)', 'oklch(0.274 0.006 286.033)', 'bg-secondary'],
@@ -40,8 +40,8 @@ export const semanticColors: Record<string, ColorTuple> = {
     warning: ['oklch(0.554 0.135 66)', 'oklch(0.852 0.199 92)', 'bg-warning'],
     'warning-foreground': ['oklch(0.13 0.028 262)', 'oklch(0.13 0.028 262)', 'text-warning-foreground'],
 
-    info: ['oklch(0.546 0.245 263)', 'oklch(0.707 0.165 255)', 'bg-info'],
-    'info-foreground': ['oklch(1 0 0)', 'oklch(0.13 0.028 262)', 'text-info-foreground'],
+    // info: ['oklch(0.546 0.245 263)', 'oklch(0.707 0.165 255)', 'bg-info'],
+    // 'info-foreground': ['oklch(1 0 0)', 'oklch(0.13 0.028 262)', 'text-info-foreground'],
 
     border: ['oklch(0.923 0.003 49)', 'hsl(230 8% 20%)', 'border-border'],
     input: ['oklch(0.923 0.003 49)', 'hsl(230 8% 20%)', 'border-input'],

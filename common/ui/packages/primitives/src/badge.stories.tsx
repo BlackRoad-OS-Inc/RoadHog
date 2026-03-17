@@ -22,10 +22,10 @@ export const Default = {
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
                 <Badge variant="default">Default</Badge>
-                <Badge variant="secondary">Secondary</Badge>
+                <Badge variant="info">Info</Badge>
                 <Badge variant="destructive">Destructive</Badge>
-                <Badge variant="outline">Outline</Badge>
-                <Badge variant="ghost">Ghost</Badge>
+                <Badge variant="warning">Warning</Badge>
+                <Badge variant="success">Success</Badge>
             </div>
         </div>
     ),
