@@ -243,7 +243,8 @@ export function calculateAutoLayoutTiles(
     const smColumnCount = BREAKPOINT_COLUMN_COUNTS.sm
     const tileWidth = columns === 1 ? smColumnCount : Math.floor(smColumnCount / columns)
 
-    const calculated = calculateLayouts(tiles)
+    // Pass a copy to avoid calculateLayouts mutating tiles (xs pass does tiles.sort)
+    const calculated = calculateLayouts([...tiles])
     const calculatedSm = (calculated.sm || []) as unknown as Array<{ i: string; h: number }>
     const calculatedHeightById: Record<number, number> = Object.fromEntries(
         calculatedSm.map((l) => [parseInt(l.i), l.h]).filter(([id]) => Number.isFinite(id))
@@ -268,7 +269,10 @@ export function calculateAutoLayoutTiles(
 
         return {
             id: tile.id,
-            layouts: { sm: { x, y, w: tileWidth, h: height } },
+            layouts: {
+                ...tile.layouts,
+                sm: { x, y, w: tileWidth, h: height },
+            },
         }
     })
 }

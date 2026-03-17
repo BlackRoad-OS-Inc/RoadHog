@@ -21,7 +21,7 @@ export function DashboardLayoutConfig({
     setLayoutZoom,
     currentLayoutSize,
     autoLayoutTiles,
-}: DashboardLayoutConfigProps): JSX.Element | null {
+}: DashboardLayoutConfigProps): JSX.Element {
     const showDashboardGrid = useFeatureFlag('DASHBOARD_GRID')
     const canShowZoomControl =
         canEditDashboard &&
