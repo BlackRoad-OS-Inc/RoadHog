@@ -12,6 +12,7 @@ from posthog.hogql.database.database import Database
 from posthog.hogql.direct_connection import get_direct_connection_source
 from posthog.hogql.errors import ExposedHogQLError
 from posthog.hogql.filters import replace_filters
+from posthog.hogql.metadata_heuristics import run_metadata_heuristics
 from posthog.hogql.modifiers import create_default_modifiers_for_team
 from posthog.hogql.parser import parse_expr, parse_program, parse_select, parse_string_template
 from posthog.hogql.placeholders import find_placeholders, replace_placeholders
@@ -56,6 +57,8 @@ def get_hogql_metadata(
             modifiers=query_modifiers,
             connection_id=str(source.id),
         )
+
+    heuristic_warnings: list[HogQLNotice] = []
 
     try:
         context = HogQLContext(
@@ -104,9 +107,11 @@ def get_hogql_metadata(
 
             if prepared_ast:
                 response.ch_table_names = get_table_names(prepared_ast)
+
+            heuristic_warnings.extend(run_metadata_heuristics(hogql_ast))
         else:
             raise ValueError(f"Unsupported language: {query.language}")
-        response.warnings = context.warnings
+        response.warnings = [*context.warnings, *heuristic_warnings]
         response.notices = context.notices
         response.errors = context.errors
         response.isValid = len(response.errors) == 0
