@@ -107,7 +107,7 @@ export default defineConfig(({ mode }) => {
             origin: 'http://localhost:8234',
             proxy: {
                 '/static': {
-                    target: 'http://localhost:8000',
+                    target: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
                     changeOrigin: true,
                 },
             },

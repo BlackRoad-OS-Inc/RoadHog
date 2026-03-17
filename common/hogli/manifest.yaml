@@ -176,6 +176,11 @@ start:
             - kafka
             - clickhouse
             - temporal
+    start:docker:
+        bin_script: start-docker
+        description: Start app services in Docker containers (infra must be running separately)
+        services:
+            - docker
     start:backend:
         bin_script: start-backend
         description: Run Django development server on port 8000 with auto-reload

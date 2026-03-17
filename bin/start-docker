@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# Convenience wrapper for running PostHog app services in Docker containers.
+#
+# Infrastructure (postgres, redis, clickhouse, kafka) must already be running
+# via docker-compose.dev.yml before using this script.
+#
+# Usage:
+#   bin/start-docker up --build     # first run (builds dev image)
+#   bin/start-docker up             # subsequent runs
+#   bin/start-docker down           # stop app services
+#   bin/start-docker logs -f        # follow logs
+#
+# Custom ports:
+#   POSTHOG_PROXY_PORT=9010 bin/start-docker up
+#
+
+set -e
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Verify the infra network exists (i.e. docker-compose.dev.yml is running)
+if ! docker network inspect posthog_default &>/dev/null; then
+    echo "Error: posthog_default network not found."
+    echo ""
+    echo "Infrastructure services must be running first. Start them with:"
+    echo "  docker compose -f docker-compose.dev.yml up -d"
+    exit 1
+fi
+
+exec docker compose -f "$REPO_ROOT/docker-compose.dev-app.yml" "$@"
