@@ -1845,10 +1845,6 @@ CORE_FILTER_DEFINITIONS_BY_GROUP: dict[str, dict[str, CoreFilterDefinition]] = {
             "description": "The input JSON that was sent to the LLM API.",
             "examples": ['{"content": "Explain quantum computing in simple terms.", "role": "user"}'],
         },
-        "$ai_input_preview": {
-            "label": "AI input preview (LLM)",
-            "description": "A short preview of the prompt sent to the LLM, useful for scanning generations at a glance.",
-        },
         "$ai_input_tokens": {
             "label": "AI input tokens (LLM)",
             "description": "The number of tokens in the input prompt that was sent to the LLM API.",
@@ -1860,10 +1856,6 @@ CORE_FILTER_DEFINITIONS_BY_GROUP: dict[str, dict[str, CoreFilterDefinition]] = {
             "examples": [
                 '{"choices": [{"text": "Quantum computing is a type of computing that harnesses the power of quantum mechanics to perform operations on data."}]}',
             ],
-        },
-        "$ai_output_choices_preview": {
-            "label": "AI output preview (LLM)",
-            "description": "A short preview of the LLM response, useful for scanning generations at a glance.",
         },
         "$ai_output_tokens": {
             "label": "AI output tokens (LLM)",

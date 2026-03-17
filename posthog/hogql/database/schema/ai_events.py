@@ -83,9 +83,6 @@ class AiEventsTable(Table):
         "input_state": StringJSONDatabaseField(name="input_state", nullable=True),
         "output_state": StringJSONDatabaseField(name="output_state", nullable=True),
         "tools": StringJSONDatabaseField(name="tools", nullable=True),
-        # Materialized previews
-        "input_preview": StringDatabaseField(name="input_preview", nullable=False),
-        "output_choices_preview": StringDatabaseField(name="output_choices_preview", nullable=False),
         # Person join via person_distinct_ids
         "pdi": LazyJoin(
             from_field=["distinct_id"],

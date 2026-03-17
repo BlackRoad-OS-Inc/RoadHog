@@ -263,18 +263,11 @@ class TracesQueryRunner(TraceMapperMixin, AnalyticsQueryRunner[TracesQueryRespon
                 arrayDistinct(
                     arraySort(x -> x.3,
                         groupArrayIf(
-                            tuple(uuid, event, timestamp, properties,
-                                  input, output, output_choices, input_state, output_state, tools),
+                            tuple(uuid, event, timestamp, properties),
                             event IN ('$ai_metric', '$ai_feedback') OR parent_id = trace_id
                         )
                     )
                 ) AS events,
-                argMinIf(input_state,
-                         timestamp, event = '$ai_trace'
-                ) AS input_state,
-                argMinIf(output_state,
-                         timestamp, event = '$ai_trace'
-                ) AS output_state,
                 ifNull(
                     argMinIf(
                         ifNull(nullIf(span_name, ''), nullIf(trace_name, '')),
@@ -336,7 +329,7 @@ class TracesQueryRunner(TraceMapperMixin, AnalyticsQueryRunner[TracesQueryRespon
         return {
             **super().get_cache_payload(),
             # When the response schema changes, increment this version to invalidate the cache.
-            "schema_version": 6,
+            "schema_version": 7,
         }
 
     @cached_property

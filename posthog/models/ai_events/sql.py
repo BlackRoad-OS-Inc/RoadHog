@@ -143,26 +143,6 @@ CREATE TABLE IF NOT EXISTS {table_name}
     output_state Nullable(String),
     tools Nullable(String),
 
-    -- Materialized preview columns (extract last input message / first output choice)
-    -- assumeNotNull is needed because JSONExtractArrayRaw returns Array(String)
-    -- which cannot exist inside Nullable context, but we guard with IS NULL first.
-    input_preview String MATERIALIZED if(
-        input IS NULL, '',
-        if(
-            JSONType(assumeNotNull(input)) = 'Array',
-            left(JSONExtractArrayRaw(assumeNotNull(input))[length(JSONExtractArrayRaw(assumeNotNull(input)))], 200),
-            left(assumeNotNull(input), 200)
-        )
-    ),
-    output_choices_preview String MATERIALIZED if(
-        output_choices IS NULL, '',
-        if(
-            JSONType(assumeNotNull(output_choices)) = 'Array',
-            left(JSONExtractArrayRaw(assumeNotNull(output_choices))[1], 200),
-            left(assumeNotNull(output_choices), 200)
-        )
-    ),
-
     -- Kafka metadata
     _timestamp DateTime,
     _offset UInt64,

@@ -65,9 +65,6 @@ AI_PROPERTY_TO_COLUMN: dict[str, str] = {
     "$ai_input_state": "input_state",
     "$ai_output_state": "output_state",
     "$ai_tools": "tools",
-    # Previews
-    "$ai_input_preview": "input_preview",
-    "$ai_output_choices_preview": "output_choices_preview",
 }
 
 _BOOLEAN_PROPERTIES: frozenset[str] = frozenset({"$ai_is_error"})
