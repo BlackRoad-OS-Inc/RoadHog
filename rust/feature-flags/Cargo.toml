@@ -70,7 +70,6 @@ workspace = true
 
 [dev-dependencies]
 rstest = "0.26"
-serial_test = "3.0"
 assert-json-diff = { workspace = true }
 reqwest = { workspace = true }
 futures = "0.3.30"
