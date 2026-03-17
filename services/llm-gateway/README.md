@@ -156,8 +156,8 @@ The product name is extracted from the first path segment and recorded as `ai_pr
 ## Supported models
 
 All OpenAI, Anthropic and Gemini chat models are supported.
+The AWS Bedrock endpoints supports Anthropic 4.5 and 4.6 Series models.
 The `/v1/models` endpoint returns provider-specific model IDs from LiteLLM's model map.
-Use `/bedrock/v1/models` to list Bedrock-specific model IDs only.
 
 ## Bedrock configuration
 
@@ -165,8 +165,7 @@ To use `/bedrock/v1/*` endpoints, configure:
 
 - `LLM_GATEWAY_BEDROCK_REGION_NAME` (required)
 
-Credentials are intentionally not loaded through `LLM_GATEWAY_*` settings in the gateway.
-Use your runtime's standard AWS authentication mechanism (e.g. IAM role, IRSA, ECS task role, or pre-existing `AWS_*` env vars provisioned by deployment).
+Credentials are intentionally not loaded through `LLM_GATEWAY_*` settings in the gateway. Use your runtime's standard AWS authentication mechanism (e.g. IAM role, IRSA, ECS task role, or pre-existing `AWS_*` env vars provisioned by deployment).
 
 ## Products
 

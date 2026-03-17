@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import structlog
 
 if TYPE_CHECKING:
+    from fastapi import Request
+
     from llm_gateway.auth.models import AuthenticatedUser
     from llm_gateway.rate_limiting.runner import ThrottleRunner
     from llm_gateway.rate_limiting.throttles import ThrottleContext
 
 logger = structlog.get_logger(__name__)
+
+POSTHOG_PROPERTY_PREFIX = "x-posthog-property-"
+POSTHOG_FLAG_PREFIX = "x-posthog-flag-"
 
 
 @dataclass
@@ -51,14 +56,7 @@ def set_posthog_properties(properties: dict[str, str] | None) -> None:
     ctx = request_context_var.get()
     if ctx is None:
         return
-    request_context_var.set(
-        RequestContext(
-            request_id=ctx.request_id,
-            product=ctx.product,
-            posthog_properties=properties,
-            posthog_flags=ctx.posthog_flags,
-        )
-    )
+    request_context_var.set(replace(ctx, posthog_properties=properties))
 
 
 def get_posthog_properties() -> dict[str, str] | None:
@@ -70,19 +68,48 @@ def set_posthog_flags(flags: dict[str, str] | None) -> None:
     ctx = request_context_var.get()
     if ctx is None:
         return
-    request_context_var.set(
-        RequestContext(
-            request_id=ctx.request_id,
-            product=ctx.product,
-            posthog_properties=ctx.posthog_properties,
-            posthog_flags=flags,
-        )
-    )
+    request_context_var.set(replace(ctx, posthog_flags=flags))
+
+
+def set_posthog_context(
+    properties: dict[str, str] | None = None,
+    flags: dict[str, str] | None = None,
+) -> None:
+    ctx = request_context_var.get()
+    if ctx is None:
+        return
+    request_context_var.set(replace(ctx, posthog_properties=properties, posthog_flags=flags))
 
 
 def get_posthog_flags() -> dict[str, str] | None:
     ctx = request_context_var.get()
     return ctx.posthog_flags if ctx else None
+
+
+def _extract_headers_with_prefix(request: Request, prefix: str) -> dict[str, str]:
+    result: dict[str, str] = {}
+    prefix_lower = prefix.lower()
+    for name, value in request.headers.items():
+        if name.lower().startswith(prefix_lower):
+            key = name[len(prefix) :].lower()
+            result[key] = value
+    return result
+
+
+def extract_posthog_properties_from_headers(request: Request) -> dict[str, str]:
+    return _extract_headers_with_prefix(request, POSTHOG_PROPERTY_PREFIX)
+
+
+def extract_posthog_flags_from_headers(request: Request) -> dict[str, str]:
+    return _extract_headers_with_prefix(request, POSTHOG_FLAG_PREFIX)
+
+
+def apply_posthog_context_from_headers(request: Request) -> None:
+    properties = extract_posthog_properties_from_headers(request)
+    flags = extract_posthog_flags_from_headers(request)
+
+    if properties or flags:
+        set_posthog_context(properties=properties or None, flags=flags or None)
 
 
 def set_throttle_context(runner: ThrottleRunner, context: ThrottleContext) -> None:

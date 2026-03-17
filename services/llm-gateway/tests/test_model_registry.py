@@ -80,37 +80,43 @@ MOCK_COST_DATA: dict[str, ModelCost] = {
         "supports_vision": True,
         "mode": "chat",
     },
+    "claude-sonnet-4-6": {
+        "litellm_provider": "anthropic",
+        "max_input_tokens": 200000,
+        "supports_vision": True,
+        "mode": "chat",
+    },
     "claude-haiku-4-5": {
         "litellm_provider": "anthropic",
         "max_input_tokens": 200000,
         "supports_vision": True,
         "mode": "chat",
     },
-    "bedrock/anthropic.claude-opus-4-5-20250929-v1:0": {
+    "us.anthropic.claude-opus-4-5-20251101-v1:0": {
         "litellm_provider": "bedrock",
         "max_input_tokens": 200000,
         "supports_vision": True,
         "mode": "chat",
     },
-    "bedrock/anthropic.claude-opus-4-6-v1:0": {
+    "us.anthropic.claude-opus-4-6": {
         "litellm_provider": "bedrock",
         "max_input_tokens": 200000,
         "supports_vision": True,
         "mode": "chat",
     },
-    "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0": {
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0": {
         "litellm_provider": "bedrock",
         "max_input_tokens": 200000,
         "supports_vision": True,
         "mode": "chat",
     },
-    "bedrock/anthropic.claude-sonnet-4-6-v1:0": {
+    "us.anthropic.claude-sonnet-4-6": {
         "litellm_provider": "bedrock",
         "max_input_tokens": 200000,
         "supports_vision": True,
         "mode": "chat",
     },
-    "bedrock/anthropic.claude-haiku-4-5-20251001-v1:0": {
+    "us.anthropic.claude-haiku-4-5-20251001-v1:0": {
         "litellm_provider": "bedrock",
         "max_input_tokens": 200000,
         "supports_vision": True,
@@ -205,7 +211,7 @@ class TestGetModel:
         [
             ("gpt-4o", "openai"),
             ("claude-sonnet-4-5", "anthropic"),
-            ("bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0", "bedrock"),
+            ("us.anthropic.claude-sonnet-4-5-20250929-v1:0", "bedrock"),
             ("gemini-2.0-flash", "vertex_ai"),
         ],
     )
@@ -291,17 +297,7 @@ class TestProviderFiltering:
                 providers = {m.provider for m in models}
                 assert providers == {"bedrock"}
                 model_ids = {m.id for m in models}
-                assert "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0" in model_ids
-
-    def test_provider_filter_returns_bedrock_raw_models(self):
-        with patch(
-            "llm_gateway.services.model_registry.get_settings",
-            return_value=create_mock_settings(openai=True, anthropic=True, gemini=True, bedrock=True),
-        ):
-            models = get_available_models("llm_gateway", provider_filter="bedrock")
-            model_ids = {m.id for m in models}
-            assert "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0" in model_ids
-            assert "claude-sonnet-4-5" not in model_ids
+                assert "us.anthropic.claude-sonnet-4-5-20250929-v1:0" in model_ids
 
 
 class TestIsModelAvailable:
@@ -349,4 +345,4 @@ class TestIsModelAvailable:
                 "llm_gateway.services.model_registry.get_settings",
                 return_value=create_mock_settings(openai=False, anthropic=False, gemini=False, bedrock=True),
             ):
-                assert is_model_available("bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0", "llm_gateway") is True
+                assert is_model_available("us.anthropic.claude-sonnet-4-5-20250929-v1:0", "llm_gateway") is True

@@ -50,7 +50,7 @@ def _get_configured_providers() -> frozenset[str]:
             configured.add(provider)
     if _is_bedrock_configured(settings):
         configured.add("bedrock")
-        # Need to use bedrock_converse for model lookups in LiteLLM until they support bedrock provider lookups
+        # Use bedrock_converse for model lookups in LiteLLM until they support bedrock provider lookups
         configured.add("bedrock_converse")
     return frozenset(configured)
 

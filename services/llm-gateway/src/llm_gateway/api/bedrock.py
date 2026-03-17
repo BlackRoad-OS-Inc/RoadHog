@@ -14,14 +14,12 @@ from llm_gateway.dependencies import RateLimitedUser
 from llm_gateway.metrics.prometheus import REQUEST_COUNT, REQUEST_LATENCY
 from llm_gateway.models.anthropic import AnthropicCountTokensRequest, AnthropicMessagesRequest
 from llm_gateway.products.config import validate_product
-from llm_gateway.request_context import set_posthog_flags, set_posthog_properties
+from llm_gateway.request_context import apply_posthog_context_from_headers
 
 logger = structlog.get_logger(__name__)
 
 bedrock_router = APIRouter()
 
-POSTHOG_PROPERTY_PREFIX = "x-posthog-property-"
-POSTHOG_FLAG_PREFIX = "x-posthog-flag-"
 COUNT_TOKENS_ENDPOINT_NAME = "bedrock_count_tokens"
 
 # Fields that the Bedrock Claude invoke API accepts (via litellm.anthropic_messages)
@@ -45,24 +43,6 @@ _BEDROCK_ALLOWED_BODY_FIELDS = frozenset(
         "output_format",  # converted by Bedrock transform
     }
 )
-
-
-def _extract_headers_with_prefix(request: Request, prefix: str) -> dict[str, str]:
-    result: dict[str, str] = {}
-    prefix_lower = prefix.lower()
-    for name, value in request.headers.items():
-        if name.lower().startswith(prefix_lower):
-            key = name[len(prefix) :].lower()
-            result[key] = value
-    return result
-
-
-def _extract_posthog_properties_from_headers(request: Request) -> dict[str, str]:
-    return _extract_headers_with_prefix(request, POSTHOG_PROPERTY_PREFIX)
-
-
-def _extract_posthog_flags_from_headers(request: Request) -> dict[str, str]:
-    return _extract_headers_with_prefix(request, POSTHOG_FLAG_PREFIX)
 
 
 def ensure_bedrock_configured(settings: Any) -> None:
@@ -199,12 +179,7 @@ async def bedrock_messages(
     user: RateLimitedUser,
     request: Request,
 ) -> dict[str, Any] | StreamingResponse:
-    properties = _extract_posthog_properties_from_headers(request)
-    if properties:
-        set_posthog_properties(properties)
-    flags = _extract_posthog_flags_from_headers(request)
-    if flags:
-        set_posthog_flags(flags)
+    apply_posthog_context_from_headers(request)
     return await _handle_bedrock_messages(body, user, request)
 
 
@@ -216,11 +191,6 @@ async def bedrock_messages_with_product(
     request: Request,
 ) -> dict[str, Any] | StreamingResponse:
     validate_product(product)
-    properties = _extract_posthog_properties_from_headers(request)
-    if properties:
-        set_posthog_properties(properties)
-    flags = _extract_posthog_flags_from_headers(request)
-    if flags:
-        set_posthog_flags(flags)
+    apply_posthog_context_from_headers(request)
 
     return await _handle_bedrock_messages(body, user, request, product=product)
