@@ -4,7 +4,7 @@ import json
 import datetime as dt
 
 from temporalio import workflow
-from temporalio.common import RetryPolicy
+from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
 
 from posthog.temporal.common.base import PostHogWorkflow
 
@@ -47,6 +47,11 @@ class DucklingBackfillWorkflow(PostHogWorkflow):
 
     @workflow.run
     async def run(self, inputs: DucklingBackfillInputs) -> None:
+        from posthog.temporal.ducklake.duckling_backfill_inputs import VALID_DATA_TYPES
+
+        if inputs.data_type not in VALID_DATA_TYPES:
+            raise ValueError(f"Invalid data_type: {inputs.data_type}, must be one of {VALID_DATA_TYPES}")
+
         logger = LOGGER.bind(**inputs.properties_to_log)
         workflow_id = workflow.info().workflow_id
 
@@ -213,6 +218,7 @@ class DucklingBackfillDiscoveryWorkflow(PostHogWorkflow):
                     partition_key=result.partition_key,
                 ),
                 id=child_workflow_id,
+                id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
                 parent_close_policy=workflow.ParentClosePolicy.ABANDON,
                 retry_policy=RetryPolicy(
                     maximum_attempts=3,

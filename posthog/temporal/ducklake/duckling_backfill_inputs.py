@@ -3,6 +3,8 @@ from __future__ import annotations
 import typing
 import dataclasses
 
+VALID_DATA_TYPES = ("events", "persons")
+
 
 @dataclasses.dataclass
 class DucklingDiscoveryInputs:

@@ -30,31 +30,38 @@ DUCKDB_MEMORY_LIMIT = "4GB"
 @activity.defn
 async def discover_duckling_teams_activity(inputs: DucklingDiscoveryInputs) -> list[DucklingDiscoveryResult]:
     """Discover teams that need duckling backfill for yesterday's date."""
+    from posthog.temporal.ducklake.duckling_backfill_inputs import VALID_DATA_TYPES
+
+    if inputs.data_type not in VALID_DATA_TYPES:
+        raise ValueError(f"Invalid data_type: {inputs.data_type}, must be one of {VALID_DATA_TYPES}")
+
     bind_contextvars(data_type=inputs.data_type)
     logger = LOGGER.bind()
 
     from posthog.ducklake.models import DuckLakeCatalog, DucklingBackfillRun
     from posthog.sync import database_sync_to_async
 
-    results: list[DucklingDiscoveryResult] = []
     yesterday = (timezone.now() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
 
     catalogs = await database_sync_to_async(lambda: list(DuckLakeCatalog.objects.values_list("team_id", flat=True)))()
 
-    for team_id in catalogs:
-        # Check if already completed
-        pk = yesterday
-        exists = await database_sync_to_async(
-            lambda tid=team_id, pk=pk: DucklingBackfillRun.objects.filter(
-                team_id=tid,
+    # Batch query: find all teams that already completed this partition
+    completed_team_ids = await database_sync_to_async(
+        lambda: set(
+            DucklingBackfillRun.objects.filter(
+                team_id__in=catalogs,
                 data_type=inputs.data_type,
-                partition_key=pk,
+                partition_key=yesterday,
                 status="completed",
-            ).exists()
-        )()
+            ).values_list("team_id", flat=True)
+        )
+    )()
 
-        if not exists:
-            results.append(DucklingDiscoveryResult(team_id=team_id, partition_key=yesterday))
+    results = [
+        DucklingDiscoveryResult(team_id=team_id, partition_key=yesterday)
+        for team_id in catalogs
+        if team_id not in completed_team_ids
+    ]
 
     logger.info("Discovered teams for daily backfill", count=len(results), date=yesterday)
     return results
