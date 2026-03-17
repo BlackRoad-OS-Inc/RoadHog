@@ -781,7 +781,7 @@ def _backfill_experiment_metric_sync(recalculation_id: str) -> dict[str, Any]:
 
             temporalio.activity.heartbeat(f"Processed day {days_processed}/{total_days}: {current_date}")
 
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "Timeseries recalculation failed",
                 recalculation_id=recalculation_id,
@@ -789,7 +789,7 @@ def _backfill_experiment_metric_sync(recalculation_id: str) -> dict[str, Any]:
             )
             recalculation_request.status = ExperimentTimeseriesRecalculation.Status.FAILED
             recalculation_request.save(update_fields=["status"])
-            raise ValueError(f"Recalculation failed on {current_date}: {e}") from e
+            raise
 
         current_date += timedelta(days=1)
 
@@ -805,7 +805,7 @@ def _backfill_experiment_metric_sync(recalculation_id: str) -> dict[str, Any]:
     return {
         "recalculation_id": str(recalculation_id),
         "experiment_id": experiment.id,
-        "metric_uuid": recalculation_request.metric.get("uuid"),
+        "metric_uuid": recalculation_request.metric["uuid"],
         "days_processed": days_processed,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
