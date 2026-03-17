@@ -1,3 +1,5 @@
+import { useFeatureFlag } from 'lib/hooks/useFeatureFlag'
+
 import { DashboardPlacement } from '~/types'
 
 import { DashboardAutoLayoutMenu } from './DashboardAutoLayoutMenu'
@@ -20,6 +22,7 @@ export function DashboardLayoutConfig({
     currentLayoutSize,
     autoLayoutTiles,
 }: DashboardLayoutConfigProps): JSX.Element | null {
+    const showDashboardGrid = useFeatureFlag('DASHBOARD_GRID')
     const canShowZoomControl =
         canEditDashboard &&
         [DashboardPlacement.Dashboard, DashboardPlacement.ProjectHomepage, DashboardPlacement.Builtin].includes(
@@ -29,7 +32,9 @@ export function DashboardLayoutConfig({
     return (
         <div className="flex items-center gap-2">
             {canShowZoomControl && <DashboardZoomControl layoutZoom={layoutZoom} setLayoutZoom={setLayoutZoom} />}
-            <DashboardAutoLayoutMenu currentLayoutSize={currentLayoutSize} autoLayoutTiles={autoLayoutTiles} />
+            {showDashboardGrid && (
+                <DashboardAutoLayoutMenu currentLayoutSize={currentLayoutSize} autoLayoutTiles={autoLayoutTiles} />
+            )}
         </div>
     )
 }
