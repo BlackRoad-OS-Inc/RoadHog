@@ -1231,15 +1231,25 @@ export const taxonomicFilterLogic = kea<taxonomicFilterLogicType>([
         ],
         infiniteListCounts: [
             (s) => [
-                (state, props) =>
-                    Object.fromEntries(
-                        Object.entries(s.infiniteListLogics(state, props)).map(([groupType, logic]) => [
-                            groupType,
-                            logic.isMounted() ? logic.selectors.totalListCount(state, logic.props) : 0,
-                        ])
-                    ),
+                (state, props) => {
+                    const logics = s.infiniteListLogics(state, props)
+                    return Object.entries(logics)
+                        .map(([groupType, logic]) => {
+                            const count = logic.isMounted() ? logic.selectors.totalListCount(state, logic.props) : 0
+                            return `${groupType}:${count}`
+                        })
+                        .join(',')
+                },
             ],
-            (infiniteListCounts) => infiniteListCounts,
+            (countsString: string): Record<string, number> =>
+                countsString
+                    ? Object.fromEntries(
+                          countsString.split(',').map((entry) => {
+                              const sep = entry.lastIndexOf(':')
+                              return [entry.slice(0, sep), Number(entry.slice(sep + 1))]
+                          })
+                      )
+                    : {},
         ],
         value: [() => [(_, props) => props.value], (value) => value],
         groupType: [() => [(_, props) => props.groupType], (groupType) => groupType],
