@@ -265,7 +265,7 @@ async def run_multi_turn_research(
     if output_fn:
         output_fn(f"Starting multi-turn research: {total} signal(s)")
 
-    # Turn 1: initial prompt with signal 1
+    # Turn 1: initial prompt + signal 1
     initial_prompt = build_initial_research_prompt(signals[0], total, title=title, summary=summary)
     session, first_finding = await start_session(
         prompt=initial_prompt,
