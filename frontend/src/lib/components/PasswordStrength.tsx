@@ -2,14 +2,28 @@ import { LemonDivider } from '@posthog/lemon-ui'
 
 import { LemonProgress } from 'lib/lemon-ui/LemonProgress'
 import { Tooltip } from 'lib/lemon-ui/Tooltip'
-import { getZxcvbn } from 'lib/zxcvbn'
 
 export type ValidatedPasswordResult = {
     score: number // 0 is no passsword - otherwise 1-5,
     feedback?: string
 }
 
-export async function validatePassword(password: string = ''): Promise<ValidatedPasswordResult> {
+let zxcvbnFn: ((password: string) => { score: number; feedback: { suggestions: string[] } }) | null = null
+let zxcvbnLoading = false
+
+// We load zxcvbn asynchronously as it's a large dependency and we don't want to block the main thread
+function ensureZxcvbnLoaded(): void {
+    if (!zxcvbnFn && !zxcvbnLoading) {
+        zxcvbnLoading = true
+        void import('zxcvbn').then(({ default: zxcvbn }) => {
+            zxcvbnFn = zxcvbn
+        })
+    }
+}
+
+export function validatePassword(password: string = ''): ValidatedPasswordResult {
+    ensureZxcvbnLoaded()
+
     if (password.length > 72) {
         return {
             score: 0,
@@ -17,8 +31,18 @@ export async function validatePassword(password: string = ''): Promise<Validated
         }
     }
 
-    const zxcvbn = await getZxcvbn()
-    const result = zxcvbn(password)
+    if (!zxcvbnFn) {
+        // Return basic length-based validation while zxcvbn is loading
+        if (!password) {
+            return { score: 0 }
+        }
+        if (password.length < 8) {
+            return { score: 1, feedback: 'Must be at least 8 characters long' }
+        }
+        return { score: 3, feedback: '' }
+    }
+
+    const result = zxcvbnFn(password)
 
     if (result.score > 3 && password.length < 8) {
         return {
