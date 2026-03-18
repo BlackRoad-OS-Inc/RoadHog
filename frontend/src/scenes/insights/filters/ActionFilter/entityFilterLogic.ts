@@ -300,12 +300,15 @@ export const entityFilterLogic = kea<entityFilterLogicType>([
 
                         // For non-DATA_WAREHOUSE types, remove any data warehouse specific fields
                         const cleanedFilter = { ...filter }
+                        const cleanedFieldValues = { ...fieldValues }
                         dataWarehousePopoverFields.forEach(({ key }) => {
                             delete cleanedFilter[key]
+                            delete cleanedFieldValues[key]
                         })
 
                         return {
                             ...cleanedFilter,
+                            ...cleanedFieldValues,
                             id: typeof id === 'undefined' ? filter.id : id,
                             name: typeof name === 'undefined' ? filter.name : name,
                             type: typeof type === 'undefined' ? filter.type : type,

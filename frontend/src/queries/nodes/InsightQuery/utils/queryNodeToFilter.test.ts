@@ -1,3 +1,4 @@
+import { TaxonomicFilterGroupType } from 'lib/components/TaxonomicFilter/types'
 import { FunnelLayout } from 'lib/constants'
 
 import { hiddenLegendItemsToKeys, queryNodeToFilter } from '~/queries/nodes/InsightQuery/utils/queryNodeToFilter'
@@ -44,6 +45,50 @@ describe('queryNodeToFilter', () => {
             toggledLifecycles: ['new', 'dormant'],
         }
         expect(result).toEqual(filters)
+    })
+
+    test('preserves custom funnel step aggregation targets on series nodes', () => {
+        const query: FunnelsQuery = {
+            kind: NodeKind.FunnelsQuery,
+            funnelsFilter: {
+                funnelVizType: FunnelVizType.Steps,
+            },
+            series: [
+                {
+                    kind: NodeKind.EventsNode,
+                    event: '$pageview',
+                    name: '$pageview',
+                    funnelAggregationTarget: 'posthog_person_id',
+                    funnelAggregationTargetType: TaxonomicFilterGroupType.EventProperties,
+                },
+                {
+                    kind: NodeKind.ActionsNode,
+                    id: 1,
+                    name: 'Signed up',
+                    funnelAggregationTarget: 'person.id',
+                    funnelAggregationTargetType: TaxonomicFilterGroupType.HogQLExpression,
+                },
+            ],
+        }
+
+        const result = queryNodeToFilter(query)
+
+        expect(result).toEqual(
+            expect.objectContaining({
+                events: expect.arrayContaining([
+                    expect.objectContaining({
+                        funnelAggregationTarget: 'posthog_person_id',
+                        funnelAggregationTargetType: 'event_properties',
+                    }),
+                ]),
+                actions: expect.arrayContaining([
+                    expect.objectContaining({
+                        funnelAggregationTarget: 'person.id',
+                        funnelAggregationTargetType: 'hogql_expression',
+                    }),
+                ]),
+            })
+        )
     })
 
     test('converts a breakdownFilter into breakdown properties', () => {

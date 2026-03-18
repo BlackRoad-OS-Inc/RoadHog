@@ -230,4 +230,30 @@ describe('entityFilterLogic', () => {
             )
         })
     })
+
+    describe('updateFilter', () => {
+        it('preserves custom aggregation target fields on event filters', async () => {
+            await expectLogic(logic, () => {
+                logic.actions.updateFilter({
+                    id: '$pageview',
+                    name: '$pageview',
+                    type: 'events',
+                    index: 0,
+                    funnelAggregationTarget: 'posthog_person_id',
+                    funnelAggregationTargetType: TaxonomicFilterGroupType.EventProperties,
+                })
+            }).toDispatchActions(['updateFilter', 'setFilters'])
+
+            expect(logic.props.setFilters).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    events: expect.arrayContaining([
+                        expect.objectContaining({
+                            funnelAggregationTarget: 'posthog_person_id',
+                            funnelAggregationTargetType: TaxonomicFilterGroupType.EventProperties,
+                        }),
+                    ]),
+                })
+            )
+        })
+    })
 })

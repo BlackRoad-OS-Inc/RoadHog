@@ -198,6 +198,14 @@ export const legacyEntityToNode = (
         }
     }
 
+    if (entity.type === 'actions' || entity.type === 'events') {
+        shared = {
+            ...shared,
+            funnelAggregationTarget: entity.funnelAggregationTarget || undefined,
+            funnelAggregationTargetType: entity.funnelAggregationTargetType || undefined,
+        } as any
+    }
+
     if (entity.type === 'actions') {
         return setLatestVersionsOnQuery(
             objectCleanWithEmpty({

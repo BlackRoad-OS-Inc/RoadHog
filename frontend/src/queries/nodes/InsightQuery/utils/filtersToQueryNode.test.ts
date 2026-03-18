@@ -1,3 +1,4 @@
+import { TaxonomicFilterGroupType } from 'lib/components/TaxonomicFilter/types'
 import { FunnelLayout, ShownAsValue } from 'lib/constants'
 import { MathAvailability } from 'scenes/insights/filters/ActionFilter/ActionFilterRow/ActionFilterRow'
 
@@ -151,6 +152,48 @@ describe('actionsAndEventsToSeries', () => {
                 timestamp_field: 'timestamp',
                 aggregation_target_field: 'order_id',
                 created_at_field: 'created_at',
+            },
+        ])
+    })
+
+    it('preserves custom funnel step aggregation targets on events and actions', () => {
+        const actions: ActionFilter[] = [
+            {
+                type: 'actions',
+                id: '1',
+                order: 0,
+                name: 'Signed up',
+                funnelAggregationTarget: 'person.id',
+                funnelAggregationTargetType: TaxonomicFilterGroupType.HogQLExpression,
+            },
+        ]
+        const events: ActionFilter[] = [
+            {
+                id: '$pageview',
+                type: 'events',
+                order: 1,
+                name: '$pageview',
+                funnelAggregationTarget: 'posthog_person_id',
+                funnelAggregationTargetType: TaxonomicFilterGroupType.EventProperties,
+            },
+        ]
+
+        const result = actionsAndEventsToSeries({ events, actions }, false, MathAvailability.FunnelsOnly)
+
+        expect(result).toEqual([
+            {
+                kind: NodeKind.ActionsNode,
+                id: '1',
+                name: 'Signed up',
+                funnelAggregationTarget: 'person.id',
+                funnelAggregationTargetType: TaxonomicFilterGroupType.HogQLExpression,
+            },
+            {
+                kind: NodeKind.EventsNode,
+                event: '$pageview',
+                name: '$pageview',
+                funnelAggregationTarget: 'posthog_person_id',
+                funnelAggregationTargetType: 'event_properties',
             },
         ])
     })

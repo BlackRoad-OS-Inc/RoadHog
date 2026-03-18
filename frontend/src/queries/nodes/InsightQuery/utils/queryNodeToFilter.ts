@@ -82,6 +82,10 @@ export const seriesNodeToFilter = (
         math_group_type_index: node.math_group_type_index,
         optionalInFunnel: node.optionalInFunnel,
         properties: node.properties as any, // TODO,
+        ...((isActionsNode(node) || isEventsNode(node)) && {
+            funnelAggregationTarget: node.funnelAggregationTarget,
+            funnelAggregationTargetType: node.funnelAggregationTargetType,
+        }),
         ...(isDataWarehouseNode(node)
             ? {
                   table_name: node.table_name,
