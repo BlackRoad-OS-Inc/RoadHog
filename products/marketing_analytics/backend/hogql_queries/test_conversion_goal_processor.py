@@ -6074,3 +6074,121 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
 
         # No UTM touchpoints means no attributed conversions
         assert len(response.results) == 0, f"Expected 0 results (no UTM data), got {len(response.results)}"
+
+    # ── Multi-touch attribution snapshot tests ──────────────────────────
+
+    def _create_multi_touch_scenario(self):
+        """Helper: creates a user with 3 touchpoints before a conversion."""
+        with freeze_time("2023-03-01"):
+            _create_person(distinct_ids=["mt_user"], team=self.team)
+            _create_event(
+                distinct_id="mt_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "awareness", "utm_source": "facebook"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-03-10"):
+            _create_event(
+                distinct_id="mt_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "retarget", "utm_source": "google"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-03-20"):
+            _create_event(
+                distinct_id="mt_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "closing", "utm_source": "email"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-03-25"):
+            _create_event(
+                distinct_id="mt_user",
+                event="purchase",
+                team=self.team,
+                properties={"revenue": 300},
+            )
+            flush_persons_and_events_in_batches()
+
+    def _build_multi_touch_query(self, attribution_mode: AttributionMode):
+        goal = ConversionGoalFilter1(
+            kind="EventsNode",
+            event="purchase",
+            conversion_goal_id="mt_snapshot",
+            conversion_goal_name="Multi Touch Snapshot",
+            math=BaseMathType.TOTAL,
+            schema_map={"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"},
+        )
+        config = MarketingAnalyticsConfig()
+        config.attribution_mode = attribution_mode
+        config.attribution_window_days = 90
+
+        processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=config)
+
+        date_conditions: list[ast.Expr] = [
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.GtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-03-01")]),
+            ),
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.LtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-03-31")]),
+            ),
+        ]
+        return processor.generate_cte_query(date_conditions)
+
+    @pytest.mark.usefixtures("unittest_snapshot")
+    def test_multi_touch_linear_attribution_snapshot(self):
+        """Snapshot: Linear attribution distributes credit equally across 3 touchpoints."""
+        self._create_multi_touch_scenario()
+        cte_query = self._build_multi_touch_query(AttributionMode.LINEAR)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        assert len(response.results) == 3, f"Expected 3 rows (one per touchpoint), got {len(response.results)}"
+        total = sum(row[4] for row in response.results)
+        assert abs(total - 1.0) < 0.01, f"Linear weights should sum to ~1.0, got {total}"
+        assert pretty_print_in_tests(response.hogql, self.team.pk) == self.snapshot
+
+    @pytest.mark.usefixtures("unittest_snapshot")
+    def test_multi_touch_time_decay_attribution_snapshot(self):
+        """Snapshot: Time-decay attribution gives more credit to recent touchpoints."""
+        self._create_multi_touch_scenario()
+        cte_query = self._build_multi_touch_query(AttributionMode.TIME_DECAY)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        assert len(response.results) == 3, f"Expected 3 rows (one per touchpoint), got {len(response.results)}"
+        total = sum(row[4] for row in response.results)
+        assert abs(total - 1.0) < 0.01, f"Time-decay weights should sum to ~1.0, got {total}"
+
+        by_campaign = {row[1]: row[4] for row in response.results}
+        assert by_campaign["closing"] > by_campaign["awareness"], (
+            f"Time-decay: closing ({by_campaign['closing']}) should beat awareness ({by_campaign['awareness']})"
+        )
+        assert pretty_print_in_tests(response.hogql, self.team.pk) == self.snapshot
+
+    @pytest.mark.usefixtures("unittest_snapshot")
+    def test_multi_touch_position_based_attribution_snapshot(self):
+        """Snapshot: Position-based gives 40% first, 40% last, 20% middle."""
+        self._create_multi_touch_scenario()
+        cte_query = self._build_multi_touch_query(AttributionMode.POSITION_BASED)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        assert len(response.results) == 3, f"Expected 3 rows (one per touchpoint), got {len(response.results)}"
+        total = sum(row[4] for row in response.results)
+        assert abs(total - 1.0) < 0.01, f"Position-based weights should sum to ~1.0, got {total}"
+
+        by_campaign = {row[1]: row[4] for row in response.results}
+        assert abs(by_campaign["awareness"] - 0.4) < 0.05, (
+            f"First touch should get ~0.4, got {by_campaign['awareness']}"
+        )
+        assert abs(by_campaign["closing"] - 0.4) < 0.05, f"Last touch should get ~0.4, got {by_campaign['closing']}"
+        assert abs(by_campaign["retarget"] - 0.2) < 0.05, f"Middle touch should get ~0.2, got {by_campaign['retarget']}"
+        assert pretty_print_in_tests(response.hogql, self.team.pk) == self.snapshot

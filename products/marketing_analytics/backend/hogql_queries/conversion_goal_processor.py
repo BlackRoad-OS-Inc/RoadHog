@@ -221,8 +221,8 @@ class ConversionGoalProcessor:
             array_join = self._build_multi_touch_array_join_subquery(array_collection, attribution_window_seconds)
             attribution = self._build_multi_touch_attribution_subquery(array_join)
         else:
-            array_join = self._build_array_join_subquery(array_collection, attribution_window_seconds)
-            attribution = self._build_attribution_logic_subquery(array_join)
+            array_join = self._build_single_touch_array_join_subquery(array_collection, attribution_window_seconds)
+            attribution = self._build_single_touch_attribution_subquery(array_join)
 
         return self._build_final_aggregation_query(attribution)
 
@@ -649,7 +649,7 @@ class ConversionGoalProcessor:
             ),
         )
 
-    def _build_array_join_subquery(
+    def _build_single_touch_array_join_subquery(
         self, inner_query: ast.SelectQuery, attribution_window_seconds: int
     ) -> ast.SelectQuery:
         """Build subquery with ARRAY JOIN and attribution window logic"""
@@ -683,10 +683,10 @@ class ConversionGoalProcessor:
                 )
             )
 
-        select_columns.append(self._build_last_utm_timestamp_expr(attribution_window_seconds))
+        select_columns.append(self._build_single_touch_timestamp_expr(attribution_window_seconds))
 
         for field in TRACKED_FIELDS:
-            select_columns.append(self._build_fallback_utm_expr(field.fallback_value, field.utm_array))
+            select_columns.append(self._build_single_touch_fallback_expr(field.fallback_value, field.utm_array))
 
         return ast.SelectQuery(
             select=select_columns,
@@ -700,7 +700,7 @@ class ConversionGoalProcessor:
             ],
         )
 
-    def _build_last_utm_timestamp_expr(self, attribution_window_seconds: int) -> ast.Alias:
+    def _build_single_touch_timestamp_expr(self, attribution_window_seconds: int) -> ast.Alias:
         """Build expression to find most recent UTM pageview within attribution window"""
         return ast.Alias(
             alias="last_utm_timestamp",
@@ -744,7 +744,7 @@ class ConversionGoalProcessor:
             ),
         )
 
-    def _build_fallback_utm_expr(self, alias: str, utm_array_field: str) -> ast.Alias:
+    def _build_single_touch_fallback_expr(self, alias: str, utm_array_field: str) -> ast.Alias:
         """Build expression for fallback UTM data"""
         return ast.Alias(
             alias=alias,
@@ -1247,7 +1247,7 @@ class ConversionGoalProcessor:
             select_from=ast.JoinExpr(table=touchpoint_exploded),
         )
 
-    def _build_attribution_logic_subquery(self, array_join_query: ast.SelectQuery) -> ast.SelectQuery:
+    def _build_single_touch_attribution_subquery(self, array_join_query: ast.SelectQuery) -> ast.SelectQuery:
         """Build subquery that applies attribution logic"""
         select_columns: list[ast.Expr] = [
             ast.Field(chain=["person_id"]),
