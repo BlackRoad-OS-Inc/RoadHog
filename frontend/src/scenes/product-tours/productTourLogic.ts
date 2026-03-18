@@ -601,9 +601,16 @@ export const productTourLogic = kea<productTourLogicType>([
                     } else if (!cache.formHydratedWhileEditing) {
                         shouldApplyForm = true
                         cache.formHydratedWhileEditing = true
-                    } else {
-                        shouldApplyForm = isOwnEcho
-                    }
+                } else {
+                    // Only re-apply when the server echoes back exactly what we last sent/saved.
+                    // This is safe because PropertyFilters skips its internal setFilters when
+                    // the incoming propertyFilters prop matches what was last synced, so any
+                    // in-progress filter row (property chosen but operator/value not yet set)
+                    // is preserved even though setProductTourFormValues is dispatched here.
+                    // If the server normalises the payload differently, isOwnEcho is false and
+                    // the form is left untouched until the user finishes the current edit session.
+                    shouldApplyForm = isOwnEcho
+                }
                 }
 
                 if (shouldApplyForm) {
