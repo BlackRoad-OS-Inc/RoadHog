@@ -39,6 +39,10 @@ jobs:
                   token: ${{ steps.deployer.outputs.token }}
                   repository: PostHog/charts
                   event-type: disable-canary-flags
+                  client-payload: |
+                      {
+                        "pr_number": "${{ github.event.pull_request.number }}"
+                      }
 
     report-pr-age:
         name: Report age of PR
