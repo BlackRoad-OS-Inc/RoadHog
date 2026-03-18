@@ -192,6 +192,9 @@ export class DashboardPage {
             })
             .first()
         await expect(card).toBeVisible({ timeout: 10000 })
+        // Scroll into view so the intersection observer marks the card as visible,
+        // which triggers content rendering (required when EXPERIMENTAL_DASHBOARD_ITEM_RENDERING is on).
+        await card.scrollIntoViewIfNeeded()
         return card
     }
 
