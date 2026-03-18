@@ -16163,6 +16163,17 @@
             "required": ["action", "form_answers"],
             "type": "object"
         },
+        "FormDismissPayload": {
+            "additionalProperties": false,
+            "properties": {
+                "action": {
+                    "const": "dismiss_form",
+                    "type": "string"
+                }
+            },
+            "required": ["action"],
+            "type": "object"
+        },
         "FunnelConversionWindowTimeUnit": {
             "enum": ["second", "minute", "hour", "day", "week", "month"],
             "type": "string"
@@ -29237,6 +29248,9 @@
                 },
                 {
                     "$ref": "#/definitions/FormResumePayload"
+                },
+                {
+                    "$ref": "#/definitions/FormDismissPayload"
                 }
             ]
         },
