@@ -296,7 +296,16 @@ def sync_manifest_from_s3() -> VersionManifest:
                 },
             )
 
-    cache.set(REDIS_POINTER_MAP_KEY, json.dumps(manifest), timeout=None)
+    global _cached_manifest
+
+    manifest_json = json.dumps(manifest)
+    cache.set(REDIS_POINTER_MAP_KEY, manifest_json, timeout=None)
+
+    # Update the in-process cache *before* purging CDN so that any
+    # revalidation requests that land on this worker immediately
+    # resolve to the new version.
+    _cached_manifest = CachedManifest.from_json(manifest_json)
+
     _purge_changed_pointers(old_pointers, manifest["pointers"])
     return manifest
 
