@@ -866,35 +866,6 @@ export function ActionFilterRow({
                                                               },
                                                           ]
                                                         : []),
-                                                    // Optional step checkbox for funnels only
-                                                    ...(isFunnelContext && index > 0
-                                                        ? [
-                                                              {
-                                                                  label: () => (
-                                                                      <>
-                                                                          <Tooltip title="Optional steps show conversion rates from the last mandatory step, but are not necessary to move to the next step in the funnel">
-                                                                              <div className="px-2 py-1">
-                                                                                  <LemonCheckbox
-                                                                                      checked={
-                                                                                          !!filter.optionalInFunnel
-                                                                                      }
-                                                                                      onChange={(checked) => {
-                                                                                          updateFilterOptional({
-                                                                                              ...filter,
-                                                                                              optionalInFunnel: checked,
-                                                                                              index,
-                                                                                          })
-                                                                                      }}
-                                                                                      label="Optional step"
-                                                                                  />
-                                                                              </div>
-                                                                          </Tooltip>
-                                                                          <LemonDivider />
-                                                                      </>
-                                                                  ),
-                                                              },
-                                                          ]
-                                                        : []),
                                                     // Custom aggregation target for funnels only
                                                     ...(isFunnelContext &&
                                                     hasFunnelCustomStepAggregationFlag &&
@@ -921,6 +892,35 @@ export function ActionFilterRow({
                                                                                   })
                                                                               }
                                                                           />
+                                                                          <LemonDivider />
+                                                                      </>
+                                                                  ),
+                                                              },
+                                                          ]
+                                                        : []),
+                                                    // Optional step checkbox for funnels only
+                                                    ...(isFunnelContext && index > 0
+                                                        ? [
+                                                              {
+                                                                  label: () => (
+                                                                      <>
+                                                                          <Tooltip title="Optional steps show conversion rates from the last mandatory step, but are not necessary to move to the next step in the funnel">
+                                                                              <div className="px-2 py-1">
+                                                                                  <LemonCheckbox
+                                                                                      checked={
+                                                                                          !!filter.optionalInFunnel
+                                                                                      }
+                                                                                      onChange={(checked) => {
+                                                                                          updateFilterOptional({
+                                                                                              ...filter,
+                                                                                              optionalInFunnel: checked,
+                                                                                              index,
+                                                                                          })
+                                                                                      }}
+                                                                                      label="Optional step"
+                                                                                  />
+                                                                              </div>
+                                                                          </Tooltip>
                                                                           <LemonDivider />
                                                                       </>
                                                                   ),
