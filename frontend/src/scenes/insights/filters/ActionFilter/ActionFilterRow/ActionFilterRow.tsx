@@ -120,6 +120,15 @@ const DragHandle = ({ listeners }: DragHandleProps): JSX.Element => (
     </span>
 )
 
+function FunnelStepMenuField({ label, children }: { label: string; children: JSX.Element }): JSX.Element {
+    return (
+        <div className="mb-2.5 mx-2">
+            <h5 className="mx-0 my-1">{label}</h5>
+            {children}
+        </div>
+    )
+}
+
 export enum MathAvailability {
     All,
     ActorsOnly,
@@ -844,23 +853,26 @@ export function ActionFilterRow({
                                                               {
                                                                   label: () => (
                                                                       <>
-                                                                          <MathSelector
-                                                                              math={math}
-                                                                              mathGroupTypeIndex={mathGroupTypeIndex}
-                                                                              index={index}
-                                                                              onMathSelect={onMathSelect}
-                                                                              disabled={readOnly}
-                                                                              style={{
-                                                                                  maxWidth: '100%',
-                                                                                  width: 'initial',
-                                                                              }}
-                                                                              mathAvailability={mathAvailability}
-                                                                              trendsDisplayCategory={
-                                                                                  trendsDisplayCategory
-                                                                              }
-                                                                              query={query || {}}
-                                                                          />
-                                                                          <LemonDivider />
+                                                                          <FunnelStepMenuField label="Event matching">
+                                                                              <MathSelector
+                                                                                  math={math}
+                                                                                  mathGroupTypeIndex={
+                                                                                      mathGroupTypeIndex
+                                                                                  }
+                                                                                  index={index}
+                                                                                  onMathSelect={onMathSelect}
+                                                                                  disabled={readOnly}
+                                                                                  style={{
+                                                                                      maxWidth: '100%',
+                                                                                      width: 'initial',
+                                                                                  }}
+                                                                                  mathAvailability={mathAvailability}
+                                                                                  trendsDisplayCategory={
+                                                                                      trendsDisplayCategory
+                                                                                  }
+                                                                                  query={query || {}}
+                                                                              />
+                                                                          </FunnelStepMenuField>
                                                                       </>
                                                                   ),
                                                               },
@@ -875,24 +887,25 @@ export function ActionFilterRow({
                                                               {
                                                                   label: () => (
                                                                       <>
-                                                                          <FunnelStepAggregationTargetSelect
-                                                                              filter={filter}
-                                                                              eventNames={
-                                                                                  funnelStepAggregationEventNames
-                                                                              }
-                                                                              onChange={(
-                                                                                  funnelAggregationTarget,
-                                                                                  funnelAggregationTargetType
-                                                                              ) =>
-                                                                                  updateFilter({
-                                                                                      ...filter,
-                                                                                      index,
+                                                                          <FunnelStepMenuField label="Aggregating by">
+                                                                              <FunnelStepAggregationTargetSelect
+                                                                                  filter={filter}
+                                                                                  eventNames={
+                                                                                      funnelStepAggregationEventNames
+                                                                                  }
+                                                                                  onChange={(
                                                                                       funnelAggregationTarget,
-                                                                                      funnelAggregationTargetType,
-                                                                                  })
-                                                                              }
-                                                                          />
-                                                                          <LemonDivider />
+                                                                                      funnelAggregationTargetType
+                                                                                  ) =>
+                                                                                      updateFilter({
+                                                                                          ...filter,
+                                                                                          index,
+                                                                                          funnelAggregationTarget,
+                                                                                          funnelAggregationTargetType,
+                                                                                      })
+                                                                                  }
+                                                                              />
+                                                                          </FunnelStepMenuField>
                                                                       </>
                                                                   ),
                                                               },
@@ -921,12 +934,13 @@ export function ActionFilterRow({
                                                                                   />
                                                                               </div>
                                                                           </Tooltip>
-                                                                          <LemonDivider />
                                                                       </>
                                                                   ),
                                                               },
                                                           ]
                                                         : []),
+                                                    // Separator for funnels only
+                                                    ...(isFunnelContext ? [{ label: () => <LemonDivider /> }] : []),
                                                     ...(!hideRename
                                                         ? [
                                                               {
