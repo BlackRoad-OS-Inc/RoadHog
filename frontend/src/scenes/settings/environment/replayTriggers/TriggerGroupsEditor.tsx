@@ -41,9 +41,6 @@ export function TriggerGroupsEditor(): JSX.Element {
                     ))}
                 </div>
             )}
-
-            {/* TODO: Add evaluation mode selector */}
-            {/* TODO: Add fallback sample rate */}
         </div>
     )
 }
