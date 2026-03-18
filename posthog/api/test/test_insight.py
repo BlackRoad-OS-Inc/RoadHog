@@ -2640,6 +2640,25 @@ class TestInsight(ClickhouseTestMixin, APIBaseTest, QueryMatchingTest):
             short_id="77889900",
             query=query_with_series_filter,
         )
+        # Multi-breakdown: flag only in breakdownFilter.breakdowns[].property
+        query_multi_breakdown = {
+            "kind": "InsightVizNode",
+            "source": {
+                "kind": "TrendsQuery",
+                "series": [{"kind": "EventsNode", "event": "$pageview", "name": "$pageview"}],
+                "breakdownFilter": {
+                    "breakdowns": [
+                        {"property": "$feature/insight-with-flag-used", "type": "event"},
+                        {"property": "$browser", "type": "event"},
+                    ]
+                },
+            },
+        }
+        insight_multi_breakdown = Insight.objects.create(
+            team=self.team,
+            short_id="66554433",
+            query=query_multi_breakdown,
+        )
 
         response = self.client.get(f"/api/projects/{self.team.id}/insights/?feature_flag=insight-with-flag-used")
         response_data = response.json()
@@ -2650,7 +2669,14 @@ class TestInsight(ClickhouseTestMixin, APIBaseTest, QueryMatchingTest):
         # insight 3 is not included; legacy + new-format (breakdown or filter in properties/series)
         self.assertCountEqual(
             ids_in_response,
-            [insight.id, insight2.id, insight_new_format.id, insight_filter_only.id, insight_series_filter.id],
+            [
+                insight.id,
+                insight2.id,
+                insight_new_format.id,
+                insight_filter_only.id,
+                insight_series_filter.id,
+                insight_multi_breakdown.id,
+            ],
         )
 
     def test_cannot_create_insight_with_dashboards_relation_from_another_team(
