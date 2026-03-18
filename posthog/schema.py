@@ -20109,6 +20109,10 @@ class SourceConfig(BaseModel):
         | SourceFieldFileUploadConfig
         | SourceFieldSSHTunnelConfig
     ]
+    hasAdvancedConfig: bool | None = Field(
+        default=False,
+        description=("Whether this source supports per-schema advanced configuration (e.g. property selection)"),
+    )
     iconClassName: str | None = None
     iconPath: str
     label: str | None = None

@@ -16,7 +16,10 @@ from posthog.temporal.data_imports.sources.common.schema import SourceSchema
 from posthog.temporal.data_imports.sources.generated_configs import HubspotSourceConfig
 from posthog.temporal.data_imports.sources.hubspot.auth import hubspot_refresh_access_token
 from posthog.temporal.data_imports.sources.hubspot.hubspot import HubspotResumeConfig, hubspot_source
-from posthog.temporal.data_imports.sources.hubspot.settings import ENDPOINTS as HUBSPOT_ENDPOINTS
+from posthog.temporal.data_imports.sources.hubspot.settings import (
+    DEFAULT_PROPS,
+    ENDPOINTS as HUBSPOT_ENDPOINTS,
+)
 
 from products.data_warehouse.backend.types import ExternalDataSourceType
 
@@ -41,6 +44,7 @@ class HubspotSource(ResumableSource[HubspotSourceConfig | HubspotSourceOldConfig
             iconPath="/static/services/hubspot.png",
             docsUrl="https://posthog.com/docs/cdp/sources/hubspot",
             featured=True,
+            hasAdvancedConfig=True,
             fields=cast(
                 list[FieldType],
                 [
@@ -50,6 +54,9 @@ class HubspotSource(ResumableSource[HubspotSourceConfig | HubspotSourceOldConfig
                 ],
             ),
         )
+
+    def get_default_properties(self, schema_name: str) -> list[str] | None:
+        return list(DEFAULT_PROPS.get(schema_name, []))
 
     def get_non_retryable_errors(self) -> dict[str, str | None]:
         return {
@@ -124,4 +131,5 @@ class HubspotSource(ResumableSource[HubspotSourceConfig | HubspotSourceOldConfig
             endpoint=inputs.schema_name,
             logger=inputs.logger,
             resumable_source_manager=resumable_source_manager,
+            selected_properties=inputs.selected_properties,
         )

@@ -4931,6 +4931,12 @@ export interface SourceConfig {
      * @default false
      */
     featured?: boolean
+
+    /**
+     * Whether this source supports per-schema advanced configuration (e.g. property selection)
+     * @default false
+     */
+    hasAdvancedConfig?: boolean
 }
 
 export const externalDataSources = [

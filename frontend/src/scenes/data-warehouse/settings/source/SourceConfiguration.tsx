@@ -11,6 +11,7 @@ import { buildKeaFormDefaultFromSourceDetails } from 'scenes/data-warehouse/new/
 
 import { AccessControlLevel, AccessControlResourceType } from '~/types'
 
+import { AdvancedConfiguration } from './AdvancedConfiguration'
 import { dataWarehouseSourceSettingsLogic } from './dataWarehouseSourceSettingsLogic'
 
 interface SourceConfigurationProps {
@@ -96,6 +97,9 @@ function UpdateSourceConnectionFormContainer(): JSX.Element {
                     </AccessControlAction>
                 </div>
             </Form>
+            {sourceFieldConfig.hasAdvancedConfig && source.schemas && (
+                <AdvancedConfiguration sourceId={source.id} schemas={source.schemas} />
+            )}
         </>
     )
 }

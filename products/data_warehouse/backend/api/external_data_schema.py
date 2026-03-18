@@ -52,6 +52,7 @@ class ExternalDataSchemaSerializer(serializers.ModelSerializer):
     sync_frequency = serializers.SerializerMethodField(read_only=True)
     status = serializers.SerializerMethodField(read_only=True)
     sync_time_of_day = serializers.SerializerMethodField(read_only=True)
+    selected_properties = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ExternalDataSchema
@@ -70,6 +71,7 @@ class ExternalDataSchemaSerializer(serializers.ModelSerializer):
             "incremental_field_type",
             "sync_frequency",
             "sync_time_of_day",
+            "selected_properties",
         ]
 
         read_only_fields = [
@@ -120,6 +122,9 @@ class ExternalDataSchemaSerializer(serializers.ModelSerializer):
     def get_sync_time_of_day(self, schema: ExternalDataSchema):
         return schema.sync_time_of_day
 
+    def get_selected_properties(self, schema: ExternalDataSchema) -> list[str] | None:
+        return schema.selected_properties
+
     def update(self, instance: ExternalDataSchema, validated_data: dict[str, Any]) -> ExternalDataSchema:
         data = self.context["request"].data
 
@@ -133,7 +138,9 @@ class ExternalDataSchemaSerializer(serializers.ModelSerializer):
         ):
             raise ValidationError("Invalid sync type")
 
-        validated_data["sync_type"] = sync_type
+        # Only update sync_type if it was explicitly provided in the request
+        if "sync_type" in data:
+            validated_data["sync_type"] = sync_type
 
         trigger_refresh = False
         # Update the validated_data with incremental fields
@@ -226,6 +233,23 @@ class ExternalDataSchemaSerializer(serializers.ModelSerializer):
 
             if should_sync is False and instance.should_sync is True:
                 hide_direct_postgres_table(instance.table)
+
+        # Handle selected_properties for advanced configuration
+        if "selected_properties" in data:
+            selected_properties = data.get("selected_properties")
+            # Normalize empty list and null to None (revert to defaults)
+            if isinstance(selected_properties, list) and len(selected_properties) == 0:
+                selected_properties = None
+
+            current_properties = instance.selected_properties
+            if selected_properties != current_properties:
+                payload = validated_data.get("sync_type_config", instance.sync_type_config.copy())
+                if selected_properties is None:
+                    payload.pop("selected_properties", None)
+                else:
+                    payload["selected_properties"] = selected_properties
+                validated_data["sync_type_config"] = payload
+                trigger_refresh = True
 
         if trigger_refresh:
             instance.sync_type_config.update({"reset_pipeline": True})
@@ -333,6 +357,26 @@ class ExternalDataSchemaViewset(TeamAndOrgViewSetMixin, viewsets.ModelViewSet):
         instance.delete_table()
 
         return Response(status=status.HTTP_200_OK)
+
+    @action(methods=["POST"], detail=True)
+    def available_properties(self, request: Request, *args: Any, **kwargs: Any):
+        instance: ExternalDataSchema = self.get_object()
+        source: ExternalDataSource = instance.source
+
+        if not source.source_type:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Missing source type"})
+
+        source_type_enum = ExternalDataSourceType(source.source_type)
+        new_source = SourceRegistry.get_source(source_type_enum)
+        default_properties = new_source.get_default_properties(instance.name)
+
+        return Response(
+            status=status.HTTP_200_OK,
+            data={
+                "default_properties": default_properties,
+                "selected_properties": instance.selected_properties,
+            },
+        )
 
     @action(methods=["POST"], detail=True)
     def incremental_fields(self, request: Request, *args: Any, **kwargs: Any):

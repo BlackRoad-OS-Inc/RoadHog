@@ -181,6 +181,7 @@ import {
     RoleType,
     SavedSessionRecordingPlaylistsResult,
     ScheduledChangeType,
+    SchemaAvailablePropertiesResponse,
     SchemaIncrementalFieldsResponse,
     SearchListParams,
     SearchResponse,
@@ -4846,6 +4847,11 @@ const api = {
         },
         async incremental_fields(schemaId: ExternalDataSourceSchema['id']): Promise<SchemaIncrementalFieldsResponse> {
             return await new ApiRequest().externalDataSourceSchema(schemaId).withAction('incremental_fields').create()
+        },
+        async available_properties(
+            schemaId: ExternalDataSourceSchema['id']
+        ): Promise<SchemaAvailablePropertiesResponse> {
+            return await new ApiRequest().externalDataSourceSchema(schemaId).withAction('available_properties').create()
         },
         async delete_data(schemaId: ExternalDataSourceSchema['id']): Promise<SchemaIncrementalFieldsResponse> {
             return await new ApiRequest().externalDataSourceSchema(schemaId).withAction('delete_data').delete()
