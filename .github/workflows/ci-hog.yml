@@ -83,8 +83,8 @@ jobs:
             - name: Install SAML (python3-saml) dependencies
               if: steps.setup-uv.outputs.cache-hit != 'true'
               run: |
-                  sudo apt-get update
-                  sudo apt-get install libxml2-dev libxmlsec1 libxmlsec1-dev libxmlsec1-openssl
+                  sudo apt-get update -o Acquire::Retries=2
+                  sudo apt-get install -y -o Acquire::Retries=2 libxml2-dev libxmlsec1 libxmlsec1-dev libxmlsec1-openssl
 
             - name: Install Python dependencies
               run: |
@@ -105,7 +105,7 @@ jobs:
             - name: Check if ANTLR definitions are up to date
               run: |
                   cd ..
-                  sudo apt-get update && sudo apt-get install default-jre
+                  sudo apt-get update -o Acquire::Retries=2 && sudo apt-get install -y -o Acquire::Retries=2 default-jre
                   mkdir antlr
                   cd antlr
                   curl -o antlr.jar https://www.antlr.org/download/antlr-$ANTLR_VERSION-complete.jar
@@ -187,8 +187,8 @@ jobs:
             - name: Install SAML (python3-saml) dependencies
               if: steps.setup-uv-hogql-python.outputs.cache-hit != 'true'
               run: |
-                  sudo apt-get update
-                  sudo apt-get install libxml2-dev libxmlsec1 libxmlsec1-dev libxmlsec1-openssl
+                  sudo apt-get update -o Acquire::Retries=2
+                  sudo apt-get install -y -o Acquire::Retries=2 libxml2-dev libxmlsec1 libxmlsec1-dev libxmlsec1-openssl
             - name: Install Python dependencies
               run: |
                   UV_PROJECT_ENVIRONMENT=$pythonLocation uv sync --frozen --dev

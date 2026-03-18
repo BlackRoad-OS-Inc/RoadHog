@@ -131,8 +131,8 @@ jobs:
             - name: Install SAML (python3-saml) dependencies
               if: steps.setup-uv.outputs.cache-hit != 'true'
               run: |
-                  sudo apt-get update
-                  sudo apt-get install libxml2-dev libxmlsec1-dev libxmlsec1-openssl
+                  sudo apt-get update -o Acquire::Retries=2
+                  sudo apt-get install -y -o Acquire::Retries=2 libxml2-dev libxmlsec1-dev libxmlsec1-openssl
 
             - name: Install python dependencies
               shell: bash

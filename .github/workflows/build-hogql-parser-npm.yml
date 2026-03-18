@@ -68,7 +68,7 @@ jobs:
               uses: ./.github/actions/setup-emsdk
 
             - name: Install Ninja
-              run: sudo apt-get install -y ninja-build
+              run: sudo apt-get install -y -o Acquire::Retries=2 ninja-build
 
             - name: Build WASM package
               run: cd common/hogql_parser && npm run build

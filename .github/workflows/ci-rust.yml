@@ -151,8 +151,8 @@ jobs:
 
             - name: Install system OpenSSL
               run: |
-                  sudo apt-get update
-                  sudo apt-get install -y libssl-dev pkg-config
+                  sudo apt-get update -o Acquire::Retries=2
+                  sudo apt-get install -y -o Acquire::Retries=2 libssl-dev pkg-config
 
             - name: Install protoc
               uses: ./.github/actions/setup-protoc
@@ -243,8 +243,8 @@ jobs:
             - name: Install SAML (python3-saml) dependencies
               if: steps.setup-uv.outputs.cache-hit != 'true'
               run: |
-                  sudo apt-get update
-                  sudo apt-get install libxml2-dev libxmlsec1-dev libxmlsec1-openssl postgresql-client
+                  sudo apt-get update -o Acquire::Retries=2
+                  sudo apt-get install -y -o Acquire::Retries=2 libxml2-dev libxmlsec1-dev libxmlsec1-openssl postgresql-client
 
             - name: Install python dependencies
               run: |
@@ -316,8 +316,8 @@ jobs:
 
             - name: Install system OpenSSL
               run: |
-                  sudo apt-get update
-                  sudo apt-get install -y libssl-dev pkg-config
+                  sudo apt-get update -o Acquire::Retries=2
+                  sudo apt-get install -y -o Acquire::Retries=2 libssl-dev pkg-config
 
             - name: Install protoc
               uses: ./.github/actions/setup-protoc
