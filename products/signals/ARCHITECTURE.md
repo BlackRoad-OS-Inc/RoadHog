@@ -132,7 +132,9 @@ Runs when a report is promoted to `candidate` status. Uses either the legacy sum
      - run **Safety judge** + **Actionability judge** concurrently via `asyncio.gather`
    - **Feature-flagged path**:
      - run **Safety judge** first on raw signals → `safety_judge_activity` (`safety_judge.py`)
-     - if safe, run sandbox-backed agentic research → `run_agentic_report_activity` (`temporal/agentic_report.py`)
+     - if safe, **select repository** → `select_repository_activity` (`temporal/agentic_report.py`) — see Repository Selection below
+     - if no repo selected → `mark_report_pending_input_activity`, **stop**
+     - if repo selected, run sandbox-backed agentic research → `run_agentic_report_activity` (`temporal/agentic_report.py`)
 4. **Evaluate results** (safety checked first in both paths):
    - If **unsafe** → `mark_report_failed_activity` with error, **stop**
    - If **not actionable** → `reset_report_to_potential_activity` (weight → 0, status → `potential`), **stop**
@@ -143,6 +145,16 @@ Runs when a report is promoted to `candidate` status. Uses either the legacy sum
 On any unhandled exception, the workflow catches and calls `mark_report_failed_activity`.
 
 The grouping workflow uses a 1-hour `run_timeout` (resets on each `continue_as_new`). The summary workflow uses a 5-hour `execution_timeout` to allow the feature-flagged agentic path to finish. Most activities use 3-attempt retry policies; the sandbox-backed agentic report activity uses a single attempt to avoid spawning duplicate research tasks automatically.
+
+#### Repository Selection
+
+Before running the agentic research, the workflow calls `select_repository_activity` — a separate Temporal activity that selects the most relevant repository from the team's GitHub integrations via `select_repository_for_report()` (`report_generation/select_repo.py`). Isolating repo selection in its own activity gives it independent retry/timeout semantics and avoids re-running selection if the longer research activity fails and retries.
+
+- **0 repos connected:** returns `None` → activity returns `REQUIRES_HUMAN_INPUT` → workflow transitions to `pending_input`.
+- **1 repo connected:** returns it directly (no sandbox needed).
+- **N repos connected:** spawns a single-turn sandbox agent using `PostHog/.github` as a lightweight dummy clone. The agent uses `gh` CLI (authenticated via the team's GitHub token) to explore candidate repos (`gh repo view`, `gh search code`) and picks the most relevant one.
+
+The selection result is persisted as a `repo_selection` artefact on the report. `ReportResearchOutput` also carries an optional `repository` field set by the caller for future update flows (so re-research can skip repo discovery).
 
 ### `SignalReportReingestionWorkflow` (`signal-report-reingestion`)
 
@@ -240,6 +252,7 @@ Binary artefacts attached to reports. Used for video segments and judge results.
 | `actionability_judgment` | `{"choice": "immediately_actionable" \| "requires_human_input" \| "not_actionable", "explanation": "...", "already_addressed": bool, "priority": "P0"\|"P1"\|"P2"\|"P3"\|"P4"\|null}` |
 | `priority_judgment`      | `{"priority": "P0"\|"P1"\|"P2"\|"P3"\|"P4", "explanation": "..."}`                                                                                                                    |
 | `signal_finding`         | `{"signal_id": "...", "relevant_code_paths": [...], "data_queried": "...", "verified": bool}`                                                                                         |
+| `repo_selection`         | `{"repository": "owner/repo" \| null, "reason": "..."}`                                                                                                                               |
 
 **Indexes:** `(report)` (`signals_sig_report__idx`)
 
@@ -511,8 +524,14 @@ products/signals/
 │   │       ├── download_github_issues.py
 │   │       ├── ingest_github_issues.py
 │   │       └── ingest_video_segments.py
+│   ├── report_generation/
+│   │   ├── AGENTS.md                # Documentation for report generation flow
+│   │   ├── research.py              # Multi-turn sandbox research orchestration + ReportResearchOutput
+│   │   ├── select_repo.py           # Repository selection — sandbox agent picks best repo from GitHub integrations
+│   │   └── fixtures/                # Test fixtures for local debug commands
 │   ├── test/
-│   │   └── test_signal_source_config_api.py
+│   │   ├── test_signal_source_config_api.py
+│   │   └── test_agentic_report_activity.py
 │   ├── migrations/
 │   │   ├── 0001_initial.py
 │   │   ├── 0002_signalreport_clustering_fields.py
@@ -524,6 +543,9 @@ products/signals/
 │   │   └── 0008_alter_signalsourceconfig_source_product_and_more.py
 │   └── temporal/
 │       ├── __init__.py             # Registers all workflows and activities (WORKFLOWS + ACTIVITIES lists)
+│       ├── agentic/                # Agentic report flow — repo selection + sandbox-backed research
+│       │   ├── report.py           # Agentic report research activity + gate activity + artefact persistence
+│       │   └── select_repository.py # Repository selection activity — picks best repo from GitHub integrations
 │       ├── emitter.py              # SignalEmitterWorkflow — ephemeral per-signal workflow for backpressure
 │       ├── buffer.py               # BufferSignalsWorkflow + S3 flush/read activities + backpressure activity
 │       ├── grouping_v2.py          # TeamSignalGroupingV2Workflow — processes S3 batches via _process_signal_batch

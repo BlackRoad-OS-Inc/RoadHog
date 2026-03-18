@@ -7,6 +7,15 @@ the safety judge first, then calls into this flow via a Temporal activity if the
 
 ## What lives here
 
+- `select_repo.py`
+  Selects the most relevant GitHub repository for a set of signals.
+  - If the team has 0 repos: returns `None` (report goes to `pending_input`).
+  - If the team has 1 repo: returns it directly (no sandbox needed).
+  - If the team has N repos: spawns a sandbox agent that uses `gh` CLI to explore
+    candidates and pick the best match. Uses `PostHog/.github` as a small dummy repo
+    for the sandbox clone, since the agent only needs `gh` CLI access (not the repo itself).
+  - Output: `RepoSelectionResult(repository: str | None, reason: str)`.
+  - Persisted as a `repo_selection` artefact on the report.
 - `research.py`
   Orchestrates a multi-turn sandbox session over a report's signals.
   The agent researches each signal, then produces:
@@ -15,6 +24,8 @@ the safety judge first, then calls into this flow via a Temporal activity if the
   - priority assessment when actionable
   - final report title
   - very short factual summary
+    `ReportResearchOutput` also carries an optional `repository` field set by the caller
+    after repo selection, for use in future update flows.
 - `fixtures/analyze_report_funnel_research_output.json`
   Saved previous research output used by local `update` testing.
 
