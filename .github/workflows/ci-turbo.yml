@@ -97,9 +97,35 @@ jobs:
 
                   echo ">>> Both parallel tasks completed successfully!"
 
-            - name: Turbo Affected
+            - name: Turbo affected vs. full dry-run comparison
               run: |
-                  bin/turbo build --affected --dry-run
+                  echo "============================================"
+                  echo "  Turbo --affected dry-run comparison"
+                  echo "============================================"
+                  echo ""
+
+                  for task in build test; do
+                    echo "--- Task: $task ---"
+
+                    full_output=$(bin/turbo run "$task" --dry-run 2>&1)
+                    affected_output=$(bin/turbo run "$task" --affected --dry-run 2>&1)
+
+                    full_packages=$(echo "$full_output" | grep "Packages in scope" || echo "n/a")
+                    affected_packages=$(echo "$affected_output" | grep "Packages in scope" || echo "n/a")
+
+                    echo "  Full:     $full_packages"
+                    echo "  Affected: $affected_packages"
+
+                    full_count=$(echo "$full_output" | grep -oP 'Tasks:\s+\K\S+' || echo "?")
+                    affected_count=$(echo "$affected_output" | grep -oP 'Tasks:\s+\K\S+' || echo "?")
+
+                    echo "  Full tasks:     $full_count"
+                    echo "  Affected tasks: $affected_count"
+                    echo ""
+                  done
+
+                  echo "--- Full dry-run details (build --affected) ---"
+                  bin/turbo run build --affected --dry-run
               env:
                   NODE_OPTIONS: --max-old-space-size=8192
                   TURBO_SCM_BASE: ${{ env.TURBO_SCM_BASE }}
