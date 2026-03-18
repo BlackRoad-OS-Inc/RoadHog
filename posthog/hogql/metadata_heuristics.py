@@ -33,6 +33,8 @@ class SimilarSubqueryHeuristic(MetadataHeuristic):
             if similar_count <= 0:
                 continue
 
+            similar_subquery_label = "other subquery" if similar_count == 1 else "other subqueries"
+
             for similar_query in similar_queries:
                 if similar_query.start is None:
                     continue
@@ -42,7 +44,7 @@ class SimilarSubqueryHeuristic(MetadataHeuristic):
                         start=similar_query.start,
                         end=similar_query.start + 6,
                         message=(
-                            f"This subquery is very similar to {similar_count} other subqueries. "
+                            f"This subquery is very similar to {similar_count} {similar_subquery_label}. "
                             "You can usually make this query faster by combining repeated table scans."
                         ),
                     )

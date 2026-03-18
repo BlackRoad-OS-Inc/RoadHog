@@ -806,7 +806,7 @@ class TestMetadata(ClickhouseTestMixin, APIBaseTest):
         # TODO: Should *probably* update the code to resolve that type as well
         self.assertEqual([notice.message for notice in metadata.notices or []], ["Field 'metadata' is of type 'JSON'"])
 
-    def test_metadata_warns_about_similar_subqueries(self):
+    def test_metadata_warns_about_similar_subquery_in_singular(self):
         metadata = self._select(
             """
             SELECT *
@@ -823,7 +823,32 @@ class TestMetadata(ClickhouseTestMixin, APIBaseTest):
             """
         )
 
-        self.assertTrue(any("very similar to 1 other subqueries" in warning.message for warning in metadata.warnings))
+        self.assertTrue(any("very similar to 1 other subquery" in warning.message for warning in metadata.warnings))
+        self.assertTrue(all(warning.fix is None for warning in metadata.warnings))
+
+    def test_metadata_warns_about_similar_subquery_in_plural(self):
+        metadata = self._select(
+            """
+            SELECT *
+            FROM (
+                SELECT person_id, count() AS total
+                FROM events
+                GROUP BY person_id
+            ) a
+            JOIN (
+                SELECT person_id, max(timestamp) AS last_seen
+                FROM events
+                GROUP BY person_id
+            ) b ON a.person_id = b.person_id
+            JOIN (
+                SELECT person_id, min(timestamp) AS first_seen
+                FROM events
+                GROUP BY person_id
+            ) c ON a.person_id = c.person_id
+            """
+        )
+
+        self.assertTrue(any("very similar to 2 other subqueries" in warning.message for warning in metadata.warnings))
         self.assertTrue(all(warning.fix is None for warning in metadata.warnings))
 
     def test_metadata_does_not_warn_for_distinct_subquery_sources(self):
