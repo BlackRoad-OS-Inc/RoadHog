@@ -17008,13 +17008,15 @@ export namespace Schemas {
       readonly check_interval_minutes: number;
       readonly state: LogsAlertConfigurationStateEnum;
       /**
-       * Total number of check periods in the sliding evaluation window (M in N-of-M).
+       * Total number of check periods in the sliding evaluation window for firing (M in N-of-M).
        * @minimum 1
+       * @maximum 10
        */
       evaluation_periods?: number;
       /**
-       * How many periods within the evaluation window must breach the threshold to trigger (N in N-of-M).
+       * How many periods within the evaluation window must breach the threshold to fire (N in N-of-M).
        * @minimum 1
+       * @maximum 10
        */
       datapoints_to_alarm?: number;
       /**
@@ -21610,13 +21612,15 @@ export namespace Schemas {
       readonly check_interval_minutes?: number;
       readonly state?: LogsAlertConfigurationStateEnum;
       /**
-       * Total number of check periods in the sliding evaluation window (M in N-of-M).
+       * Total number of check periods in the sliding evaluation window for firing (M in N-of-M).
        * @minimum 1
+       * @maximum 10
        */
       evaluation_periods?: number;
       /**
-       * How many periods within the evaluation window must breach the threshold to trigger (N in N-of-M).
+       * How many periods within the evaluation window must breach the threshold to fire (N in N-of-M).
        * @minimum 1
+       * @maximum 10
        */
       datapoints_to_alarm?: number;
       /**
