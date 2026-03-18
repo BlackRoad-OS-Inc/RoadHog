@@ -2284,7 +2284,7 @@
           "row_count": null,
           "type": "posthog"
       },
-      "metrics": {
+      "posthog.metrics": {
           "fields": {
               "uuid": {
                   "chain": null,
@@ -2487,8 +2487,8 @@
                   "type": "json"
               }
           },
-          "id": "metrics",
-          "name": "metrics",
+          "id": "posthog.metrics",
+          "name": "posthog.metrics",
           "row_count": null,
           "type": "posthog"
       },
@@ -6548,7 +6548,7 @@
           "row_count": null,
           "type": "posthog"
       },
-      "metrics": {
+      "posthog.metrics": {
           "fields": {
               "uuid": {
                   "chain": null,
@@ -6751,8 +6751,8 @@
                   "type": "json"
               }
           },
-          "id": "metrics",
-          "name": "metrics",
+          "id": "posthog.metrics",
+          "name": "posthog.metrics",
           "row_count": null,
           "type": "posthog"
       },
