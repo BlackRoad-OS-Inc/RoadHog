@@ -191,9 +191,6 @@ class UserTeamPermissions:
         if organization is None or organization_membership is None:
             return None
 
-        if not organization.is_feature_available(AvailableFeature.ADVANCED_PERMISSIONS):
-            return organization_membership.level
-
         # Use prefetched data to check team privacy and access
         access_controls = self.p._prefetched_access_controls.get(self.team.id, [])
 

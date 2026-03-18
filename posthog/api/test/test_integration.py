@@ -821,3 +821,113 @@ class TestGitHubIntegrationStateValidation:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Invalid or expired state token" in response.json()["detail"]
         mock_from_install.assert_not_called()
+
+
+class TestIntegrationPermissions:
+    @pytest.fixture(autouse=True)
+    def setup_integration(self, db):
+        from ee.models.rbac.access_control import AccessControl
+
+        self.AccessControl = AccessControl
+        self.organization = Organization.objects.create(name="Test Org")
+        self.team = Team.objects.create(organization=self.organization, name="Test Team")
+        # Org-level MEMBER, not ADMIN
+        self.user = User.objects.create_and_join(
+            self.organization,
+            "member@posthog.com",
+            "test",
+            level=OrganizationMembership.Level.MEMBER,
+        )
+        self.org_membership = OrganizationMembership.objects.get(user=self.user, organization=self.organization)
+
+    def _email_integration_payload(self):
+        return {
+            "kind": "email",
+            "config": {
+                "email": "test@example.com",
+                "name": "Test",
+                "provider": "ses",
+                "mail_from_subdomain": "mail",
+            },
+        }
+
+    def _grant_project_admin(self):
+        self.AccessControl.objects.create(
+            team=self.team,
+            resource="project",
+            resource_id=str(self.team.id),
+            organization_member=self.org_membership,
+            access_level="admin",
+        )
+
+    def test_org_member_cannot_create_integration(self, client: HttpClient):
+        client.force_login(self.user)
+
+        response = client.post(
+            f"/api/environments/{self.team.pk}/integrations",
+            self._email_integration_payload(),
+            content_type="application/json",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_org_member_cannot_delete_integration(self, client: HttpClient):
+        # Create an integration as org admin first
+        self.org_membership.level = OrganizationMembership.Level.ADMIN
+        self.org_membership.save()
+        integration = Integration.objects.create(
+            team=self.team,
+            kind="slack",
+            config={},
+        )
+        # Demote back to member
+        self.org_membership.level = OrganizationMembership.Level.MEMBER
+        self.org_membership.save()
+
+        client.force_login(self.user)
+
+        response = client.delete(f"/api/environments/{self.team.pk}/integrations/{integration.pk}")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @patch("posthog.models.integration.SESProvider")
+    def test_project_admin_can_create_integration(self, mock_ses_provider_class, client: HttpClient):
+        mock_ses_provider_class.return_value = MagicMock()
+        self._grant_project_admin()
+        client.force_login(self.user)
+
+        response = client.post(
+            f"/api/environments/{self.team.pk}/integrations",
+            self._email_integration_payload(),
+            content_type="application/json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_project_admin_can_delete_integration(self, client: HttpClient):
+        self._grant_project_admin()
+        integration = Integration.objects.create(
+            team=self.team,
+            kind="slack",
+            config={},
+        )
+        client.force_login(self.user)
+
+        response = client.delete(f"/api/environments/{self.team.pk}/integrations/{integration.pk}")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    @patch("posthog.models.integration.SESProvider")
+    def test_org_admin_can_create_integration(self, mock_ses_provider_class, client: HttpClient):
+        mock_ses_provider_class.return_value = MagicMock()
+        self.org_membership.level = OrganizationMembership.Level.ADMIN
+        self.org_membership.save()
+        client.force_login(self.user)
+
+        response = client.post(
+            f"/api/environments/{self.team.pk}/integrations",
+            self._email_integration_payload(),
+            content_type="application/json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
