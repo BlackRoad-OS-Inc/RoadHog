@@ -1292,6 +1292,61 @@ export interface RevenueCurrencyPropertyConfigApi {
     static?: CurrencyCodeApi | null
 }
 
+export type TaxonomicFilterGroupTypeApi = (typeof TaxonomicFilterGroupTypeApi)[keyof typeof TaxonomicFilterGroupTypeApi]
+
+export const TaxonomicFilterGroupTypeApi = {
+    Metadata: 'metadata',
+    Actions: 'actions',
+    Cohorts: 'cohorts',
+    CohortsWithAll: 'cohorts_with_all',
+    DataWarehouse: 'data_warehouse',
+    DataWarehouseProperties: 'data_warehouse_properties',
+    DataWarehousePersonProperties: 'data_warehouse_person_properties',
+    Elements: 'elements',
+    Events: 'events',
+    InternalEvents: 'internal_events',
+    InternalEventProperties: 'internal_event_properties',
+    EventProperties: 'event_properties',
+    EventFeatureFlags: 'event_feature_flags',
+    EventMetadata: 'event_metadata',
+    NumericalEventProperties: 'numerical_event_properties',
+    PersonProperties: 'person_properties',
+    PageviewUrls: 'pageview_urls',
+    PageviewEvents: 'pageview_events',
+    Screens: 'screens',
+    ScreenEvents: 'screen_events',
+    EmailAddresses: 'email_addresses',
+    AutocaptureEvents: 'autocapture_events',
+    CustomEvents: 'custom_events',
+    Wildcard: 'wildcard',
+    Groups: 'groups',
+    Persons: 'persons',
+    FeatureFlags: 'feature_flags',
+    Insights: 'insights',
+    Experiments: 'experiments',
+    Plugins: 'plugins',
+    Dashboards: 'dashboards',
+    NameGroups: 'name_groups',
+    SessionProperties: 'session_properties',
+    HogqlExpression: 'hogql_expression',
+    Notebooks: 'notebooks',
+    LogEntries: 'log_entries',
+    ErrorTrackingIssues: 'error_tracking_issues',
+    Logs: 'logs',
+    LogAttributes: 'log_attributes',
+    LogResourceAttributes: 'log_resource_attributes',
+    Replay: 'replay',
+    ReplaySavedFilters: 'replay_saved_filters',
+    RevenueAnalyticsProperties: 'revenue_analytics_properties',
+    Resources: 'resources',
+    ErrorTrackingProperties: 'error_tracking_properties',
+    ActivityLogProperties: 'activity_log_properties',
+    MaxAiContext: 'max_ai_context',
+    WorkflowVariables: 'workflow_variables',
+    SuggestedFilters: 'suggested_filters',
+    Empty: 'empty',
+} as const
+
 export type EventsNodeApiKind = (typeof EventsNodeApiKind)[keyof typeof EventsNodeApiKind]
 
 export const EventsNodeApiKind = {
@@ -1347,6 +1402,13 @@ export interface EventsNodeApi {
               | RevenueAnalyticsPropertyFilterApi
           )[]
         | null
+    /**
+     * Funnels only: overrides the insight level aggregation target for this step.
+     * @nullable
+     */
+    funnelAggregationTarget?: string | null
+    /** Funnels only: type of the custom aggregation target for this step. */
+    funnelAggregationTargetType?: TaxonomicFilterGroupTypeApi | null
     kind?: EventsNodeApiKind
     /** @nullable */
     limit?: number | null
@@ -1363,7 +1425,10 @@ export interface EventsNodeApi {
     math_property_type?: string | null
     /** @nullable */
     name?: string | null
-    /** @nullable */
+    /**
+     * Funnels only: whether this is an optional step.
+     * @nullable
+     */
     optionalInFunnel?: boolean | null
     /**
      * Columns to order by
@@ -1455,6 +1520,13 @@ export interface ActionsNodeApi {
               | RevenueAnalyticsPropertyFilterApi
           )[]
         | null
+    /**
+     * Funnels only: overrides the insight level aggregation target for this step.
+     * @nullable
+     */
+    funnelAggregationTarget?: string | null
+    /** Funnels only: type of the custom aggregation target for this step. */
+    funnelAggregationTargetType?: TaxonomicFilterGroupTypeApi | null
     id: number
     kind?: ActionsNodeApiKind
     math?: (typeof ActionsNodeApiMath)[keyof typeof ActionsNodeApiMath] | null
@@ -1470,7 +1542,10 @@ export interface ActionsNodeApi {
     math_property_type?: string | null
     /** @nullable */
     name?: string | null
-    /** @nullable */
+    /**
+     * Funnels only: whether this is an optional step.
+     * @nullable
+     */
     optionalInFunnel?: boolean | null
     /**
      * Properties configurable in the interface
@@ -1576,7 +1651,10 @@ export interface DataWarehouseNodeApi {
     math_property_type?: string | null
     /** @nullable */
     name?: string | null
-    /** @nullable */
+    /**
+     * Funnels only: whether this is an optional step.
+     * @nullable
+     */
     optionalInFunnel?: boolean | null
     /**
      * Properties configurable in the interface
@@ -1679,7 +1757,10 @@ export interface GroupNodeApi {
     nodes: (EventsNodeApi | ActionsNodeApi | DataWarehouseNodeApi)[]
     /** Group of entities combined with AND/OR operator */
     operator: FilterLogicalOperatorApi
-    /** @nullable */
+    /**
+     * Funnels only: whether this is an optional step.
+     * @nullable
+     */
     optionalInFunnel?: boolean | null
     /**
      * Columns to order by
@@ -2061,6 +2142,13 @@ export interface FunnelExclusionEventsNodeApi {
               | RevenueAnalyticsPropertyFilterApi
           )[]
         | null
+    /**
+     * Funnels only: overrides the insight level aggregation target for this step.
+     * @nullable
+     */
+    funnelAggregationTarget?: string | null
+    /** Funnels only: type of the custom aggregation target for this step. */
+    funnelAggregationTargetType?: TaxonomicFilterGroupTypeApi | null
     funnelFromStep: number
     funnelToStep: number
     kind?: FunnelExclusionEventsNodeApiKind
@@ -2079,7 +2167,10 @@ export interface FunnelExclusionEventsNodeApi {
     math_property_type?: string | null
     /** @nullable */
     name?: string | null
-    /** @nullable */
+    /**
+     * Funnels only: whether this is an optional step.
+     * @nullable
+     */
     optionalInFunnel?: boolean | null
     /**
      * Columns to order by
@@ -2172,6 +2263,13 @@ export interface FunnelExclusionActionsNodeApi {
               | RevenueAnalyticsPropertyFilterApi
           )[]
         | null
+    /**
+     * Funnels only: overrides the insight level aggregation target for this step.
+     * @nullable
+     */
+    funnelAggregationTarget?: string | null
+    /** Funnels only: type of the custom aggregation target for this step. */
+    funnelAggregationTargetType?: TaxonomicFilterGroupTypeApi | null
     funnelFromStep: number
     funnelToStep: number
     id: number
@@ -2189,7 +2287,10 @@ export interface FunnelExclusionActionsNodeApi {
     math_property_type?: string | null
     /** @nullable */
     name?: string | null
-    /** @nullable */
+    /**
+     * Funnels only: whether this is an optional step.
+     * @nullable
+     */
     optionalInFunnel?: boolean | null
     /**
      * Properties configurable in the interface
@@ -3149,7 +3250,10 @@ export interface LifecycleDataWarehouseNodeApi {
     math_property_type?: string | null
     /** @nullable */
     name?: string | null
-    /** @nullable */
+    /**
+     * Funnels only: whether this is an optional step.
+     * @nullable
+     */
     optionalInFunnel?: boolean | null
     /**
      * Properties configurable in the interface
