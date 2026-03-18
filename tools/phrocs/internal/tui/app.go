@@ -138,10 +138,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.viewportAtBottom && !m.copyMode && !m.searchMode {
 				m.viewport.GotoBottom()
 			}
-			// Incrementally update search matches to avoid rescanning the full
-			// scrollback on every new line — O(M) per line instead of O(N).
+			// Recompute search matches since the vterm output may have changed
 			if m.searchQuery != "" {
-				m.updateSearchForNewLine(msg)
+				m.recomputeSearch()
 			}
 		}
 

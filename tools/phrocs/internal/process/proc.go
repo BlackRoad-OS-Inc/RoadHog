@@ -1,17 +1,19 @@
 package process
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/vt"
 	"github.com/creack/pty"
 	gops "github.com/shirou/gopsutil/v4/process"
 
@@ -53,12 +55,10 @@ type StatusMsg struct {
 	Status Status
 }
 
-// New output line from process
+// New output from process
 type OutputMsg struct {
-	Name      string
-	Line      string
-	LineIndex int  // index of this line in the buffer after the append
-	Evicted   bool // true when the oldest buffered line was dropped to make room
+	Name string
+	Line string
 }
 
 // Metrics holds the most recent sampled resource usage for a process tree.
@@ -96,7 +96,10 @@ type Snapshot struct {
 	LastSampledAt     *time.Time `json:"last_sampled_at"`
 }
 
-// Represents a single managed subprocess
+// Represents a single managed subprocess. Output is processed through a
+// virtual terminal emulator (charmbracelet/x/vt) so ANSI escape sequences
+// like cursor movement, line erasure, and progress bar animations render
+// correctly instead of corrupting the line buffer.
 type Process struct {
 	Name string
 	Cfg  config.ProcConfig
@@ -104,7 +107,9 @@ type Process struct {
 	mu            sync.Mutex
 	maxLines      int
 	status        Status
-	lines         []string
+	vterm         *vt.Emulator
+	vtermW        int // last known width
+	vtermH        int // last known height
 	cmd           *exec.Cmd
 	ptmx          *os.File // pty master; nil when using pipes
 	readyPattern  *regexp.Regexp
@@ -118,14 +123,19 @@ type Process struct {
 }
 
 func NewProcess(name string, cfg config.ProcConfig, scrollback int) *Process {
+	em := vt.NewEmulator(80, 24)
+	em.SetScrollbackSize(scrollback)
+
 	p := &Process{
 		Name:     name,
 		Cfg:      cfg,
 		maxLines: scrollback,
 		status:   StatusStopped,
-		ready:    cfg.ReadyPattern == "", // ready if no pattern, otherwise wait for pattern
+		vterm:    em,
+		vtermW:   80,
+		vtermH:   24,
+		ready:    cfg.ReadyPattern == "",
 	}
-	// Compile ready pattern if one exists
 	if cfg.ReadyPattern != "" {
 		if re, err := regexp.Compile(cfg.ReadyPattern); err == nil {
 			p.readyPattern = re
@@ -140,25 +150,57 @@ func (p *Process) Status() Status {
 	return p.status
 }
 
-// Returns a copy of the output lines
+// Returns output lines extracted from the virtual terminal emulator.
+// Scrollback lines (historical content) are plain text; current screen
+// lines preserve ANSI styling for colors and formatting.
 func (p *Process) Lines() []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	cp := make([]string, len(p.lines))
-	copy(cp, p.lines)
-	return cp
+	if p.vterm == nil {
+		return nil
+	}
+
+	lines := make([]string, 0)
+
+	// Scrollback: historical content that scrolled off the top of the screen
+	sb := p.vterm.Scrollback()
+	if sb != nil {
+		for i := range sb.Len() {
+			sbLine := sb.Line(i)
+			var buf strings.Builder
+			for _, cell := range sbLine {
+				if cell.Content != "" {
+					buf.WriteString(cell.Content)
+				}
+			}
+			lines = append(lines, buf.String())
+		}
+	}
+
+	// Current screen content with ANSI styling preserved
+	render := p.vterm.Render()
+	screenLines := strings.Split(render, "\n")
+	for len(screenLines) > 0 {
+		last := screenLines[len(screenLines)-1]
+		if strings.TrimSpace(ansi.Strip(last)) == "" {
+			screenLines = screenLines[:len(screenLines)-1]
+		} else {
+			break
+		}
+	}
+	lines = append(lines, screenLines...)
+
+	return lines
 }
 
-// Directly appends a line to the output buffer, honoring the
-// scrollback limit. Mirrors the append step in readLoop; intended for tests
-// that inject output without running a real subprocess.
+// AppendLine writes a line to the virtual terminal emulator. Intended for
+// tests that inject output without running a real subprocess.
 func (p *Process) AppendLine(line string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if len(p.lines) >= p.maxLines {
-		p.lines = p.lines[1:]
+	if p.vterm != nil {
+		p.vterm.WriteString(line + "\n")
 	}
-	p.lines = append(p.lines, line)
 }
 
 // Returns a consistent point-in-time view of the process
@@ -211,13 +253,17 @@ func (p *Process) Start(send func(tea.Msg)) error {
 		return nil
 	}
 	p.status = StatusPending
-	p.lines = nil
+	// Reset vterm for fresh output
+	if p.vterm != nil {
+		_ = p.vterm.Close()
+	}
+	p.vterm = vt.NewEmulator(p.vtermW, p.vtermH)
+	p.vterm.SetScrollbackSize(p.maxLines)
 	p.metrics = nil
 	p.exitCode = nil
 	p.startedAt = time.Now()
 	p.readyAt = time.Time{}
 	p.stopRequested = false
-	// Reset ready flag when restarting
 	p.ready = p.readyPattern == nil
 	p.mu.Unlock()
 
@@ -401,38 +447,38 @@ func (p *Process) startWithPipe(cmd *exec.Cmd, send func(tea.Msg)) error {
 	return nil
 }
 
-// Scans line by line, appending to the output buffer and sending OutputMsgs
+// Reads raw bytes from the process output and feeds them into the virtual
+// terminal emulator, which correctly handles ANSI escape sequences like
+// cursor movement, line erasure, and progress bar animations.
 func (p *Process) readLoop(r io.Reader, send func(tea.Msg)) {
-	// Larger buffer to handle long lines (like minified JS error traces)
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 256*1024), 256*1024)
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			chunk := buf[:n]
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		p.mu.Lock()
-		evicted := len(p.lines) >= p.maxLines
-		if evicted {
-			// Discard oldest line to keep the buffer bounded.
-			p.lines = p.lines[1:]
+			p.mu.Lock()
+			if p.vterm != nil {
+				_, _ = p.vterm.Write(chunk)
+			}
+
+			shouldNotify := false
+			if !p.ready && p.readyPattern != nil && p.readyPattern.Match(chunk) {
+				p.ready = true
+				p.readyAt = time.Now()
+				p.status = StatusRunning
+				shouldNotify = true
+			}
+			p.mu.Unlock()
+
+			send(OutputMsg{Name: p.Name})
+
+			if shouldNotify {
+				send(StatusMsg{Name: p.Name, Status: StatusRunning})
+			}
 		}
-		p.lines = append(p.lines, line)
-		lineIndex := len(p.lines) - 1
-
-		// Check if this line matches the ready pattern
-		shouldNotifyCh := false
-		if !p.ready && p.readyPattern != nil && p.readyPattern.MatchString(line) {
-			p.ready = true
-			p.readyAt = time.Now()
-			p.status = StatusRunning
-			shouldNotifyCh = true
-		}
-		p.mu.Unlock()
-
-		send(OutputMsg{Name: p.Name, Line: line, LineIndex: lineIndex, Evicted: evicted})
-
-		// Send status update if we just became ready
-		if shouldNotifyCh {
-			send(StatusMsg{Name: p.Name, Status: StatusRunning})
+		if err != nil {
+			break
 		}
 	}
 }
@@ -582,10 +628,16 @@ func (p *Process) PID() int {
 	return 0
 }
 
-// Updates the pty window size to keep output correctly reflowed
+// Updates the pty window size and vterm dimensions to keep output correctly
+// reflowed and ensure the virtual terminal matches the display area.
 func (p *Process) Resize(cols, rows uint16) {
 	p.mu.Lock()
 	ptmx := p.ptmx
+	p.vtermW = int(cols)
+	p.vtermH = int(rows)
+	if p.vterm != nil {
+		p.vterm.Resize(int(cols), int(rows))
+	}
 	p.mu.Unlock()
 	if ptmx != nil {
 		_ = pty.Setsize(ptmx, &pty.Winsize{Rows: rows, Cols: cols})
