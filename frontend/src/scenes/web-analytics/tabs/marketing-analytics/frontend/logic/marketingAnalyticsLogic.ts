@@ -543,10 +543,29 @@ export const marketingAnalyticsLogic = kea<marketingAnalyticsLogicType>([
             (dataWarehouseSourcesLoading: boolean) => dataWarehouseSourcesLoading,
         ],
         allAvailableSources: [
-            (s) => [s.validExternalTables, s.validNativeSources],
-            (validExternalTables: ExternalTable[], validNativeSources: NativeSource[]) => {
+            (s) => [s.validExternalTables, s.validNativeSources, s.nativeSources],
+            (
+                validExternalTables: ExternalTable[],
+                validNativeSources: NativeSource[],
+                nativeSources: ExternalDataSource[]
+            ) => {
                 const sources: Array<{ id: string; name: string; type: string; source_type: string; prefix?: string }> =
                     []
+
+                // Include all native sources (not just valid ones) so the banner can show
+                // warnings for sources with disabled/missing tables
+                const validNativeIds = new Set(validNativeSources.map((ns) => ns.source.id))
+                nativeSources.forEach((source) => {
+                    if (!validNativeIds.has(source.id)) {
+                        sources.push({
+                            id: source.id,
+                            name: source.source_type,
+                            type: 'native',
+                            source_type: source.source_type,
+                            prefix: source.prefix ?? undefined,
+                        })
+                    }
+                })
 
                 validNativeSources.forEach((nativeSource) => {
                     sources.push({
