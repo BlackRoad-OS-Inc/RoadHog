@@ -8,10 +8,21 @@ on:
             - '.github/workflows/rust-docker-build.yml'
         branches:
             - 'master'
+    pull_request:
+        paths:
+            - 'rust/**'
+            - '.github/workflows/rust-docker-build.yml'
+        branches:
+            - 'master'
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     build:
         name: build ${{ matrix.image }}
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         strategy:
             matrix:
                 include:
