@@ -24,6 +24,8 @@ import { Button } from '@/components/ui/button'
     - [x] storybook
   - [x] primitives/button
     - [x] storybook
+  - [x] primitives/card-group
+    - [x] storybook
   - [x] primitives/card
     - [x] storybook
   - [ ] primitives/chip
