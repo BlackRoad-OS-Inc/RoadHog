@@ -11,8 +11,9 @@ test.describe('insight variables', () => {
 
         // Add a temporary override
         await page.goto(page.url() + '?query_variables=%7B"variable_4"%3A40%7D%20')
-        // Wait for all insight cards to be present in the DOM before searching by title
-        await expect(page.locator('.InsightCard')).toHaveCount(5, { timeout: 30000 })
+        // Wait for all 5 card titles to be visible — this is the true readiness signal.
+        // toHaveCount('.InsightCard') only waits for wrapper elements, not their content.
+        await expect(page.locator('[data-attr="insight-card-title"]')).toHaveCount(5, { timeout: 30000 })
 
         const cardForDefaultVariable = await dashboard.findCardByTitle('Variable default')
         await expect(cardForDefaultVariable.locator('.BoldNumber')).toHaveText('10')
