@@ -1196,7 +1196,9 @@ jobs:
                   PERSON_ON_EVENTS_V2_ENABLED: ${{ matrix.person-on-events && 'true' || 'false' }}
               shell: bash
               run: | # async_migrations covered in ci-async-migrations.yml
-                  set +e
+                  # Kill pytest immediately on cancellation to avoid Django DB teardown
+                  # holding the runner alive for minutes after GitHub requests cancellation.
+                  trap 'kill -KILL -$pytest_pgid 2>/dev/null; exit 130' TERM INT
                   pytest -v --tb=short ${{
                       matrix.compat
                       && env.CLICKHOUSE_COMPAT_PYTEST_TARGETS
@@ -1217,9 +1219,12 @@ jobs:
                       --reruns 2 --reruns-delay 1 \
                       -r fEsxX \
                       --junitxml=junit-core.xml \
-                      $PYTEST_ARGS
+                      $PYTEST_ARGS &
+                  pytest_pid=$!
+                  pytest_pgid=$(ps -o pgid= -p $pytest_pid | tr -d ' ')
+                  wait $pytest_pid
                   exit_code=$?
-                  set -e
+                  trap - TERM INT
                   if [ $exit_code -eq 5 ]; then
                       echo "No tests collected for this shard, this is expected when splitting tests"
                       exit 0
@@ -1263,7 +1268,9 @@ jobs:
                   MODAL_TOKEN_ID: ${{ needs.changes.outputs.tasks_temporal == 'true' && secrets.MODAL_TOKEN_ID || '' }}
                   MODAL_TOKEN_SECRET: ${{ needs.changes.outputs.tasks_temporal == 'true' && secrets.MODAL_TOKEN_SECRET || '' }}
               run: |
-                  set +e
+                  # Kill pytest immediately on cancellation to avoid Django DB teardown
+                  # holding the runner alive for minutes after GitHub requests cancellation.
+                  trap 'kill -KILL -$pytest_pgid 2>/dev/null; exit 130' TERM INT
                   pytest -v --tb=short --timeout=600 --timeout-method=thread posthog/temporal products/batch_exports/backend/tests/temporal products/tasks/backend/temporal -m "not async_migrations" \
                       --splits ${{ matrix.concurrency }} --group ${{ matrix.group }} \
                       --durations=100 --durations-min=1.0 --store-durations \
@@ -1271,9 +1278,12 @@ jobs:
                       --reruns 2 --reruns-delay 1 \
                       -r fEsxX \
                       --junitxml=junit-temporal.xml \
-                      $PYTEST_ARGS
+                      $PYTEST_ARGS &
+                  pytest_pid=$!
+                  pytest_pgid=$(ps -o pgid= -p $pytest_pid | tr -d ' ')
+                  wait $pytest_pid
                   exit_code=$?
-                  set -e
+                  trap - TERM INT
                   if [ $exit_code -eq 5 ]; then
                       echo "No tests collected for this shard, this is expected when splitting tests"
                       exit 0
