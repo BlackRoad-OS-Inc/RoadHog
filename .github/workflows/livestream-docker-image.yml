@@ -38,6 +38,8 @@ jobs:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   dockerhub-username: ${{ secrets.DOCKERHUB_USER }}
                   dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
+                  # Legacy path — remove once Helm charts are updated to ghcr.io/posthog/<image>
+                  legacy-images: ghcr.io/posthog/posthog/livestream
 
             - name: Set up Depot CLI
               uses: depot/setup-action@b0b1ea4f69e92ebf5dea3f8713a1b0c37b2126a5 # v1.6.0

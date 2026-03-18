@@ -60,14 +60,29 @@ runs:
               username: ${{ inputs.dockerhub-username }}
               password: ${{ inputs.dockerhub-password }}
 
+        # Build the images list: standard paths + any legacy paths for backwards compatibility
+        - name: Build images list
+          id: images
+          shell: bash
+          run: |
+              {
+                echo "list<<EOF"
+                echo "ghcr.io/posthog/${{ inputs.image-name }}"
+                echo "posthog/${{ inputs.image-name }}"
+                echo "${{ steps.aws-ecr.outputs.registry }}/${{ inputs.image-name }}"
+                if [ -n "$LEGACY_IMAGES" ]; then
+                  echo "$LEGACY_IMAGES"
+                fi
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+          env:
+              LEGACY_IMAGES: ${{ inputs.legacy-images }}
+
         - name: Docker meta
           id: meta
           uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
           with:
-              images: |
-                  ghcr.io/posthog/${{ inputs.image-name }}
-                  posthog/${{ inputs.image-name }}
-                  ${{ steps.aws-ecr.outputs.registry }}/${{ inputs.image-name }}
+              images: ${{ steps.images.outputs.list }}
               tags: |
                   type=ref,event=pr
                   type=ref,event=branch
