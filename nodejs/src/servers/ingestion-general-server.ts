@@ -227,8 +227,7 @@ export class IngestionGeneralServer extends BaseServer {
         const serviceLoaders: (() => Promise<PluginServerService>)[] = []
 
         const isTestingMode = this.config.PLUGIN_SERVER_MODE === PluginServerMode.ingestion_v2_testing
-        const isCombinedMode =
-            !this.config.PLUGIN_SERVER_MODE || this.config.PLUGIN_SERVER_MODE === PluginServerMode.local_cdp
+        const isCombinedMode = this.config.PLUGIN_SERVER_MODE === PluginServerMode.ingestion_v2_combined
 
         if (isTestingMode) {
             serviceLoaders.push(async () => {

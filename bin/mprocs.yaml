@@ -54,6 +54,11 @@ procs:
         # Valid groups: cdp_workflows, realtime_cohorts, session_replay, logs, feature_flags
         # Example: NODEJS_CAPABILITY_GROUPS=cdp_workflows,session_replay
 
+    ingestion:
+        shell: 'bin/wait-for-docker && bin/check_ducklake_up && PLUGIN_SERVER_MODE=ingestion-v2-combined ./bin/posthog-node'
+        capability: event_ingestion
+        ready_pattern: 'All systems go'
+
     frontend:
         shell: './bin/start-frontend'
         autorestart: true

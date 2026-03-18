@@ -1,16 +1,16 @@
 import supertest from 'supertest'
 
-import { PluginServer } from '../server'
-import { PluginServerMode } from '../types'
+import { PluginServerMode } from '../common/config'
+import { IngestionGeneralServer } from '../servers/ingestion-general-server'
 
 describe('router', () => {
     jest.retryTimes(3) // Flakey due to reliance on kafka/clickhouse
-    let server: PluginServer
+    let server: IngestionGeneralServer
 
     beforeAll(async () => {
         jest.spyOn(process, 'exit').mockImplementation()
 
-        server = new PluginServer({
+        server = new IngestionGeneralServer({
             PLUGIN_SERVER_MODE: PluginServerMode.ingestion_v2,
         })
         await server.start()
