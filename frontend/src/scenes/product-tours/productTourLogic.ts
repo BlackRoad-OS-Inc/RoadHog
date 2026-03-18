@@ -592,7 +592,21 @@ export const productTourLogic = kea<productTourLogicType>([
                     values.isEditingProductTour &&
                     isEqual(incomingPayload, cache.lastSentDraftPayload ?? cache.lastDraftPayload)
 
-                if (!isOwnEcho && !hasUnsavedLocalChanges) {
+                // While editing, draft polling must not overwrite the form with a stale GET response
+                // (e.g. right after autosave), or in-progress UI like event property filters disappears.
+                let shouldApplyForm = false
+                if (!hasUnsavedLocalChanges) {
+                    if (!values.isEditingProductTour) {
+                        shouldApplyForm = !isOwnEcho
+                    } else if (!cache.formHydratedWhileEditing) {
+                        shouldApplyForm = true
+                        cache.formHydratedWhileEditing = true
+                    } else {
+                        shouldApplyForm = isOwnEcho
+                    }
+                }
+
+                if (shouldApplyForm) {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     ;(actions.setProductTourFormValues as any)(formValues)
                     cache.lastDraftPayload = incomingPayload
@@ -608,6 +622,9 @@ export const productTourLogic = kea<productTourLogicType>([
             }
         },
         editingProductTour: ({ editing }) => {
+            if (!editing) {
+                cache.formHydratedWhileEditing = false
+            }
             if (editing && props.id !== 'new') {
                 cache.disposables.add(() => {
                     const canFetch = (): boolean =>

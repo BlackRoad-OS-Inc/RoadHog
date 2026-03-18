@@ -1,7 +1,8 @@
 import './PropertyFilters.scss'
 
 import { BindLogic, useActions, useValues } from 'kea'
-import React, { useEffect, useState } from 'react'
+import isEqual from 'lodash.isequal'
+import React, { useEffect, useRef, useState } from 'react'
 
 import { TaxonomicPropertyFilter } from 'lib/components/PropertyFilters/components/TaxonomicPropertyFilter'
 import {
@@ -98,10 +99,26 @@ export function PropertyFilters({
     const { filters, filtersWithNew, filterIds, filterIdsWithNew } = useValues(propertyFilterLogic(logicProps))
     const { remove, setFilters, setFilter } = useActions(propertyFilterLogic(logicProps))
     const [allowOpenOnInsert, setAllowOpenOnInsert] = useState<boolean>(false)
+    const lastSyncedFiltersProp = useRef<AnyPropertyFilter[] | null>(null)
+    const prevPageKeyRef = useRef(pageKey)
 
     useEffect(() => {
-        setFilters(propertyFilters ?? [])
-    }, [propertyFilters, setFilters])
+        const incoming = propertyFilters ?? []
+        const pageKeyChanged = prevPageKeyRef.current !== pageKey
+        if (pageKeyChanged) {
+            prevPageKeyRef.current = pageKey
+            lastSyncedFiltersProp.current = null
+        }
+        if (
+            !pageKeyChanged &&
+            lastSyncedFiltersProp.current !== null &&
+            isEqual(incoming, lastSyncedFiltersProp.current)
+        ) {
+            return
+        }
+        lastSyncedFiltersProp.current = incoming
+        setFilters(incoming)
+    }, [propertyFilters, setFilters, pageKey])
 
     const displayedFilters = allowNew && editable ? filtersWithNew : filters
     const displayedFilterIds = allowNew && editable ? filterIdsWithNew : filterIds
