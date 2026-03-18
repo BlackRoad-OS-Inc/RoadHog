@@ -743,6 +743,7 @@ export interface EntityNode extends Node {
     properties?: AnyPropertyFilter[]
     /** Fixed properties in the query, can't be edited in the interface (e.g. scoping down by person) */
     fixedProperties?: AnyPropertyFilter[]
+    /** Funnels only: whether this is an optional step. */
     optionalInFunnel?: boolean
 }
 
@@ -753,6 +754,10 @@ export interface EventsNode extends EntityNode {
     limit?: integer
     /** Columns to order by */
     orderBy?: string[]
+    /** Funnels only: overrides the insight level aggregation target for this step. */
+    funnelAggregationTarget?: string
+    /** Funnels only: type of the custom aggregation target for this step. */
+    funnelAggregationTargetType?: TaxonomicFilterGroupType
 }
 
 export interface DataWarehouseNode extends EntityNode {
@@ -777,6 +782,10 @@ export interface LifecycleDataWarehouseNode extends EntityNode {
 export interface ActionsNode extends EntityNode {
     kind: NodeKind.ActionsNode
     id: integer
+    /** Funnels only: overrides the insight level aggregation target for this step. */
+    funnelAggregationTarget?: string
+    /** Funnels only: type of the custom aggregation target for this step. */
+    funnelAggregationTargetType?: TaxonomicFilterGroupType
 }
 
 export type AnyEntityNode<WarehouseNode = DataWarehouseNode> = EventsNode | ActionsNode | WarehouseNode

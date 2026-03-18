@@ -1332,6 +1332,7 @@ export type EntityFilter = {
     custom_name?: string | null
     index?: number
     order?: number
+    /** Funnels only: whether this is an optional step. */
     optionalInFunnel?: boolean
 }
 
@@ -1346,6 +1347,10 @@ export interface ActionFilter extends EntityFilter {
     days?: string[] // TODO: why was this added here?
     operator?: FilterLogicalOperator | null
     nestedFilters?: EntityFilter[] | null
+    /** Funnels only: overrides the insight level aggregation target for this step. */
+    funnelAggregationTarget?: string | null
+    /** Funnels only: type of the custom aggregation target for this step. */
+    funnelAggregationTargetType?: TaxonomicFilterGroupType | null
 }
 
 export const isGroupFilter = (filter: EntityFilter): filter is ActionFilter => filter.type === EntityTypes.GROUPS

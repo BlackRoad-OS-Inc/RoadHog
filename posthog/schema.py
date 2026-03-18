@@ -7910,6 +7910,14 @@ class AssistantTrendsActionsNode(BaseModel):
         extra="forbid",
     )
     custom_name: str | None = None
+    funnelAggregationTarget: str | None = Field(
+        default=None,
+        description=("Funnels only: overrides the insight level aggregation target for this step."),
+    )
+    funnelAggregationTargetType: TaxonomicFilterGroupType | None = Field(
+        default=None,
+        description=("Funnels only: type of the custom aggregation target for this step."),
+    )
     id: int
     kind: Literal["ActionsNode"] = "ActionsNode"
     math: (
@@ -7928,7 +7936,7 @@ class AssistantTrendsActionsNode(BaseModel):
     math_property: str | None = None
     math_property_type: str | None = None
     name: str = Field(..., description="Action name from the plan.")
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             AssistantGenericPropertyFilter1
@@ -7953,6 +7961,14 @@ class AssistantTrendsEventsNode(BaseModel):
     )
     custom_name: str | None = None
     event: str | None = Field(default=None, description="The event or `null` for all events.")
+    funnelAggregationTarget: str | None = Field(
+        default=None,
+        description=("Funnels only: overrides the insight level aggregation target for this step."),
+    )
+    funnelAggregationTargetType: TaxonomicFilterGroupType | None = Field(
+        default=None,
+        description=("Funnels only: type of the custom aggregation target for this step."),
+    )
     kind: Literal["EventsNode"] = "EventsNode"
     math: (
         BaseMathType
@@ -7970,7 +7986,7 @@ class AssistantTrendsEventsNode(BaseModel):
     math_property: str | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             AssistantGenericPropertyFilter1
@@ -10057,6 +10073,14 @@ class ConversionGoalFilter1(BaseModel):
         default=None,
         description=("Fixed properties in the query, can't be edited in the interface (e.g. scoping down by person)"),
     )
+    funnelAggregationTarget: str | None = Field(
+        default=None,
+        description=("Funnels only: overrides the insight level aggregation target for this step."),
+    )
+    funnelAggregationTargetType: TaxonomicFilterGroupType | None = Field(
+        default=None,
+        description=("Funnels only: type of the custom aggregation target for this step."),
+    )
     kind: Literal["EventsNode"] = "EventsNode"
     limit: int | None = None
     math: (
@@ -10077,7 +10101,7 @@ class ConversionGoalFilter1(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     orderBy: list[str] | None = Field(default=None, description="Columns to order by")
     properties: (
         list[
@@ -10140,6 +10164,14 @@ class ConversionGoalFilter2(BaseModel):
         default=None,
         description=("Fixed properties in the query, can't be edited in the interface (e.g. scoping down by person)"),
     )
+    funnelAggregationTarget: str | None = Field(
+        default=None,
+        description=("Funnels only: overrides the insight level aggregation target for this step."),
+    )
+    funnelAggregationTargetType: TaxonomicFilterGroupType | None = Field(
+        default=None,
+        description=("Funnels only: type of the custom aggregation target for this step."),
+    )
     id: int
     kind: Literal["ActionsNode"] = "ActionsNode"
     math: (
@@ -10160,7 +10192,7 @@ class ConversionGoalFilter2(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             EventPropertyFilter
@@ -10245,7 +10277,7 @@ class ConversionGoalFilter3(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             EventPropertyFilter
@@ -10959,7 +10991,7 @@ class DataWarehouseNode(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             EventPropertyFilter
@@ -11223,7 +11255,7 @@ class EntityNode(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             EventPropertyFilter
@@ -11474,6 +11506,14 @@ class EventsNode(BaseModel):
         default=None,
         description=("Fixed properties in the query, can't be edited in the interface (e.g. scoping down by person)"),
     )
+    funnelAggregationTarget: str | None = Field(
+        default=None,
+        description=("Funnels only: overrides the insight level aggregation target for this step."),
+    )
+    funnelAggregationTargetType: TaxonomicFilterGroupType | None = Field(
+        default=None,
+        description=("Funnels only: type of the custom aggregation target for this step."),
+    )
     kind: Literal["EventsNode"] = "EventsNode"
     limit: int | None = None
     math: (
@@ -11494,7 +11534,7 @@ class EventsNode(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     orderBy: list[str] | None = Field(default=None, description="Columns to order by")
     properties: (
         list[
@@ -11629,7 +11669,7 @@ class ExperimentDataWarehouseNode(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             EventPropertyFilter
@@ -11785,6 +11825,14 @@ class FunnelExclusionActionsNode(BaseModel):
         default=None,
         description=("Fixed properties in the query, can't be edited in the interface (e.g. scoping down by person)"),
     )
+    funnelAggregationTarget: str | None = Field(
+        default=None,
+        description=("Funnels only: overrides the insight level aggregation target for this step."),
+    )
+    funnelAggregationTargetType: TaxonomicFilterGroupType | None = Field(
+        default=None,
+        description=("Funnels only: type of the custom aggregation target for this step."),
+    )
     funnelFromStep: int
     funnelToStep: int
     id: int
@@ -11807,7 +11855,7 @@ class FunnelExclusionActionsNode(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             EventPropertyFilter
@@ -11867,6 +11915,14 @@ class FunnelExclusionEventsNode(BaseModel):
         default=None,
         description=("Fixed properties in the query, can't be edited in the interface (e.g. scoping down by person)"),
     )
+    funnelAggregationTarget: str | None = Field(
+        default=None,
+        description=("Funnels only: overrides the insight level aggregation target for this step."),
+    )
+    funnelAggregationTargetType: TaxonomicFilterGroupType | None = Field(
+        default=None,
+        description=("Funnels only: type of the custom aggregation target for this step."),
+    )
     funnelFromStep: int
     funnelToStep: int
     kind: Literal["EventsNode"] = "EventsNode"
@@ -11889,7 +11945,7 @@ class FunnelExclusionEventsNode(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     orderBy: list[str] | None = Field(default=None, description="Columns to order by")
     properties: (
         list[
@@ -12143,7 +12199,7 @@ class LifecycleDataWarehouseNode(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             EventPropertyFilter
@@ -15438,6 +15494,14 @@ class ActionsNode(BaseModel):
         default=None,
         description=("Fixed properties in the query, can't be edited in the interface (e.g. scoping down by person)"),
     )
+    funnelAggregationTarget: str | None = Field(
+        default=None,
+        description=("Funnels only: overrides the insight level aggregation target for this step."),
+    )
+    funnelAggregationTargetType: TaxonomicFilterGroupType | None = Field(
+        default=None,
+        description=("Funnels only: type of the custom aggregation target for this step."),
+    )
     id: int
     kind: Literal["ActionsNode"] = "ActionsNode"
     math: (
@@ -15458,7 +15522,7 @@ class ActionsNode(BaseModel):
     math_property_revenue_currency: RevenueCurrencyPropertyConfig | None = None
     math_property_type: str | None = None
     name: str | None = None
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     properties: (
         list[
             EventPropertyFilter
@@ -17256,7 +17320,7 @@ class GroupNode(BaseModel):
         ..., description="Entities to combine in this group"
     )
     operator: FilterLogicalOperator = Field(..., description="Group of entities combined with AND/OR operator")
-    optionalInFunnel: bool | None = None
+    optionalInFunnel: bool | None = Field(default=None, description="Funnels only: whether this is an optional step.")
     orderBy: list[str] | None = Field(default=None, description="Columns to order by")
     properties: (
         list[

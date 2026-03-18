@@ -40,6 +40,14 @@
                     },
                     "type": "array"
                 },
+                "funnelAggregationTarget": {
+                    "description": "Funnels only: overrides the insight level aggregation target for this step.",
+                    "type": "string"
+                },
+                "funnelAggregationTargetType": {
+                    "$ref": "#/definitions/TaxonomicFilterGroupType",
+                    "description": "Funnels only: type of the custom aggregation target for this step."
+                },
                 "id": {
                     "$ref": "#/definitions/integer"
                 },
@@ -73,6 +81,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "properties": {
@@ -2107,6 +2116,14 @@
                 "custom_name": {
                     "type": "string"
                 },
+                "funnelAggregationTarget": {
+                    "description": "Funnels only: overrides the insight level aggregation target for this step.",
+                    "type": "string"
+                },
+                "funnelAggregationTargetType": {
+                    "$ref": "#/definitions/TaxonomicFilterGroupType",
+                    "description": "Funnels only: type of the custom aggregation target for this step."
+                },
                 "id": {
                     "$ref": "#/definitions/integer"
                 },
@@ -2135,6 +2152,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "properties": {
@@ -2245,6 +2263,14 @@
                     "description": "The event or `null` for all events.",
                     "type": ["string", "null"]
                 },
+                "funnelAggregationTarget": {
+                    "description": "Funnels only: overrides the insight level aggregation target for this step.",
+                    "type": "string"
+                },
+                "funnelAggregationTargetType": {
+                    "$ref": "#/definitions/TaxonomicFilterGroupType",
+                    "description": "Funnels only: type of the custom aggregation target for this step."
+                },
                 "kind": {
                     "const": "EventsNode",
                     "type": "string"
@@ -2269,6 +2295,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "properties": {
@@ -8507,6 +8534,14 @@
                             },
                             "type": "array"
                         },
+                        "funnelAggregationTarget": {
+                            "description": "Funnels only: overrides the insight level aggregation target for this step.",
+                            "type": "string"
+                        },
+                        "funnelAggregationTargetType": {
+                            "$ref": "#/definitions/TaxonomicFilterGroupType",
+                            "description": "Funnels only: type of the custom aggregation target for this step."
+                        },
                         "kind": {
                             "const": "EventsNode",
                             "type": "string"
@@ -8540,6 +8575,7 @@
                             "type": "string"
                         },
                         "optionalInFunnel": {
+                            "description": "Funnels only: whether this is an optional step.",
                             "type": "boolean"
                         },
                         "orderBy": {
@@ -8589,6 +8625,14 @@
                             },
                             "type": "array"
                         },
+                        "funnelAggregationTarget": {
+                            "description": "Funnels only: overrides the insight level aggregation target for this step.",
+                            "type": "string"
+                        },
+                        "funnelAggregationTargetType": {
+                            "$ref": "#/definitions/TaxonomicFilterGroupType",
+                            "description": "Funnels only: type of the custom aggregation target for this step."
+                        },
                         "id": {
                             "$ref": "#/definitions/integer"
                         },
@@ -8622,6 +8666,7 @@
                             "type": "string"
                         },
                         "optionalInFunnel": {
+                            "description": "Funnels only: whether this is an optional step.",
                             "type": "boolean"
                         },
                         "properties": {
@@ -8706,6 +8751,7 @@
                             "type": "string"
                         },
                         "optionalInFunnel": {
+                            "description": "Funnels only: whether this is an optional step.",
                             "type": "boolean"
                         },
                         "properties": {
@@ -11072,6 +11118,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "properties": {
@@ -12556,6 +12603,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "properties": {
@@ -13783,6 +13831,14 @@
                     },
                     "type": "array"
                 },
+                "funnelAggregationTarget": {
+                    "description": "Funnels only: overrides the insight level aggregation target for this step.",
+                    "type": "string"
+                },
+                "funnelAggregationTargetType": {
+                    "$ref": "#/definitions/TaxonomicFilterGroupType",
+                    "description": "Funnels only: type of the custom aggregation target for this step."
+                },
                 "kind": {
                     "const": "EventsNode",
                     "type": "string"
@@ -13816,6 +13872,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "orderBy": {
@@ -14140,6 +14197,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "properties": {
@@ -16361,6 +16419,14 @@
                     },
                     "type": "array"
                 },
+                "funnelAggregationTarget": {
+                    "description": "Funnels only: overrides the insight level aggregation target for this step.",
+                    "type": "string"
+                },
+                "funnelAggregationTargetType": {
+                    "$ref": "#/definitions/TaxonomicFilterGroupType",
+                    "description": "Funnels only: type of the custom aggregation target for this step."
+                },
                 "funnelFromStep": {
                     "$ref": "#/definitions/integer"
                 },
@@ -16400,6 +16466,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "properties": {
@@ -16436,6 +16503,14 @@
                         "$ref": "#/definitions/AnyPropertyFilter"
                     },
                     "type": "array"
+                },
+                "funnelAggregationTarget": {
+                    "description": "Funnels only: overrides the insight level aggregation target for this step.",
+                    "type": "string"
+                },
+                "funnelAggregationTargetType": {
+                    "$ref": "#/definitions/TaxonomicFilterGroupType",
+                    "description": "Funnels only: type of the custom aggregation target for this step."
                 },
                 "funnelFromStep": {
                     "$ref": "#/definitions/integer"
@@ -16476,6 +16551,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "orderBy": {
@@ -17164,6 +17240,7 @@
                     "description": "Group of entities combined with AND/OR operator"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "orderBy": {
@@ -19169,6 +19246,7 @@
                     "type": "string"
                 },
                 "optionalInFunnel": {
+                    "description": "Funnels only: whether this is an optional step.",
                     "type": "boolean"
                 },
                 "properties": {
