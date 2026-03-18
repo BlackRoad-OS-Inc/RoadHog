@@ -180,13 +180,6 @@ jobs:
 
             - name: Run integration tests
               run: |
-                  pytest posthog/api/test/rust_integration/test_feature_flag_rust_integration.py -v --tb=short
-              env:
-                  SKIP_RUST_INTEGRATION_TESTS: '0'
-                  FEATURE_FLAGS_SERVICE_URL: 'http://127.0.0.1:3001'
-
-            - name: Run standalone integration tests
-              run: |
                   pytest posthog/api/test/rust_integration/spike/test_flags.py -v --tb=short
               env:
                   SKIP_RUST_INTEGRATION_TESTS: '0'

@@ -276,45 +276,36 @@ def _django_db_setup(django_db_keepdb, django_db_blocker):
     # Run sqlx migrations to create posthog_person_new and related tables
     run_persons_sqlx_migrations(keepdb=django_db_keepdb)
 
-    # ClickHouse setup is optional — some test environments (e.g. Rust /flags
-    # integration tests) only need Postgres and Redis.
-    clickhouse_available = False
-    try:
-        database = Database(
-            settings.CLICKHOUSE_DATABASE,
-            db_url=settings.CLICKHOUSE_HTTP_URL,
-            username=settings.CLICKHOUSE_USER,
-            password=settings.CLICKHOUSE_PASSWORD,
-            cluster=settings.CLICKHOUSE_CLUSTER,
-            verify_ssl_cert=settings.CLICKHOUSE_VERIFY,
-            randomize_replica_paths=True,
-            # don't use the egress proxy, clickhouse is internal
-            trust_env=False,
-        )
+    database = Database(
+        settings.CLICKHOUSE_DATABASE,
+        db_url=settings.CLICKHOUSE_HTTP_URL,
+        username=settings.CLICKHOUSE_USER,
+        password=settings.CLICKHOUSE_PASSWORD,
+        cluster=settings.CLICKHOUSE_CLUSTER,
+        verify_ssl_cert=settings.CLICKHOUSE_VERIFY,
+        randomize_replica_paths=True,
+        # don't use the egress proxy, clickhouse is internal
+        trust_env=False,
+    )
 
-        if not django_db_keepdb:
-            try:
-                database.drop_database()
-            except:
-                pass
+    if not django_db_keepdb:
+        try:
+            database.drop_database()
+        except:
+            pass
 
-        database.create_database()  # Create database if it doesn't exist
-        create_clickhouse_tables()
-        clickhouse_available = True
-    except Exception:
-        import logging
+    database.create_database()  # Create database if it doesn't exist
 
-        logging.getLogger(__name__).warning("ClickHouse is not available — skipping ClickHouse setup")
+    create_clickhouse_tables()
 
     yield
 
-    if clickhouse_available:
-        if django_db_keepdb:
-            # Reset ClickHouse data, unless we're running AI evals, where we want to keep the DB between runs
-            if not settings.IN_EVAL_TESTING:
-                reset_clickhouse_tables()
-        else:
-            database.drop_database()
+    if django_db_keepdb:
+        # Reset ClickHouse data, unless we're running AI evals, where we want to keep the DB between runs
+        if not settings.IN_EVAL_TESTING:
+            reset_clickhouse_tables()
+    else:
+        database.drop_database()
 
 
 @pytest.fixture(scope="package")
