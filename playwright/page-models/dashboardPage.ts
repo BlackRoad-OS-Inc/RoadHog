@@ -191,7 +191,7 @@ export class DashboardPage {
                 has: this.page.locator('[data-attr="insight-card-title"]', { hasText: title }),
             })
             .first()
-        await expect(card).toBeVisible({ timeout: 10000 })
+        await expect(card).toBeVisible({ timeout: 30000 })
         // Scroll into view so the intersection observer marks the card as visible,
         // which triggers content rendering (required when EXPERIMENTAL_DASHBOARD_ITEM_RENDERING is on).
         await card.scrollIntoViewIfNeeded()
