@@ -365,7 +365,16 @@ pnpm turbo run backend:test --filter=@posthog/products-visual_review
 pnpm turbo run backend:contract-check
 ```
 
-# 10. Summary
+# 10. Migration Tooling
+
+Two tools support incremental migration of products to the isolated facade+contracts architecture:
+
+- **`hogli product:lint <name>`** — checks isolation compliance and shows progress for a single product. Reports which layers exist (contracts, facade, logic, presentation), flags impure imports and ORM-bound serializers, and prints actionable hints for each missing or broken layer. Use `--all` for a compact pass/fail summary across all products.
+- **`.agents/skills/isolating-product-facade-contracts/`** — an agent skill (for use in Claude Code) that provides a phased migration plan for converting a legacy product to the isolated architecture. The skill references Visual review as a canonical implementation and walks through contract creation, facade introduction, caller migration, and boundary enforcement across multiple narrow PRs.
+
+The product must already live under `products/<name>/` before either tool applies — moving code out of `posthog/` or `ee/` is a separate prerequisite step.
+
+# 11. Summary
 
 This document outlines the **future direction** of our codebase:
 
