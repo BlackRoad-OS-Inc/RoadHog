@@ -104,6 +104,7 @@ jobs:
                   sparse-checkout: |
                       rust/
                       proto/
+                      .github/actions/docker-meta/
                   sparse-checkout-cone-mode: false
 
             - name: Copy proto files into rust build context
@@ -119,25 +120,15 @@ jobs:
                   image: tonistiigi/binfmt:latest
                   platforms: all
 
-            - name: Login to ghcr.io
-              uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+            - name: Docker meta and registry login
+              id: docker-meta
+              uses: ./.github/actions/docker-meta
               with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
-                  logout: false
-
-            - name: Docker meta
-              id: meta
-              uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
-              with:
-                  images: ghcr.io/posthog/posthog/${{ matrix.image }}
-                  tags: |
-                      type=ref,event=pr
-                      type=ref,event=branch
-                      type=semver,pattern={{version}}
-                      type=semver,pattern={{major}}.{{minor}}
-                      type=sha
+                  image-name: ${{ matrix.image }}
+                  aws-role-to-assume: ${{ secrets.AWS_ECR_PUBLISH_IAM_ROLE }}
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  dockerhub-username: ${{ secrets.DOCKERHUB_USER }}
+                  dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
             - name: Set up Docker Buildx
               id: buildx
@@ -158,8 +149,8 @@ jobs:
                   context: ./rust/
                   file: ${{ matrix.dockerfile }}
                   push: true
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
+                  tags: ${{ steps.docker-meta.outputs.tags }}
+                  labels: ${{ steps.docker-meta.outputs.labels }}
                   platforms: linux/arm64,linux/amd64
                   build-args: |
                       SCCACHE_LOG=debug
