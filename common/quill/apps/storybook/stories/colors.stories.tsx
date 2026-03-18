@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { semanticColors } from '@posthog/ui-tokens'
+import { semanticColors } from '@posthog/quill-tokens'
 
 const meta = {
     title: 'Tokens/Colors',
@@ -64,8 +64,8 @@ export const AllColors: Story = {
         return (
             <div className="space-y-6">
                 <p className="text-sm text-muted-foreground">
-                    Semantic color tokens from <code className="text-xs">@posthog/ui-tokens</code>. Toggle the theme in
-                    the toolbar to see dark mode values.
+                    Semantic color tokens from <code className="text-xs">@posthog/quill-tokens</code>. Toggle the theme
+                    in the toolbar to see dark mode values.
                 </p>
                 <div>
                     <ColorSwatch

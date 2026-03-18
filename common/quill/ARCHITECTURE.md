@@ -9,11 +9,11 @@
 ```text
 ui/
 ├── packages/
-│   ├── tokens/          @posthog/ui-tokens       — Source-of-truth design tokens (JS) + CSS generation
-│   ├── primitives/      @posthog/ui-primitives    — Base UI components (React + Tailwind v4 + Base-UI)
-│   ├── components/      @posthog/ui-components    — Composed primitives with easy-to-use APIs (what apps import)
-│   ├── blocks/          @posthog/ui-blocks        — Product-level patterns (FeatureFlag, Experiment, etc.)
-│   └── mcp-renderer/    @posthog/ui-mcp-renderer  — MCP iframe HTML renderer
+│   ├── tokens/          @posthog/quill-tokens       — Source-of-truth design tokens (JS) + CSS generation
+│   ├── primitives/      @posthog/quill-primitives    — Base UI components (React + Tailwind v4 + Base-UI)
+│   ├── components/      @posthog/quill-components    — Composed primitives with easy-to-use APIs (what apps import)
+│   ├── blocks/          @posthog/quill-blocks        — Product-level patterns (FeatureFlag, Experiment, etc.)
+│   └── mcp-renderer/    @posthog/quill-mcp-renderer  — MCP iframe HTML renderer
 ├── apps/
 │   ├── web/             — Vite dev/showcase app
 │   └── storybook/       — Storybook documentation
@@ -26,22 +26,22 @@ ui/
 ## 2. Dependency graph
 
 ```text
-@posthog/ui-tokens           (no dependencies — pure JS/TS)
+@posthog/quill-tokens           (no dependencies — pure JS/TS)
         │
-        ├──▶ @posthog/ui-primitives
+        ├──▶ @posthog/quill-primitives
         │       ├── @base-ui/react       (unstyled headless components)
         │       ├── class-variance-authority (CVA — variant class maps)
         │       ├── clsx + tailwind-merge (class merging)
         │       ├── lucide-react         (icons)
         │       └── vaul                 (drawer primitive)
         │
-        ├──▶ @posthog/ui-components      (imports primitives + tokens)
-        │       └── @posthog/ui-primitives
+        ├──▶ @posthog/quill-components      (imports primitives + tokens)
+        │       └── @posthog/quill-primitives
         │
-        ├──▶ @posthog/ui-blocks          (imports components + primitives + tokens)
-        │       └── @posthog/ui-components
+        ├──▶ @posthog/quill-blocks          (imports components + primitives + tokens)
+        │       └── @posthog/quill-components
         │
-        └──▶ @posthog/ui-mcp-renderer
+        └──▶ @posthog/quill-mcp-renderer
 
 Apps (web, storybook) depend on components + tokens at workspace:*
 ```
@@ -84,7 +84,7 @@ export const semanticColors = {
 
 ### 3.3 Generation script
 
-**`packages/tokens/scripts/generate-css.ts`** runs via `pnpm --filter @posthog/ui-tokens build` (after vite build).
+**`packages/tokens/scripts/generate-css.ts`** runs via `pnpm --filter @posthog/quill-tokens build` (after vite build).
 
 It calls two generator functions:
 
@@ -193,7 +193,7 @@ The script writes files to multiple locations:
 
 ## 4. Package exports (npm entry points)
 
-### @posthog/ui-tokens
+### @posthog/quill-tokens
 
 ```json
 {
@@ -206,7 +206,7 @@ The script writes files to multiple locations:
 
 **JS exports:** `semanticColors`, `resolveTheme()`, `generateColorSystemCSS()`, `generateStylesCSS()`, `spacing`, `fontSize`, `fontFamily`, `borderRadius`, `shadow`, CSS utility functions.
 
-### @posthog/ui-primitives
+### @posthog/quill-primitives
 
 ```json
 {
@@ -219,7 +219,7 @@ The script writes files to multiple locations:
 
 **JS exports:** 40+ React components (Button, Dialog, Sheet, Card, Menu, Select, etc.) plus `useMediaQuery` hook.
 
-### @posthog/ui-components
+### @posthog/quill-components
 
 ```json
 {
@@ -230,9 +230,9 @@ The script writes files to multiple locations:
 }
 ```
 
-**JS exports:** Re-exports all primitives, plus composed components with easy-to-use APIs. This is the primary import for apps — consumers import from `@posthog/ui-components` rather than reaching into primitives directly.
+**JS exports:** Re-exports all primitives, plus composed components with easy-to-use APIs. This is the primary import for apps — consumers import from `@posthog/quill-components` rather than reaching into primitives directly.
 
-### @posthog/ui-blocks
+### @posthog/quill-blocks
 
 ```json
 {
@@ -242,7 +242,7 @@ The script writes files to multiple locations:
 }
 ```
 
-### @posthog/ui-mcp-renderer
+### @posthog/quill-mcp-renderer
 
 ```json
 {
@@ -310,7 +310,7 @@ Built on **@base-ui/react** (unstyled headless components from the Base-UI libra
 import './styles.css' // Generated file — imports tailwindcss + color-system.css + @theme + @layer base
 
 // App.tsx
-import { Button, Dialog } from '@posthog/ui-components'
+import { Button, Dialog } from '@posthog/quill-components'
 ```
 
 The app's `styles.css` (generated) includes:
@@ -327,13 +327,13 @@ An external consumer would:
 
 ```tsx
 // 1. Import the color system (provides CSS variable values)
-import '@posthog/ui-tokens/color-system.css'
+import '@posthog/quill-tokens/color-system.css'
 
 // 2. Import component styles (provides Tailwind utility classes used by components)
-import '@posthog/ui-components/styles.css'
+import '@posthog/quill-components/styles.css'
 
 // 3. Use components
-import { Button } from '@posthog/ui-components'
+import { Button } from '@posthog/quill-components'
 ```
 
 The external app also needs Tailwind v4 configured, and must add a `.dark` class to the root element for dark mode (the `@custom-variant dark` directive maps dark variants to `.dark` ancestry).
@@ -342,10 +342,10 @@ The external app also needs Tailwind v4 configured, and must add a `.dark` class
 
 Since PostHog already has its own Tailwind setup, integration would involve:
 
-1. Import `@posthog/ui-tokens/color-system.css` to get semantic CSS variables
-2. Either import `@posthog/ui-components/styles.css` or regenerate equivalent styles using `generateStylesCSS()` with custom `@source` paths
+1. Import `@posthog/quill-tokens/color-system.css` to get semantic CSS variables
+2. Either import `@posthog/quill-components/styles.css` or regenerate equivalent styles using `generateStylesCSS()` with custom `@source` paths
 3. Ensure `.dark` class toggling on a parent element
-4. Import and use components from `@posthog/ui-components`
+4. Import and use components from `@posthog/quill-components`
 
 ---
 
@@ -355,23 +355,23 @@ Since PostHog already has its own Tailwind setup, integration would involve:
 pnpm build (root)
   └── pnpm -r build (runs in dependency order)
 
-      1. @posthog/ui-tokens
+      1. @posthog/quill-tokens
          ├── vite build        → dist/index.js, dist/index.cjs, dist/index.d.ts
          └── tsx generate-css  → dist/color-system.css
                                   + writes styles.css & color-system.css to all targets
 
-      2. @posthog/ui-primitives
+      2. @posthog/quill-primitives
          └── vite build        → dist/index.js, dist/index.cjs, dist/index.d.ts, dist/styles.css
              (Tailwind v4 plugin processes src/styles.css during build)
 
-      3. @posthog/ui-components
+      3. @posthog/quill-components
          └── vite build        → dist/index.js, dist/index.cjs, dist/index.d.ts, dist/styles.css
              (re-exports primitives + adds composed components)
 
-      4. @posthog/ui-blocks
+      4. @posthog/quill-blocks
          └── vite build        → dist/index.js, dist/index.cjs, dist/index.d.ts
 
-      5. @posthog/ui-mcp-renderer
+      5. @posthog/quill-mcp-renderer
          └── vite build        → dist/index.js, dist/index.cjs, dist/index.d.ts
 ```
 
@@ -386,14 +386,14 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'react/jsx-runtime', '@posthog/ui-tokens'],
+      external: ['react', 'react-dom', 'react/jsx-runtime', '@posthog/quill-tokens'],
     },
     cssCodeSplit: false, // Bundle all CSS into one file
   },
 })
 ```
 
-Key: `@posthog/ui-tokens` is externalized — primitives reference token CSS vars at runtime, not at build time.
+Key: `@posthog/quill-tokens` is externalized — primitives reference token CSS vars at runtime, not at build time.
 
 ---
 

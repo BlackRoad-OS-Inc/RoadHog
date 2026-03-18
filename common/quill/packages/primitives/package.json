@@ -1,5 +1,5 @@
 {
-    "name": "@posthog/ui-primitives",
+    "name": "@posthog/quill-primitives",
     "version": "0.0.1",
     "private": true,
     "files": [
@@ -16,7 +16,7 @@
     "dependencies": {
         "@base-ui/react": "^1.0.0",
         "@fontsource-variable/inter": "^5.2.8",
-        "@posthog/ui-tokens": "workspace:*",
+        "@posthog/quill-tokens": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
