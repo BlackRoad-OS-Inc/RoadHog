@@ -17,15 +17,20 @@ from products.signals.backend.report_generation.research import (
     ReportResearchOutput,
     SignalFinding,
 )
+from products.signals.backend.report_generation.select_repo import RepoSelectionResult
 from products.signals.backend.temporal.actionability_judge import ActionabilityChoice, Priority
-from products.signals.backend.temporal.agentic_report import (
+from products.signals.backend.temporal.agentic.report import (
     RunAgenticReportInput,
     SignalsAgenticReportGateInput,
     run_agentic_report_activity,
     signals_agentic_report_gate_activity,
 )
+from products.signals.backend.temporal.agentic.select_repository import (
+    SelectRepositoryInput,
+    _TeamRepoContext,
+    select_repository_activity,
+)
 from products.signals.backend.temporal.types import SignalData
-from products.tasks.backend.services.custom_prompt_runner import CustomPromptSandboxContext
 
 
 @pytest_asyncio.fixture
@@ -56,6 +61,7 @@ def _build_research_output() -> ReportResearchOutput:
     return ReportResearchOutput(
         title="Onboarding funnel completion tracking may be regressing",
         summary="Signals point to a likely regression around onboarding completion event tracking.",
+        repository="posthog/posthog",
         findings=[
             SignalFinding(
                 signal_id="sig-1",
@@ -130,7 +136,7 @@ async def test_signals_agentic_report_gate_activity(monkeypatch, ateam, flag_ena
         return flag_enabled
 
     monkeypatch.setattr(
-        "products.signals.backend.temporal.agentic_report.posthoganalytics.feature_enabled",
+        "products.signals.backend.temporal.agentic.report.posthoganalytics.feature_enabled",
         fake_feature_enabled,
     )
 
@@ -146,6 +152,80 @@ async def test_signals_agentic_report_gate_activity(monkeypatch, ateam, flag_ena
 
 @pytest.mark.asyncio
 @pytest.mark.django_db
+async def test_select_repository_activity_persists_artefact(monkeypatch, ateam):
+    report = await database_sync_to_async(SignalReport.objects.create)(
+        team=ateam,
+        status=SignalReport.Status.IN_PROGRESS,
+        signal_count=2,
+        total_weight=1.3,
+    )
+
+    monkeypatch.setattr(
+        "products.signals.backend.temporal.agentic.select_repository._resolve_team_repo_context",
+        lambda team_id: _TeamRepoContext(team_id=team_id, user_id=1),
+    )
+
+    async def fake_select_repo(*args, **kwargs):
+        return RepoSelectionResult(repository="posthog/posthog", reason="Single repository connected: posthog/posthog")
+
+    monkeypatch.setattr(
+        "products.signals.backend.temporal.agentic.select_repository.select_repository_for_report",
+        fake_select_repo,
+    )
+
+    result = await select_repository_activity(
+        SelectRepositoryInput(team_id=ateam.id, report_id=str(report.id), signals=_build_signals())
+    )
+
+    assert result.repository == "posthog/posthog"
+    assert "Single repository" in result.reason
+
+    artefact = await database_sync_to_async(
+        lambda: SignalReportArtefact.objects.get(report=report, type=SignalReportArtefact.ArtefactType.REPO_SELECTION)
+    )()
+    content = json.loads(artefact.content)
+    assert content["repository"] == "posthog/posthog"
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db
+async def test_select_repository_activity_no_repo(monkeypatch, ateam):
+    report = await database_sync_to_async(SignalReport.objects.create)(
+        team=ateam,
+        status=SignalReport.Status.IN_PROGRESS,
+        signal_count=2,
+        total_weight=1.3,
+    )
+
+    monkeypatch.setattr(
+        "products.signals.backend.temporal.agentic.select_repository._resolve_team_repo_context",
+        lambda team_id: _TeamRepoContext(team_id=team_id, user_id=1),
+    )
+
+    async def fake_select_repo(*args, **kwargs):
+        return RepoSelectionResult(repository=None, reason="No GitHub repositories connected to this team.")
+
+    monkeypatch.setattr(
+        "products.signals.backend.temporal.agentic.select_repository.select_repository_for_report",
+        fake_select_repo,
+    )
+
+    result = await select_repository_activity(
+        SelectRepositoryInput(team_id=ateam.id, report_id=str(report.id), signals=_build_signals())
+    )
+
+    assert result.repository is None
+    assert "No GitHub repositories" in result.reason
+
+    artefact = await database_sync_to_async(
+        lambda: SignalReportArtefact.objects.get(report=report, type=SignalReportArtefact.ArtefactType.REPO_SELECTION)
+    )()
+    content = json.loads(artefact.content)
+    assert content["repository"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db
 async def test_run_agentic_report_activity_persists_artefacts(monkeypatch, ateam):
     report = await database_sync_to_async(SignalReport.objects.create)(
         team=ateam,
@@ -155,26 +235,29 @@ async def test_run_agentic_report_activity_persists_artefacts(monkeypatch, ateam
     )
 
     monkeypatch.setattr(
-        "products.signals.backend.temporal.agentic_report._resolve_sandbox_context_for_report",
-        lambda team_id: CustomPromptSandboxContext(team_id=team_id, user_id=1, repository="posthog/posthog"),
+        "products.signals.backend.temporal.agentic.report._resolve_user_id",
+        lambda team_id: 1,
     )
 
     async def fake_run_multi_turn_research(*args, **kwargs):
         return _build_research_output()
 
     monkeypatch.setattr(
-        "products.signals.backend.temporal.agentic_report.run_multi_turn_research",
+        "products.signals.backend.temporal.agentic.report.run_multi_turn_research",
         fake_run_multi_turn_research,
     )
 
     result = await run_agentic_report_activity(
-        RunAgenticReportInput(team_id=ateam.id, report_id=str(report.id), signals=_build_signals())
+        RunAgenticReportInput(
+            team_id=ateam.id, report_id=str(report.id), signals=_build_signals(), repository="posthog/posthog"
+        )
     )
 
     assert result.title == "Onboarding funnel completion tracking may be regressing"
     assert result.choice == ActionabilityChoice.IMMEDIATELY_ACTIONABLE
     assert result.priority == Priority.P1
     assert result.already_addressed is False
+    assert result.repository == "posthog/posthog"
 
     artefacts = await database_sync_to_async(
         lambda: list(SignalReportArtefact.objects.filter(report=report).order_by("type", "created_at"))
@@ -214,21 +297,23 @@ async def test_run_agentic_report_activity_does_not_persist_partial_artefacts(mo
     )
 
     monkeypatch.setattr(
-        "products.signals.backend.temporal.agentic_report._resolve_sandbox_context_for_report",
-        lambda team_id: CustomPromptSandboxContext(team_id=team_id, user_id=1, repository="posthog/posthog"),
+        "products.signals.backend.temporal.agentic.report._resolve_user_id",
+        lambda team_id: 1,
     )
 
     async def fake_run_multi_turn_research(*args, **kwargs):
         raise RuntimeError("sandbox failed")
 
     monkeypatch.setattr(
-        "products.signals.backend.temporal.agentic_report.run_multi_turn_research",
+        "products.signals.backend.temporal.agentic.report.run_multi_turn_research",
         fake_run_multi_turn_research,
     )
 
     with pytest.raises(RuntimeError, match="sandbox failed"):
         await run_agentic_report_activity(
-            RunAgenticReportInput(team_id=ateam.id, report_id=str(report.id), signals=_build_signals()[:1])
+            RunAgenticReportInput(
+                team_id=ateam.id, report_id=str(report.id), signals=_build_signals()[:1], repository="posthog/posthog"
+            )
         )
 
     artefact_count = await database_sync_to_async(lambda: SignalReportArtefact.objects.filter(report=report).count())()
