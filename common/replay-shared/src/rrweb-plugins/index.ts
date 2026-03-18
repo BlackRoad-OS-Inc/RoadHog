@@ -1,5 +1,3 @@
-import Hls from 'hls.js'
-
 import { ReplayPlugin, playerConfig } from '@posthog/rrweb'
 
 import { PLACEHOLDER_SVG_DATA_IMAGE_URL } from '../mobile/transformer/shared'
@@ -78,12 +76,13 @@ export { AudioMuteReplayerPlugin } from './audio-mute-plugin'
 export { WindowTitlePlugin } from './window-title-plugin'
 
 export const HLSPlayerPlugin: ReplayPlugin = {
-    onBuild: (node) => {
+    onBuild: async (node) => {
         if (node && node.nodeName === 'VIDEO' && node.nodeType === 1) {
             const videoEl = node as HTMLVideoElement
             const hlsSrc = videoEl.getAttribute('hls-src')
 
             if (videoEl && hlsSrc) {
+                const Hls = await import('hls.js').then(({ default: Hls }) => Hls)
                 if (Hls.isSupported()) {
                     const hls = new Hls()
                     hls.loadSource(hlsSrc)

@@ -1,16 +1,15 @@
-import zxcvbn from 'zxcvbn'
-
 import { LemonDivider } from '@posthog/lemon-ui'
 
 import { LemonProgress } from 'lib/lemon-ui/LemonProgress'
 import { Tooltip } from 'lib/lemon-ui/Tooltip'
+import { getZxcvbn } from 'lib/zxcvbn'
 
 export type ValidatedPasswordResult = {
     score: number // 0 is no passsword - otherwise 1-5,
     feedback?: string
 }
 
-export function validatePassword(password: string = ''): ValidatedPasswordResult {
+export async function validatePassword(password: string = ''): Promise<ValidatedPasswordResult> {
     if (password.length > 72) {
         return {
             score: 0,
@@ -18,6 +17,7 @@ export function validatePassword(password: string = ''): ValidatedPasswordResult
         }
     }
 
+    const zxcvbn = await getZxcvbn()
     const result = zxcvbn(password)
 
     if (result.score > 3 && password.length < 8) {
