@@ -19,7 +19,7 @@ To run these tests locally:
     2. Run tests:
        SKIP_RUST_INTEGRATION_TESTS=0 \
        FEATURE_FLAGS_SERVICE_URL=http://127.0.0.1:3001 \
-       pytest posthog/api/test/test_feature_flag_rust_integration.py -v
+       pytest posthog/api/test/rust_integration/test_feature_flag_rust_integration.py -v
 
 In CI, these tests require FEATURE_FLAGS_SERVICE_URL to point to a running Rust service.
 """
@@ -39,7 +39,7 @@ import requests
 from rest_framework.test import APIClient
 
 from posthog.models import Cohort, FeatureFlag, Person
-from posthog.models.cohort.cohort import CohortType
+from posthog.models.cohort.cohort import CohortPeople, CohortType
 
 
 @pytest.fixture(scope="module")
@@ -79,8 +79,9 @@ def create_cohort_via_api(
     """
     import json
 
-    # Patch on_commit to run synchronously (avoids Celery task dispatch issues in tests)
-    with patch("django.db.transaction.on_commit", side_effect=lambda func: func()):
+    # Suppress on_commit callbacks to avoid triggering Celery tasks that require ClickHouse.
+    # We only need the serializer's synchronous side effects (cohort_type, bytecode, etc.).
+    with patch("django.db.transaction.on_commit", side_effect=lambda *args, **kwargs: None):
         response = client.post(
             f"/api/projects/{team_id}/cohorts/",
             {"name": name, "filters": json.dumps(filters)},
@@ -767,11 +768,16 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
             {"properties": {"type": "OR", "values": []}},  # Empty filters for static
         )
 
-        # Manually add person to static cohort
+        # Manually add person to static cohort via direct Postgres insert
+        # (avoiding cohort.insert_users_by_list which tries to write to ClickHouse)
         cohort = Cohort.objects.get(id=cohort_data["id"])
         cohort.is_static = True
         cohort.save()
-        cohort.insert_users_by_list(["static_member"])
+        person = Person.objects.get(
+            team=self.team,
+            persondistinctid__distinct_id="static_member",
+        )
+        CohortPeople.objects.create(cohort=cohort, person=person, version=cohort.version)
 
         self._create_flag(
             "static-cohort-flag",
