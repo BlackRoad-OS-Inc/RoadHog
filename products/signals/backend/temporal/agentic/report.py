@@ -98,6 +98,14 @@ def _resolve_user_id(team_id: int) -> int:
     return membership.user_id
 
 
+_AGENTIC_ARTEFACT_TYPES = [
+    SignalReportArtefact.ArtefactType.REPO_SELECTION,
+    SignalReportArtefact.ArtefactType.SIGNAL_FINDING,
+    SignalReportArtefact.ArtefactType.ACTIONABILITY_JUDGMENT,
+    SignalReportArtefact.ArtefactType.PRIORITY_JUDGMENT,
+]
+
+
 def _persist_agentic_report_artefacts(
     team_id: int, report_id: str, result: ReportResearchOutput, repo_selection: RepoSelectionResult
 ) -> None:
@@ -136,6 +144,12 @@ def _persist_agentic_report_artefacts(
             )
         )
     with transaction.atomic():
+        # Delete artefacts from previous agentic runs (re-promotion) before writing new ones.
+        # Only deletes types owned by this path — safety_judgment is created by the safety judge
+        # activity and left untouched.
+        SignalReportArtefact.objects.filter(
+            team_id=team_id, report_id=report_id, type__in=_AGENTIC_ARTEFACT_TYPES
+        ).delete()
         SignalReportArtefact.objects.bulk_create(artefacts)
 
 
