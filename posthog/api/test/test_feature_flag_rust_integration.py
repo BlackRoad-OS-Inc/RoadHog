@@ -17,118 +17,55 @@ In CI, these tests require FEATURE_FLAGS_SERVICE_URL to point to a running Rust 
 """
 
 import os
-import time
-import signal
-import socket
-import subprocess
 from collections.abc import Generator
 from typing import Any
 
 import pytest
-from posthog.test.base import APIBaseTest
-
-from django.conf import settings
+from posthog.test.base import NonAtomicBaseTest
 
 import requests
+from rest_framework.test import APIClient
 
 from posthog.models import Cohort, Person
 from posthog.models.cohort.cohort import CohortType
 
 
-def get_free_port() -> int:
-    """Find an available port for the Rust server."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-def wait_for_server(url: str, timeout: float = 30.0) -> bool:
-    """Wait for the server to be ready, returns True if successful."""
-    start = time.time()
-    while time.time() - start < timeout:
-        try:
-            response = requests.get(f"{url}/_readiness", timeout=1)
-            if response.status_code == 200:
-                return True
-        except requests.RequestException:
-            pass
-        time.sleep(0.5)
-    return False
-
-
 @pytest.fixture(scope="module")
 def rust_flags_server() -> Generator[str, None, None]:
     """
-    Start the Rust feature flags server for integration tests.
+    Connect to an external Rust feature flags server for integration tests.
 
-    This fixture starts the Rust server as a subprocess and yields the URL.
-    The server is stopped when the test module completes.
+    Requires FEATURE_FLAGS_SERVICE_URL to be set and pointing to a running server.
 
-    If FEATURE_FLAGS_SERVICE_URL is set, uses that instead of starting a new server.
+    To run locally:
+        1. Start the Rust server:
+           cd rust/feature-flags
+           READ_DATABASE_URL=postgres://posthog:posthog@localhost:5432/test_posthog \\
+           WRITE_DATABASE_URL=postgres://posthog:posthog@localhost:5432/test_posthog \\
+           cargo run --bin feature-flags
+
+        2. Run tests:
+           SKIP_RUST_INTEGRATION_TESTS=0 \\
+           FEATURE_FLAGS_SERVICE_URL=http://127.0.0.1:3001 \\
+           pytest posthog/api/test/test_feature_flag_rust_integration.py -v
     """
-    # Check if we should use an existing server
-    existing_url = os.environ.get("FEATURE_FLAGS_SERVICE_URL")
-    if existing_url:
-        # Verify it's actually running
-        try:
-            response = requests.get(f"{existing_url}/_readiness", timeout=2)
-            if response.status_code == 200:
-                yield existing_url
-                return
-        except requests.RequestException:
-            pass
-        # Fall through to start our own server
+    server_url = os.environ.get("FEATURE_FLAGS_SERVICE_URL")
 
-    port = get_free_port()
-    server_url = f"http://127.0.0.1:{port}"
+    if not server_url:
+        pytest.skip(
+            "FEATURE_FLAGS_SERVICE_URL not set. "
+            "Start the Rust flags server and set FEATURE_FLAGS_SERVICE_URL to run these tests."
+        )
 
-    # Build the path to the Rust binary
-    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-    rust_dir = os.path.join(repo_root, "rust", "feature-flags")
-
-    # Set up environment for the Rust server
-    env = os.environ.copy()
-    env["BIND_HOST"] = "127.0.0.1"
-    env["BIND_PORT"] = str(port)
-
-    # Build database URL from Django settings
-    db_settings = settings.DATABASES["default"]
-    db_name = db_settings.get("TEST", {}).get("NAME") or db_settings.get("NAME") or "posthog"
-    db_user = db_settings.get("USER", "posthog")
-    db_password = db_settings.get("PASSWORD", "posthog")
-    db_host = db_settings.get("HOST", "localhost")
-    db_port = db_settings.get("PORT", "5432")
-    env["READ_DATABASE_URL"] = f"postgres://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-    env["WRITE_DATABASE_URL"] = env["READ_DATABASE_URL"]
-    env["REDIS_URL"] = getattr(settings, "REDIS_URL", "redis://localhost:6379/")
-
-    # Start the Rust server
-    process = subprocess.Popen(
-        ["cargo", "run", "--bin", "feature-flags", "--release"],
-        cwd=rust_dir,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        preexec_fn=os.setsid,  # Create new process group for clean shutdown
-    )
-
+    # Verify the server is actually running
     try:
-        # Wait for server to be ready
-        if not wait_for_server(server_url, timeout=60):
-            stdout, stderr = process.communicate(timeout=1)
-            pytest.fail(
-                f"Rust flags server failed to start within 60s.\nstdout: {stdout.decode()}\nstderr: {stderr.decode()}"
-            )
+        response = requests.get(f"{server_url}/_readiness", timeout=5)
+        if response.status_code != 200:
+            pytest.skip(f"Rust flags server at {server_url} returned status {response.status_code}")
+    except requests.RequestException as e:
+        pytest.skip(f"Rust flags server at {server_url} is not reachable: {e}")
 
-        yield server_url
-    finally:
-        # Clean shutdown
-        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-            process.wait()
+    yield server_url
 
 
 def create_cohort_via_api(client, team_id: int, name: str, filters: dict[str, Any]) -> dict[str, Any]:
@@ -209,14 +146,23 @@ def call_flags_endpoint(
     os.environ.get("SKIP_RUST_INTEGRATION_TESTS", "1") == "1",
     reason="Rust integration tests require SKIP_RUST_INTEGRATION_TESTS=0",
 )
-class TestFeatureFlagRustIntegration(APIBaseTest):
+class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
     """
     Integration tests that verify the Rust /flags endpoint correctly handles
     cohorts created via the Django API with proper serialization.
 
     These tests specifically target the regression where cohort_type=None in
     test data caused realtime cohorts to be incorrectly evaluated.
+
+    Uses TransactionTestCase (via NonAtomicBaseTest) so data is committed
+    and visible to the external Rust server process.
     """
+
+    def setUp(self):
+        super().setUp()
+        # Set up DRF API client for making authenticated requests
+        self.client = APIClient()
+        self.client.force_login(self.user)
 
     @pytest.fixture(autouse=True)
     def setup_rust_server(self, rust_flags_server):

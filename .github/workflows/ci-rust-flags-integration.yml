@@ -94,6 +94,10 @@ jobs:
             - name: Install Python dependencies
               run: UV_PROJECT_ENVIRONMENT=$pythonLocation uv sync --frozen --dev
 
+            - name: Create persons database
+              run: |
+                  PGPASSWORD=posthog psql -h localhost -U posthog -d test_posthog -c "CREATE DATABASE test_posthog_persons;"
+
             - name: Set up test database schema
               run: |
                   python manage.py migrate --run-syncdb
@@ -124,6 +128,8 @@ jobs:
                   BIND_PORT: '3001'
                   READ_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog
                   WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog
+                  PERSONS_READ_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog_persons
+                  PERSONS_WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog_persons
                   REDIS_URL: redis://localhost:6379/
 
             - name: Run integration tests
