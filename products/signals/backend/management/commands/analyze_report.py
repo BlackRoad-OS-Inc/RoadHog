@@ -9,6 +9,7 @@ import asyncio
 import logging
 from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from products.signals.backend.report_generation.research import ReportResearchOutput, run_multi_turn_research
@@ -181,6 +182,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        if not settings.DEBUG:
+            raise CommandError("This command can only be run with DEBUG=True")
+
         mode = options["mode"]
         verbose = options["verbose"]
         repository = options["repository"]

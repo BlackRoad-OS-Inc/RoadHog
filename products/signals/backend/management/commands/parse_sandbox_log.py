@@ -8,7 +8,8 @@ Usage:
 import sys
 import json
 
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 
 # ANSI color codes
 _RESET = "\033[0m"
@@ -68,6 +69,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        if not settings.DEBUG:
+            raise CommandError("This command can only be run with DEBUG=True")
+
         logfile = options["logfile"]
         show_thoughts = not options["no_thoughts"]
 
