@@ -59,6 +59,7 @@ def get_hogql_metadata(
         )
 
     heuristic_warnings: list[HogQLNotice] = []
+    context: Optional[HogQLContext] = None
 
     try:
         context = HogQLContext(
@@ -95,6 +96,7 @@ def get_hogql_metadata(
                     )
                     hogql_ast = cast(ast.SelectQuery, replace_placeholders(hogql_ast, query.globals))
 
+            heuristic_warnings.extend(run_metadata_heuristics(hogql_ast))
             hogql_table_names = get_table_names(hogql_ast)
             response.table_names = hogql_table_names
 
@@ -107,14 +109,8 @@ def get_hogql_metadata(
 
             if prepared_ast:
                 response.ch_table_names = get_table_names(prepared_ast)
-
-            heuristic_warnings.extend(run_metadata_heuristics(hogql_ast))
         else:
             raise ValueError(f"Unsupported language: {query.language}")
-        response.warnings = [*context.warnings, *heuristic_warnings]
-        response.notices = context.notices
-        response.errors = context.errors
-        response.isValid = len(response.errors) == 0
     except Exception as e:
         response.isValid = False
         if isinstance(e, ExposedHogQLError):
@@ -131,6 +127,15 @@ def get_hogql_metadata(
             response.errors.append(HogQLNotice(message=f"Unexpected {e.__class__.__name__}: {str(e)}"))
         else:
             response.errors.append(HogQLNotice(message=f"Unexpected {e.__class__.__name__}"))
+    finally:
+        if context is not None:
+            response.warnings = [*context.warnings, *heuristic_warnings]
+            response.notices = context.notices
+            if response.errors:
+                response.errors = [*context.errors, *response.errors]
+            else:
+                response.errors = context.errors
+            response.isValid = len(response.errors) == 0
 
     # We add a magic "F'" start prefix to get Antlr into the right parsing mode, subtract it now
     if query.language == HogLanguage.HOG_TEMPLATE:
