@@ -53,8 +53,7 @@ echo "Verifying ${#stories_to_verify[@]} file(s) × $REPEAT_COUNT runs:"
 printf "  %s\n" "${stories_to_verify[@]}"
 
 # Build a regex pattern matching any of the changed story files.
-# test-storybook uses --testPathPattern (jest regex) to filter which stories run.
-# Story file paths are relative to repo root, e.g. frontend/src/scenes/insights/UserPaths.stories.tsx
+# test-storybook wraps Jest — pass Jest options after -- separator.
 pattern=""
 for story in "${stories_to_verify[@]}"; do
     # Escape dots for regex
@@ -79,7 +78,7 @@ for run in $(seq 1 "$REPEAT_COUNT"); do
     set +e
     pnpm --filter=@posthog/storybook test:visual:ci:verify \
         --browsers chromium \
-        --testPathPattern "$pattern" 2>&1 | tee "/tmp/storybook-verify-run${run}.log"
+        -- --testPathPattern "$pattern" 2>&1 | tee "/tmp/storybook-verify-run${run}.log"
     exit_code=$?
     set -e
 
@@ -93,28 +92,9 @@ for run in $(seq 1 "$REPEAT_COUNT"); do
     echo ""
 done
 
-# Write results JSON for optional PR comment integration.
-RESULTS_FILE="common/storybook/flake-verification-results.json"
-files_json=$(printf '%s\n' "${stories_to_verify[@]}" | jq -R . | jq -s .)
-
 if [ "$failed_runs" -gt 0 ]; then
     echo "Flake verification failed — $failed_runs/$REPEAT_COUNT runs failed"
-    jq -n \
-        --arg status "failed" \
-        --arg message "Flake verification failed — $failed_runs/$REPEAT_COUNT runs failed" \
-        --argjson files "$files_json" \
-        --argjson repeat "$REPEAT_COUNT" \
-        --argjson failed "$failed_runs" \
-        '{status: $status, message: $message, files: $files, repeat_count: $repeat, failed_runs: $failed}' \
-        > "$RESULTS_FILE"
     exit 1
 fi
 
 echo "Flake verification passed — all $REPEAT_COUNT runs stable"
-jq -n \
-    --arg status "passed" \
-    --arg message "All changed stories stable across $REPEAT_COUNT runs" \
-    --argjson files "$files_json" \
-    --argjson repeat "$REPEAT_COUNT" \
-    '{status: $status, message: $message, files: $files, repeat_count: $repeat}' \
-    > "$RESULTS_FILE"
