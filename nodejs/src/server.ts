@@ -19,10 +19,7 @@ import { CdpPrecalculatedFiltersConsumer } from './cdp/consumers/cdp-precalculat
 import { CyclotronV2JanitorService } from './cdp/services/cyclotron-v2'
 import { EncryptedFields } from './cdp/utils/encryption-utils'
 import { defaultConfig } from './config/config'
-import {
-    createIngestionRedisConnectionConfig,
-    createPosthogRedisConnectionConfig,
-} from './config/redis-pools'
+import { createIngestionRedisConnectionConfig, createPosthogRedisConnectionConfig } from './config/redis-pools'
 import { startEvaluationScheduler } from './evaluation-scheduler/evaluation-scheduler'
 import { KafkaProducerWrapper } from './kafka/producer'
 import { LogsIngestionConsumer } from './logs-ingestion/logs-ingestion-consumer'
