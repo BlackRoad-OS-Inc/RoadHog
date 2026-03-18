@@ -13555,6 +13555,8 @@ export namespace Schemas {
       readonly sync_time_of_day: string;
       /** @nullable */
       readonly description: string | null;
+      /** @nullable */
+      readonly selected_properties: readonly string[] | null;
     }
 
     export interface ExternalDataSourceRevenueAnalyticsConfig {
@@ -21119,6 +21121,8 @@ export namespace Schemas {
       readonly sync_time_of_day?: string;
       /** @nullable */
       readonly description?: string | null;
+      /** @nullable */
+      readonly selected_properties?: readonly string[] | null;
     }
 
     /**
