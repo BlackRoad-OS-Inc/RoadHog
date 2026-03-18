@@ -77,6 +77,12 @@ class PushSubscription(UUIDModel):
         Create or update a push subscription token.
         If a subscription with the same team/distinct_id/token exists, updates it.
         """
+        # Validate the integration belongs to this team to prevent cross-tenant linking.
+        from posthog.models.integration import Integration
+
+        if not Integration.objects.filter(id=integration_id, team_id=team_id).exists():
+            raise ValueError("Integration does not belong to the specified team")
+
         token_hash = cls._hash_token(token)
 
         subscription, _created = cls.objects.update_or_create(

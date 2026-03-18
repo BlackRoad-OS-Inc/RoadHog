@@ -219,6 +219,23 @@ class TestPushSubscription(BaseTest):
         results = PushSubscription.get_active_tokens_for_distinct_id(self.team.id, "user-1")
         assert len(results) == 1
 
+    def test_upsert_rejects_integration_from_other_team(self):
+        other_team = Team.objects.create(organization=self.organization, name="other team")
+        other_integration = Integration.objects.create(
+            team=other_team, kind="firebase", integration_id="other-proj", config={}, sensitive_config={}
+        )
+
+        with self.assertRaises(ValueError, msg="Integration does not belong to the specified team"):
+            PushSubscription.upsert_token(
+                team_id=self.team.id,
+                distinct_id="user-1",
+                token="token-1",
+                platform=PushPlatform.ANDROID,
+                integration_id=other_integration.id,
+            )
+
+        assert PushSubscription.objects.count() == 0
+
     def test_upsert_reactivates_deactivated_token(self):
         integration = self._create_integration()
         PushSubscription.upsert_token(
