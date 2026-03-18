@@ -39,6 +39,7 @@ export enum PluginServerMode {
     recording_api = 'recording-api',
     ingestion_v2_testing = 'ingestion-v2-testing',
     ingestion_v2_combined = 'ingestion-v2-combined',
+    ingestion_traces = 'ingestion-traces',
 }
 
 export const stringToPluginServerMode = Object.fromEntries(

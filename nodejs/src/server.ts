@@ -26,6 +26,7 @@ import {
 import { startEvaluationScheduler } from './evaluation-scheduler/evaluation-scheduler'
 import { KafkaProducerWrapper } from './kafka/producer'
 import { LogsIngestionConsumer } from './logs-ingestion/logs-ingestion-consumer'
+import { TracesIngestionConsumer } from './logs-ingestion/traces-ingestion-consumer'
 import { BaseServer, CleanupResources } from './servers/base-server'
 import { SessionRecordingIngester } from './session-recording/consumer'
 import { RecordingApi } from './session-replay/recording-api/recording-api'
@@ -88,6 +89,7 @@ export class PluginServer extends BaseServer {
             capabilities.cdpBatchHogFlow
         )
         const needsLogs = !!capabilities.logsIngestion
+        const needsTraces = !!capabilities.tracesIngestion
 
         // 1. Shared infrastructure (always needed)
         const { teamManager } = await this.createSharedInfrastructure()
@@ -98,9 +100,9 @@ export class PluginServer extends BaseServer {
             cdpServices = await this.createCdpSharedServices()
         }
 
-        // 3. CDP + Logs services (posthog redis, quota limiting)
+        // 3. CDP + Logs + Traces services (posthog redis, quota limiting)
         let cdpLogsServices: ReturnType<typeof this.createCdpLogsServices> | undefined
-        if (needsCdp || needsLogs) {
+        if (needsCdp || needsLogs || needsTraces) {
             cdpLogsServices = this.createCdpLogsServices(teamManager)
         }
 
@@ -298,6 +300,17 @@ export class PluginServer extends BaseServer {
         if (capabilities.cdpBatchHogFlow) {
             serviceLoaders.push(async () => {
                 const consumer = new CdpBatchHogFlowRequestsConsumer(this.config, cdpDeps!)
+                await consumer.start()
+                return consumer.service
+            })
+        }
+
+        if (capabilities.tracesIngestion) {
+            serviceLoaders.push(async () => {
+                const consumer = new TracesIngestionConsumer(this.config, {
+                    teamManager,
+                    quotaLimiting: cdpLogsServices!.quotaLimiting,
+                })
                 await consumer.start()
                 return consumer.service
             })
