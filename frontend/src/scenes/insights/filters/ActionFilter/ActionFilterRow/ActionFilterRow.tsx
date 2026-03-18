@@ -44,10 +44,12 @@ import {
     TaxonomicPopoverProps,
     TaxonomicStringPopover,
 } from 'lib/components/TaxonomicPopover/TaxonomicPopover'
+import { FEATURE_FLAGS } from 'lib/constants'
 import { IconWithCount, SortableDragIcon } from 'lib/lemon-ui/icons'
 import { LemonButton, LemonButtonProps } from 'lib/lemon-ui/LemonButton'
 import { LemonDropdown } from 'lib/lemon-ui/LemonDropdown'
 import { Tooltip } from 'lib/lemon-ui/Tooltip'
+import { featureFlagLogic } from 'lib/logic/featureFlagLogic'
 import { capitalizeFirstLetter, getEventNamesForAction } from 'lib/utils'
 import { databaseTableListLogic } from 'scenes/data-management/database/databaseTableListLogic'
 import { funnelDataLogic } from 'scenes/funnels/funnelDataLogic'
@@ -97,6 +99,7 @@ import {
 
 import { LocalFilter } from '../entityFilterLogic'
 import { entityFilterLogicType } from '../entityFilterLogicType'
+import { FunnelStepAggregationTargetSelect } from './FunnelStepAggregationTargetSelect'
 
 // Property math types that can be meaningfully aggregated when rolling up histogram buckets
 // e.g. taking p99 of p99 values doesn't make sense
@@ -244,6 +247,7 @@ export function ActionFilterRow({
         ...actionsTaxonomicGroupTypes,
     ]
 
+    const { featureFlags } = useValues(featureFlagLogic)
     const { currentTeamId } = useValues(teamLogic)
     const { entityFilterVisible } = useValues(logic)
     const {
@@ -266,6 +270,8 @@ export function ActionFilterRow({
 
     const isFunnelContext = mathAvailability === MathAvailability.FunnelsOnly
     const isTrendsContext = trendsDisplayCategory != null
+    const hasFunnelCustomStepAggregationFlag =
+        featureFlags[FEATURE_FLAGS.PRODUCT_ANALYTICS_FUNNEL_CUSTOM_STEP_AGGREGATION]
 
     // Always call hooks for React compliance - provide safe defaults for non-funnel contexts
     // dashboardItemId should be the insight's id, but the typeKey might contain a /on-dashboard- suffix
@@ -876,6 +882,19 @@ export function ActionFilterRow({
                                                                                   />
                                                                               </div>
                                                                           </Tooltip>
+                                                                          <LemonDivider />
+                                                                      </>
+                                                                  ),
+                                                              },
+                                                          ]
+                                                        : []),
+                                                    // Custom aggregation target for funnels only
+                                                    ...(isFunnelContext && hasFunnelCustomStepAggregationFlag
+                                                        ? [
+                                                              {
+                                                                  label: () => (
+                                                                      <>
+                                                                          <FunnelStepAggregationTargetSelect />
                                                                           <LemonDivider />
                                                                       </>
                                                                   ),
