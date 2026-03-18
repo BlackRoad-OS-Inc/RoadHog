@@ -198,6 +198,7 @@ class SignalReportArtefact(UUIDModel):
         ACTIONABILITY_JUDGMENT = "actionability_judgment"
         PRIORITY_JUDGMENT = "priority_judgment"
         SIGNAL_FINDING = "signal_finding"
+        REPO_SELECTION = "repo_selection"
 
     team = models.ForeignKey("posthog.Team", on_delete=models.CASCADE)
     report = models.ForeignKey(SignalReport, on_delete=models.CASCADE, related_name="artefacts")
