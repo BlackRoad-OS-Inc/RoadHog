@@ -25,6 +25,7 @@ def _make_manifest(versions: list[str], pointers: dict[str, str]) -> dict:
 
 def _reset_caches():
     sv._cached_manifest = None
+    sv._js_content_cache.clear()
 
 
 class TestComputeVersionManifest(SimpleTestCase):

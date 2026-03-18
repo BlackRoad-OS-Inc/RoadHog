@@ -2,6 +2,7 @@ import os
 import re
 import json
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import NotRequired, Optional, TypedDict
 
@@ -18,6 +19,13 @@ logger = structlog.get_logger(__name__)
 
 # Disk fallback: the array.js shipped with the current deploy
 _disk_js_content: Optional[str] = None
+
+# In-process LRU cache for versioned JS content fetched from Redis/S3.
+# Version content is immutable so entries never need invalidation, but
+# we bound the size to avoid unbounded memory growth from long-tail pins.
+# 80 entries ≈ 16MB worst case (80 × ~200KB).
+_js_content_cache: OrderedDict[str, str] = OrderedDict()
+_JS_CONTENT_CACHE_MAX_SIZE = 80
 
 DEFAULT_SNIPPET_VERSION = "1"
 S3_VERSIONS_KEY = "versions.json"
@@ -126,6 +134,12 @@ def _get_disk_js_content() -> str:
     return _disk_js_content
 
 
+def _lru_put(version: str, content: str) -> None:
+    _js_content_cache[version] = content
+    if len(_js_content_cache) > _JS_CONTENT_CACHE_MAX_SIZE:
+        _js_content_cache.popitem(last=False)
+
+
 def _get_redis_key(version: str) -> str:
     return f"{REDIS_JS_KEY_PREFIX}:{version}"
 
@@ -152,23 +166,30 @@ def get_js_content(requested_version: Optional[str] = None) -> str:
         logger.warning("Invalid resolved version, falling back to disk", version=version)
         return _get_disk_js_content()
 
-    # 1. Try Redis
+    # 1. In-process LRU cache (immutable content, bounded size)
+    if version in _js_content_cache:
+        _js_content_cache.move_to_end(version)
+        return _js_content_cache[version]
+
+    # 2. Try Redis
     redis_key = _get_redis_key(version)
     cached = cache.get(redis_key)
     if cached is not None:
+        _lru_put(version, cached)
         return cached
 
-    # 2. Try S3
+    # 3. Try S3
     try:
         s3_key = array_js_path(version)
         content = object_storage.read(s3_key, bucket=settings.POSTHOG_JS_S3_BUCKET, missing_ok=True)
         if content is not None:
             cache.set(redis_key, content, REDIS_JS_CONTENT_TTL)
+            _lru_put(version, content)
             return content
     except ObjectStorageError:
         logger.exception("Failed to read JS content from S3", version=version)
 
-    # 3. Disk fallback
+    # 4. Disk fallback
     logger.warning("Falling back to disk JS content", version=version)
     return _get_disk_js_content()
 
