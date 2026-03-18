@@ -57,6 +57,15 @@ export function initKea({
     beforePlugins,
     replaceInitialPathInWindow,
 }: InitKeaProps = {}): void {
+    // Allow JSON.stringify to handle BigInt values (e.g. in feature flag payloads).
+    // Without this, reselect's dev-mode stability check crashes when PostHog's
+    // console interceptor tries to serialize selector inputs containing BigInts.
+    if (!(BigInt.prototype as any).toJSON) {
+        ;(BigInt.prototype as any).toJSON = function () {
+            return Number(this)
+        }
+    }
+
     const plugins = [
         ...(beforePlugins || []),
         disposablesPlugin,

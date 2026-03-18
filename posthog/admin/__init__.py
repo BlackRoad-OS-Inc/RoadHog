@@ -23,6 +23,8 @@ def register_all_admin():
         FeatureFlagAdmin,
         GroupTypeMappingAdmin,
         HogFlowAdmin,
+        HogFlowScheduleAdmin,
+        HogFlowScheduledRunAdmin,
         HogFunctionAdmin,
         InsightAdmin,
         InstanceSettingAdmin,
@@ -141,6 +143,12 @@ def register_all_admin():
     admin.site.register(DuckgresServer, DuckgresServerAdmin)
     admin.site.register(DuckLakeCatalog, DuckLakeCatalogAdmin)
     admin.site.register(HogFlow, HogFlowAdmin)
+
+    from products.workflows.backend.models.hog_flow_schedule import HogFlowSchedule
+    from products.workflows.backend.models.hog_flow_scheduled_run import HogFlowScheduledRun
+
+    admin.site.register(HogFlowSchedule, HogFlowScheduleAdmin)
+    admin.site.register(HogFlowScheduledRun, HogFlowScheduledRunAdmin)
     admin.site.register(HogFunction, HogFunctionAdmin)
     admin.site.register(EventIngestionRestrictionConfig, EventIngestionRestrictionConfigAdmin)
     admin.site.register(Link, LinkAdmin)

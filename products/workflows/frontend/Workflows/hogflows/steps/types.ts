@@ -147,7 +147,14 @@ export const HogFlowTriggerSchema = z.discriminatedUnion('type', [
             properties: z.array(z.any()),
         }),
         scheduled_at: z.string().optional(), // ISO 8601 datetime string for one-time scheduling
-        // Future: recurring schedule fields can be added here
+        schedule: z
+            .object({
+                rrule: z.string(), // RFC 5545 RRULE string
+                starts_at: z.string(), // ISO 8601 datetime
+                timezone: z.string().optional(),
+            })
+            .optional()
+            .nullable(),
     }),
 ])
 

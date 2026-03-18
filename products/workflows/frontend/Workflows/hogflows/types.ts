@@ -70,6 +70,29 @@ export const HogFlowBatchJobSchema = z.object({
     updated_at: z.string(),
 })
 
+export const HogFlowScheduleSchema = z.object({
+    id: z.string(),
+    rrule: z.string(),
+    starts_at: z.string(),
+    timezone: z.string(),
+    status: z.enum(['active', 'paused', 'completed']),
+    created_at: z.string(),
+})
+
+export const HogFlowScheduledRunSchema = z.object({
+    id: z.string(),
+    scheduled_at: z.string(),
+    status: z.enum(['pending', 'queued', 'completed', 'failed', 'skipped', 'cancelled']),
+    batch_job: z.string().nullable(),
+    started_at: z.string().nullable(),
+    completed_at: z.string().nullable(),
+    failure_reason: z.string().nullable(),
+    created_at: z.string(),
+})
+
+export interface HogFlowSchedule extends z.infer<typeof HogFlowScheduleSchema> {}
+export interface HogFlowScheduledRun extends z.infer<typeof HogFlowScheduledRunSchema> {}
+
 // NOTE: these are purposefully exported as interfaces to support kea typegen
 export interface HogFlow extends z.infer<typeof HogFlowSchema> {
     created_by?: UserBasicType | null

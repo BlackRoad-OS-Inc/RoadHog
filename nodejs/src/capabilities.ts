@@ -220,5 +220,9 @@ export function getPluginServerCapabilities(config: PluginsServerConfig): Plugin
             return {
                 ingestionV2Testing: true,
             }
+        case PluginServerMode.cdp_hogflow_scheduler:
+            return {
+                cdpHogflowScheduler: true,
+            }
     }
 }

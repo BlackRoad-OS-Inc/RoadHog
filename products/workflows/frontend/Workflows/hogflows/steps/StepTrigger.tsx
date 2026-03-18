@@ -50,6 +50,7 @@ import { getRegisteredTriggerTypes } from '../registry/triggers/triggerTypeRegis
 import { HogFlowAction } from '../types'
 import { batchTriggerLogic, BLAST_RADIUS_LIMIT } from './batchTriggerLogic'
 import { HogFlowFunctionConfiguration } from './components/HogFlowFunctionConfiguration'
+import { RecurringSchedulePicker } from './components/RecurringSchedulePicker'
 
 type TriggerAction = Extract<HogFlowAction, { type: 'trigger' }>
 type EventTriggerConfig = {
@@ -489,9 +490,10 @@ function StepTriggerConfigurationBatch({
     config: Extract<HogFlowAction['config'], { type: 'batch' }>
 }): JSX.Element {
     const { partialSetWorkflowActionConfig } = useActions(workflowLogic)
+    const { featureFlags } = useValues(featureFlagLogic)
 
     return (
-        <div className="flex flex-col gap-2 my-2">
+        <div className="flex flex-col gap-2 my-2 w-full">
             <div>
                 <span className="font-semibold">This batch will include</span>{' '}
                 <StepTriggerAffectedUsers actionId={action.id} filters={config.filters} />
@@ -529,6 +531,28 @@ function StepTriggerConfigurationBatch({
                     operatorAllowlist={WORKFLOW_OPERATOR_ALLOWLIST}
                 />
             </div>
+
+            {featureFlags[FEATURE_FLAGS.WORKFLOWS_RECURRING_SCHEDULES] && (
+                <>
+                    <LemonDivider />
+
+                    <LemonLabel>Schedule</LemonLabel>
+                    <RecurringSchedulePicker
+                        schedule={config.schedule ?? null}
+                        scheduledAt={config.scheduled_at ?? null}
+                        onChange={(schedule) =>
+                            partialSetWorkflowActionConfig(action.id, {
+                                schedule: schedule,
+                            })
+                        }
+                        onScheduledAtChange={(scheduledAt) =>
+                            partialSetWorkflowActionConfig(action.id, {
+                                scheduled_at: scheduledAt ?? undefined,
+                            })
+                        }
+                    />
+                </>
+            )}
         </div>
     )
 }

@@ -388,6 +388,22 @@ export const workflowLogic = kea<workflowLogicType>([
                                         filters: 'At least one property filter is required for batch workflows',
                                     }
                                 }
+                                if (action.config.schedule) {
+                                    if (!action.config.schedule.rrule) {
+                                        result.valid = false
+                                        result.errors = {
+                                            ...result.errors,
+                                            schedule: 'A recurrence rule is required for recurring schedules',
+                                        }
+                                    }
+                                    if (!action.config.schedule.starts_at) {
+                                        result.valid = false
+                                        result.errors = {
+                                            ...result.errors,
+                                            schedule_starts_at: 'A start date is required for recurring schedules',
+                                        }
+                                    }
+                                }
                             }
                         }
 

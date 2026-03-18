@@ -120,7 +120,7 @@ export default defineConfig(({ mode }) => {
             devSourcemap: true,
         },
         optimizeDeps: {
-            include: ['react', 'react-dom', 'buffer'],
+            include: ['react', 'react-dom', 'buffer', 'rrule'],
             exclude: ['snappy-wasm'], // Don't pre-bundle snappy-wasm so WASM file stays with JS
         },
     }
