@@ -67,15 +67,17 @@ runs:
           run: |
               {
                 echo "list<<EOF"
-                echo "ghcr.io/posthog/${{ inputs.image-name }}"
-                echo "posthog/${{ inputs.image-name }}"
-                echo "${{ steps.aws-ecr.outputs.registry }}/${{ inputs.image-name }}"
+                echo "ghcr.io/posthog/$IMAGE_NAME"
+                echo "posthog/$IMAGE_NAME"
+                echo "$ECR_REGISTRY/$IMAGE_NAME"
                 if [ -n "$LEGACY_IMAGES" ]; then
                   echo "$LEGACY_IMAGES"
                 fi
                 echo "EOF"
               } >> "$GITHUB_OUTPUT"
           env:
+              IMAGE_NAME: ${{ inputs.image-name }}
+              ECR_REGISTRY: ${{ steps.aws-ecr.outputs.registry }}
               LEGACY_IMAGES: ${{ inputs.legacy-images }}
 
         - name: Docker meta
