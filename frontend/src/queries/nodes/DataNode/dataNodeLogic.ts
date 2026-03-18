@@ -1198,7 +1198,7 @@ export const dataNodeLogic = kea<dataNodeLogicType>([
                 actions.loadNewData()
                 cache.disposables.add(() => {
                     const timerId = window.setInterval(() => {
-                        if (!values.responseLoading) {
+                        if (!values.newDataLoading) {
                             actions.loadNewData()
                         }
                     }, AUTOLOAD_INTERVAL)

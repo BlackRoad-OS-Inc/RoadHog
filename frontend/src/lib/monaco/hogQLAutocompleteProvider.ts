@@ -14,6 +14,12 @@ import { setLatestVersionsOnQuery } from '~/queries/utils'
 
 import { getContextSourceQuery } from './sourceQueryUtils'
 
+const EMPTY_RESULT: languages.CompletionList = { suggestions: [], incomplete: false }
+
+// Cooldown period after a failed autocomplete request to avoid hammering the backend
+const FAILURE_COOLDOWN_MS = 5_000
+let lastFailure: { queryText: string; startOffset: number; timestamp: number } | null = null
+
 const convertCompletionItemKind = (kind: AutocompleteCompletionItemKind): languages.CompletionItemKind => {
     switch (kind) {
         case 'Method':
@@ -92,10 +98,7 @@ export const hogQLAutocompleteProvider = (type: HogLanguage): languages.Completi
     provideCompletionItems: async (model, position) => {
         const logic: BuiltLogic<codeEditorLogicType> | undefined = (model as any).codeEditorLogic
         if (!logic || !logic.isMounted()) {
-            return {
-                suggestions: [],
-                incomplete: false,
-            }
+            return EMPTY_RESULT
         }
         const word = model.getWordUntilPosition(position)
         const startOffset = model.getOffsetAt({
@@ -106,11 +109,23 @@ export const hogQLAutocompleteProvider = (type: HogLanguage): languages.Completi
             lineNumber: position.lineNumber,
             column: word.endColumn,
         })
+
+        const queryText = model.getValue()
+
+        // Skip if the same query+position recently failed — avoids hammering the backend
+        if (
+            lastFailure &&
+            lastFailure.queryText === queryText &&
+            lastFailure.startOffset === startOffset &&
+            Date.now() - lastFailure.timestamp < FAILURE_COOLDOWN_MS
+        ) {
+            return EMPTY_RESULT
+        }
+
         const connectionId =
             logic.isMounted() && logic.props.sourceQuery?.kind === NodeKind.HogQLQuery
                 ? (logic.props.sourceQuery.connectionId ?? undefined)
                 : undefined
-        const queryText = model.getValue()
         const sourceQuery = logic.isMounted() ? getContextSourceQuery(logic.props.sourceQuery, queryText) : undefined
 
         const query: HogQLAutocomplete = setLatestVersionsOnQuery(
@@ -128,7 +143,18 @@ export const hogQLAutocompleteProvider = (type: HogLanguage): languages.Completi
             },
             { recursion: false }
         )
-        const response = await performQuery<HogQLAutocomplete>(query)
+
+        let response
+        try {
+            response = await performQuery<HogQLAutocomplete>(query)
+        } catch {
+            lastFailure = { queryText, startOffset, timestamp: Date.now() }
+            return EMPTY_RESULT
+        }
+
+        // Clear failure state on success
+        lastFailure = null
+
         const completionItems = response.suggestions
         const suggestions = completionItems.map<languages.CompletionItem>((item) => {
             const kind = convertCompletionItemKind(item.kind)
