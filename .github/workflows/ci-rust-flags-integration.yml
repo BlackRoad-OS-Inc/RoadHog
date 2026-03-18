@@ -157,6 +157,27 @@ jobs:
                   PERSONS_WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog_persons
                   REDIS_URL: redis://localhost:6379/
 
+            - name: Start Django API server
+              run: |
+                  python manage.py runserver 127.0.0.1:8000 --noreload &
+                  echo "DJANGO_PID=$!" >> $GITHUB_ENV
+                  for i in {1..15}; do
+                      if curl -s http://127.0.0.1:8000/_health > /dev/null 2>&1; then
+                          echo "Django server is ready"
+                          break
+                      fi
+                      echo "Waiting for Django server... ($i/15)"
+                      sleep 2
+                  done
+                  if ! curl -s http://127.0.0.1:8000/_health > /dev/null 2>&1; then
+                      echo "ERROR: Django server failed to start after 15 attempts"
+                      exit 1
+                  fi
+              env:
+                  DEBUG: '1'
+                  DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/test_posthog'
+                  PERSONS_DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/test_posthog_persons'
+
             - name: Run integration tests
               run: |
                   pytest posthog/api/test/rust_integration/test_feature_flag_rust_integration.py -v --tb=short
@@ -164,9 +185,22 @@ jobs:
                   SKIP_RUST_INTEGRATION_TESTS: '0'
                   FEATURE_FLAGS_SERVICE_URL: 'http://127.0.0.1:3001'
 
-            - name: Stop Rust flags service
+            - name: Run standalone integration tests
+              run: |
+                  pytest posthog/api/test/rust_integration/spike/test_flags.py -v --tb=short
+              env:
+                  SKIP_RUST_INTEGRATION_TESTS: '0'
+                  FEATURE_FLAGS_SERVICE_URL: 'http://127.0.0.1:3001'
+                  DJANGO_API_URL: 'http://127.0.0.1:8000'
+                  DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/test_posthog'
+                  PERSONS_DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/test_posthog_persons'
+
+            - name: Stop services
               if: always()
               run: |
                   if [ -n "$RUST_FLAGS_PID" ]; then
                       kill $RUST_FLAGS_PID || true
+                  fi
+                  if [ -n "$DJANGO_PID" ]; then
+                      kill $DJANGO_PID || true
                   fi

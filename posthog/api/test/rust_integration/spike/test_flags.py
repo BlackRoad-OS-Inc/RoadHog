@@ -9,7 +9,7 @@ No Django test framework. Each test:
 
 from typing import Any
 
-from conftest import DjangoAPI, PersonsDB, TestEnv, evaluate_flags
+from conftest import DjangoAPI, TestDB, TestEnv, evaluate_flags
 
 
 def _cohort_filters(*and_groups: list[dict[str, Any]]) -> dict[str, Any]:
@@ -26,9 +26,9 @@ def _cohort_filters(*and_groups: list[dict[str, Any]]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def test_realtime_cohort_with_person_properties(persons_db: PersonsDB, api: DjangoAPI, env: TestEnv):
-    persons_db.create_person(["user1"], {"email": "test@posthog.com", "plan": "enterprise"})
-    persons_db.create_person(["user2"], {"email": "test@other.com", "plan": "free"})
+def test_realtime_cohort_with_person_properties(db: TestDB, api: DjangoAPI, env: TestEnv):
+    db.create_person(["user1"], {"email": "test@posthog.com", "plan": "enterprise"})
+    db.create_person(["user2"], {"email": "test@other.com", "plan": "free"})
 
     cohort = api.create_cohort(
         "Enterprise Users",
@@ -56,10 +56,10 @@ def test_realtime_cohort_with_person_properties(persons_db: PersonsDB, api: Djan
     assert evaluate_flags(env.api_token, "user2")["flags"]["enterprise-feature"]["enabled"] is False
 
 
-def test_multiple_or_conditions(persons_db: PersonsDB, api: DjangoAPI, env: TestEnv):
-    persons_db.create_person(["premium"], {"subscription": "premium"})
-    persons_db.create_person(["enterprise"], {"subscription": "enterprise"})
-    persons_db.create_person(["free"], {"subscription": "free"})
+def test_multiple_or_conditions(db: TestDB, api: DjangoAPI, env: TestEnv):
+    db.create_person(["premium"], {"subscription": "premium"})
+    db.create_person(["enterprise"], {"subscription": "enterprise"})
+    db.create_person(["free"], {"subscription": "free"})
 
     cohort = api.create_cohort(
         "Paid Users",
@@ -86,10 +86,10 @@ def test_multiple_or_conditions(persons_db: PersonsDB, api: DjangoAPI, env: Test
     assert evaluate_flags(env.api_token, "free")["flags"]["paid-feature"]["enabled"] is False
 
 
-def test_nested_cohorts(persons_db: PersonsDB, api: DjangoAPI, env: TestEnv):
-    persons_db.create_person(["both"], {"country": "US", "verified": True})
-    persons_db.create_person(["outer_only"], {"country": "US", "verified": False})
-    persons_db.create_person(["inner_only"], {"country": "UK", "verified": True})
+def test_nested_cohorts(db: TestDB, api: DjangoAPI, env: TestEnv):
+    db.create_person(["both"], {"country": "US", "verified": True})
+    db.create_person(["outer_only"], {"country": "US", "verified": False})
+    db.create_person(["inner_only"], {"country": "UK", "verified": True})
 
     inner = api.create_cohort(
         "Verified",
@@ -122,12 +122,12 @@ def test_nested_cohorts(persons_db: PersonsDB, api: DjangoAPI, env: TestEnv):
     assert evaluate_flags(env.api_token, "inner_only")["flags"]["nested-flag"]["enabled"] is False
 
 
-def test_static_cohort(persons_db: PersonsDB, api: DjangoAPI, env: TestEnv):
-    member_id = persons_db.create_person(["member"], {"email": "member@example.com"})
-    persons_db.create_person(["nonmember"], {"email": "other@example.com"})
+def test_static_cohort(db: TestDB, api: DjangoAPI, env: TestEnv):
+    member_id = db.create_person(["member"], {"email": "member@example.com"})
+    db.create_person(["nonmember"], {"email": "other@example.com"})
 
     cohort = api.create_cohort("Static VIPs", _cohort_filters(), is_static=True)
-    persons_db.add_to_static_cohort(member_id, cohort["id"])
+    db.add_to_static_cohort(member_id, cohort["id"])
 
     api.create_flag(
         "static-flag",
@@ -145,10 +145,10 @@ def test_static_cohort(persons_db: PersonsDB, api: DjangoAPI, env: TestEnv):
     assert evaluate_flags(env.api_token, "nonmember")["flags"]["static-flag"]["enabled"] is False
 
 
-def test_group_based_flag(persons_db: PersonsDB, api: DjangoAPI, env: TestEnv):
-    persons_db.create_person(["group_user"], {"email": "user@company.com"})
-    persons_db.create_group("organization", 0, "org_123", {"plan": "enterprise"})
-    persons_db.create_group("organization", 0, "org_456", {"plan": "free"})
+def test_group_based_flag(db: TestDB, api: DjangoAPI, env: TestEnv):
+    db.create_person(["group_user"], {"email": "user@company.com"})
+    db.create_group("organization", 0, "org_123", {"plan": "enterprise"})
+    db.create_group("organization", 0, "org_456", {"plan": "free"})
 
     api.create_flag(
         "group-feature",
@@ -199,8 +199,8 @@ def test_unknown_distinct_id(api: DjangoAPI, env: TestEnv):
     assert result["flags"]["unknown-user-flag"]["enabled"] is False
 
 
-def test_disabled_flag(persons_db: PersonsDB, api: DjangoAPI, env: TestEnv):
-    persons_db.create_person(["disabled_user"], {"plan": "enterprise"})
+def test_disabled_flag(db: TestDB, api: DjangoAPI, env: TestEnv):
+    db.create_person(["disabled_user"], {"plan": "enterprise"})
 
     api.create_flag(
         "active-flag",
