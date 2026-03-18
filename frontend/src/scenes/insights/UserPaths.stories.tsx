@@ -1,7 +1,6 @@
 import { samplePersonProperties, sampleRetentionPeopleResponse } from 'scenes/insights/__mocks__/insight.mocks'
 
 import { Meta, StoryObj } from '@storybook/react'
-import { waitFor } from '@storybook/testing-library'
 
 import { App } from 'scenes/App'
 import { createInsightStory } from 'scenes/insights/__mocks__/createInsightScene'
@@ -11,11 +10,10 @@ import { mswDecorator } from '~/mocks/browser'
 type Story = StoryObj<typeof App>
 const meta: Meta = {
     title: 'Scenes-App/Insights/User Paths',
-    tags: ['test-skip'],
     parameters: {
         layout: 'fullscreen',
         testOptions: {
-            snapshotBrowsers: [], // Paths canvas resize observer causes flaky width — skip snapshots
+            snapshotBrowsers: ['chromium'],
             viewport: {
                 // needs a slightly larger width to push the rendered scene away from breakpoint boundary
                 width: 1300,
@@ -51,24 +49,6 @@ UserPaths.parameters = {
         waitForSelector: ['[data-attr=path-node-card-button]:nth-child(7)', '.Paths__canvas'],
     },
 }
-// The Paths component uses useResizeObserver to measure canvasWidth, then destroys
-// and recreates the SVG when it changes. This causes a race condition where the SVG
-// width may not have stabilized before the snapshot is taken. Wait for it to settle.
-const waitForPathsCanvasToStabilize: NonNullable<Story['play']> = async ({ canvasElement }) => {
-    let lastWidth = 0
-    await waitFor(
-        () => {
-            const svg = canvasElement.querySelector('.Paths__canvas')
-            const currentWidth = svg ? svg.getBoundingClientRect().width : 0
-            if (currentWidth === 0 || currentWidth !== lastWidth) {
-                lastWidth = currentWidth
-                throw new Error('SVG width not yet stable')
-            }
-        },
-        { timeout: 3000, interval: 200 }
-    )
-}
-UserPaths.play = waitForPathsCanvasToStabilize
 
 export const UserPathsEdit: Story = createInsightStory(
     require('../../mocks/fixtures/api/projects/team_id/insights/userPaths.json'),
@@ -79,7 +59,6 @@ UserPathsEdit.parameters = {
         waitForSelector: ['[data-attr=path-node-card-button]:nth-child(7)', '.Paths__canvas'],
     },
 }
-UserPathsEdit.play = waitForPathsCanvasToStabilize
 
 export const UserPathsEditViewports: Story = createInsightStory(
     require('../../mocks/fixtures/api/projects/team_id/insights/userPaths.json'),
@@ -91,5 +70,4 @@ UserPathsEditViewports.parameters = {
         viewportWidths: ['medium', 'wide', 'superwide'],
     },
 }
-UserPathsEditViewports.play = waitForPathsCanvasToStabilize
 /* eslint-enable @typescript-eslint/no-var-requires */

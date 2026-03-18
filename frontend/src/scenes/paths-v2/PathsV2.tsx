@@ -20,7 +20,7 @@ import { renderPaths } from './renderPaths'
 export function PathsV2(): JSX.Element {
     const canvasRef = useRef<HTMLDivElement>(null)
     const canvasContainerRef = useRef<HTMLDivElement>(null)
-    const { width: canvasWidth, height: canvasHeight } = useResizeObserver({ ref: canvasRef })
+    const { width: canvasWidth, height: canvasHeight } = useResizeObserver({ ref: canvasContainerRef })
     const [nodes, setNodes] = useState<PathNodeData[]>([])
 
     const { insightProps } = useValues(insightLogic)

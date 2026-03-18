@@ -26,7 +26,7 @@ export function Paths(): JSX.Element {
     const canvasRef = useRef<HTMLDivElement>(null)
     const canvasContainerRef = useRef<HTMLDivElement>(null)
     const { width: canvasWidth = FALLBACK_CANVAS_WIDTH, height: canvasHeight = FALLBACK_CANVAS_HEIGHT } =
-        useResizeObserver({ ref: canvasRef })
+        useResizeObserver({ ref: canvasContainerRef })
     const [nodeCards, setNodeCards] = useState<PathNodeData[]>([])
 
     const { insight, insightProps } = useValues(insightLogic)
