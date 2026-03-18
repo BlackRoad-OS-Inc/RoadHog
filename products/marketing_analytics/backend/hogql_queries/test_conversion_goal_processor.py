@@ -18,7 +18,6 @@ from posthog.schema import (
     DateRange,
     EventPropertyFilter,
     MarketingAnalyticsDrillDownLevel,
-    NodeKind,
     PropertyMathType,
     PropertyOperator,
 )
@@ -164,7 +163,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_processor_basic_properties(self):
         """Test basic processor properties and initialization"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="signup_goal",
             conversion_goal_name="Sign Ups",
@@ -184,7 +183,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_processor_index_variations(self):
         """Test processor behavior with different index values"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="test_event",
             conversion_goal_id="test",
             conversion_goal_name="Test",
@@ -205,7 +204,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_events_node_basic(self):
         """Test basic EventsNode functionality"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="events_basic",
             conversion_goal_name="Events Basic",
@@ -224,8 +223,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         action = _create_action(team=self.team, name="Test Action", event_name="sign_up")
 
         goal = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action.id),
+            kind="ActionsNode",
+            id=action.pk,
             conversion_goal_id="actions_basic",
             conversion_goal_name="Actions Basic",
             math=BaseMathType.TOTAL,
@@ -241,7 +240,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_data_warehouse_node_basic(self):
         """Test basic DataWarehouseNode functionality"""
         goal = ConversionGoalFilter3(
-            kind=NodeKind.DATA_WAREHOUSE_NODE,
+            kind="DataWarehouseNode",
             id="warehouse_id",
             table_name="warehouse_table",
             conversion_goal_id="warehouse_basic",
@@ -311,7 +310,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="total_business_test",
             conversion_goal_name="Total Business Test",
@@ -400,7 +399,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="dau_business_test",
             conversion_goal_name="DAU Business Test",
@@ -483,7 +482,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="sum_business_test",
             conversion_goal_name="Sum Business Test",
@@ -563,7 +562,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="sum_missing_business_test",
             conversion_goal_name="Sum Missing Business Test",
@@ -637,7 +636,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="avg_fallback_business_test",
             conversion_goal_name="Avg Fallback Business Test",
@@ -727,7 +726,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="filter_business_test",
             conversion_goal_name="Filter Business Test",
@@ -747,7 +746,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         ]
 
         # Apply property filters to conditions
-        full_conditions = additional_conditions.copy()
+        full_conditions: list[ast.Expr] = list(additional_conditions)
         full_conditions = add_conversion_goal_property_filters(full_conditions, goal, self.team)
 
         # Execute the full query and validate business logic
@@ -807,7 +806,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="multi_filter",
             conversion_goal_name="Multi Filter",
@@ -829,7 +828,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
                 right=ast.Call(name="toDate", args=[ast.Constant(value="2023-01-01")]),
             ),
         ]
-        full_conditions = additional_conditions.copy()
+        full_conditions: list[ast.Expr] = list(additional_conditions)
         full_conditions = add_conversion_goal_property_filters(full_conditions, goal, self.team)
 
         # Generate and execute the ConversionGoalProcessor query
@@ -897,7 +896,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="complex_filter",
             conversion_goal_name="Complex Filter",
@@ -921,7 +920,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
                 right=ast.Call(name="toDate", args=[ast.Constant(value="2023-01-01")]),
             ),
         ]
-        full_conditions = additional_conditions.copy()
+        full_conditions: list[ast.Expr] = list(additional_conditions)
         full_conditions = add_conversion_goal_property_filters(full_conditions, goal, self.team)
 
         # Generate and execute the ConversionGoalProcessor query
@@ -955,7 +954,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_utm_expressions_events_node(self):
         """Test UTM expressions for EventsNode"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="utm_events",
             conversion_goal_name="UTM Events",
@@ -966,13 +965,15 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=self.config)
 
         utm_campaign, utm_source = processor.get_utm_expressions()
+        assert isinstance(utm_campaign, ast.Field)
+        assert isinstance(utm_source, ast.Field)
         assert utm_campaign.chain == ["events", "properties", "utm_campaign"]
         assert utm_source.chain == ["events", "properties", "utm_source"]
 
     def test_utm_expressions_data_warehouse_node(self):
         """Test UTM expressions for DataWarehouseNode"""
         goal = ConversionGoalFilter3(
-            kind=NodeKind.DATA_WAREHOUSE_NODE,
+            kind="DataWarehouseNode",
             id="warehouse_utm",
             table_name="warehouse_table",
             conversion_goal_id="utm_warehouse",
@@ -992,13 +993,15 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=self.config)
 
         utm_campaign, utm_source = processor.get_utm_expressions()
+        assert isinstance(utm_campaign, ast.Field)
+        assert isinstance(utm_source, ast.Field)
         assert utm_campaign.chain == ["campaign_field"]
         assert utm_source.chain == ["source_field"]
 
     def test_schema_mapping_custom_fields(self):
         """Test custom field mappings in schema_map"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="custom_schema",
             conversion_goal_name="Custom Schema",
@@ -1009,13 +1012,15 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=self.config)
 
         utm_campaign, utm_source = processor.get_utm_expressions()
+        assert isinstance(utm_campaign, ast.Field)
+        assert isinstance(utm_source, ast.Field)
         assert utm_campaign.chain == ["events", "properties", "custom_campaign_field"]
         assert utm_source.chain == ["events", "properties", "custom_source_field"]
 
     def test_schema_mapping_missing_fields(self):
         """Test behavior when schema_map is missing required fields - should fallback gracefully"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="missing_schema",
             conversion_goal_name="Missing Schema",
@@ -1031,6 +1036,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         assert utm_source is not None
 
         # Verify fallback to default field names
+        assert isinstance(utm_campaign, ast.Field)
+        assert isinstance(utm_source, ast.Field)
         assert utm_campaign.chain == ["events", "properties", "utm_campaign"]
         assert utm_source.chain == ["events", "properties", "utm_source"]
 
@@ -1068,7 +1075,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
 
         # Configure processor to use CUSTOM field mappings
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="custom_fields_attribution",
             conversion_goal_name="Custom Fields Attribution",
@@ -1120,7 +1127,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_generate_join_clause_structure(self):
         """Test JOIN clause generation structure"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="join_test",
             conversion_goal_name="Join Test",
@@ -1133,13 +1140,14 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         join_clause = processor.generate_join_clause()
         assert join_clause.join_type == "LEFT JOIN"
         assert join_clause.alias == "cg_0"
+        assert join_clause.constraint is not None
         assert join_clause.constraint.constraint_type == "ON"
         assert isinstance(join_clause.constraint.expr, ast.And)
 
     def test_generate_select_columns_structure(self):
         """Test SELECT columns generation structure"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="select_test",
             conversion_goal_name="Select Test",
@@ -1167,8 +1175,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_error_missing_action(self):
         """Test error handling when Action doesn't exist"""
         goal = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id="999999",
+            kind="ActionsNode",
+            id=999999,
             conversion_goal_id="missing_action",
             conversion_goal_name="Missing Action",
             math=BaseMathType.TOTAL,
@@ -1183,7 +1191,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_error_invalid_math_property_combination(self):
         """Test graceful handling of invalid math+property combinations"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="invalid_combo",
             conversion_goal_name="Invalid Combo",
@@ -1201,6 +1209,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         # DAU should ignore math_property and use uniq(distinct_id)
         assert isinstance(select_field, ast.Call)
         assert select_field.name == "uniq"
+        assert isinstance(select_field.args[0], ast.Field)
         assert select_field.args[0].chain == ["events", "distinct_id"]
 
     def test_error_empty_event_name(self):
@@ -1235,7 +1244,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="",  # Empty event name
             conversion_goal_id="empty_event",
             conversion_goal_name="Empty Event",
@@ -1283,7 +1292,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         long_name = "A" * 1000  # Very long goal name (1000 characters)
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="long_name",
             conversion_goal_name=long_name,
@@ -1349,7 +1358,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event=special_event,
             conversion_goal_id="special_chars",
             conversion_goal_name="Special Chars",
@@ -1419,7 +1428,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="unicode_test",
             conversion_goal_name="Unicode Test",
@@ -1484,7 +1493,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="temporal_complex",
             conversion_goal_name="Temporal Complex",
@@ -1531,7 +1540,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_integration_events_node_full_query_execution(self):
         """Integration test: Full EventsNode query execution with snapshot"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="integration_events",
             conversion_goal_name="Integration Events",
@@ -1560,8 +1569,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         action = _create_action(team=self.team, name="Integration Action", event_name="sign_up")
 
         goal = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action.id),
+            kind="ActionsNode",
+            id=action.pk,
             conversion_goal_id="integration_actions",
             conversion_goal_name="Integration Actions",
             math=BaseMathType.TOTAL,
@@ -1587,7 +1596,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_integration_sum_math_full_query_execution(self):
         """Integration test: Full SUM math query execution with snapshot"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="integration_sum",
             conversion_goal_name="Integration Sum",
@@ -1614,7 +1623,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
     def test_integration_query_structure_validation(self):
         """Integration test: Validate overall query structure without execution"""
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="structure_test",
             conversion_goal_name="Structure Test",
@@ -1663,7 +1672,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="temporal_forward",
             conversion_goal_name="Temporal Forward",
@@ -1719,7 +1728,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
 
         # Create processor and execute query
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="validation_test",
             conversion_goal_name="Validation Test",
@@ -1789,7 +1798,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="backward_validation",
             conversion_goal_name="Backward Validation",
@@ -1858,7 +1867,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
 
         # Create processor and execute query
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="multi_touch_test",
             conversion_goal_name="Multi Touch Test",
@@ -1944,7 +1953,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
 
         # Test the attribution priority logic
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="direct_utm_priority",
             conversion_goal_name="Direct UTM Priority",
@@ -2014,7 +2023,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="temporal_backward",
             conversion_goal_name="Temporal Backward",
@@ -2083,7 +2092,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="multi_touch_last",
             conversion_goal_name="Multi Touch Last",
@@ -2153,7 +2162,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="multi_touch_first",
             conversion_goal_name="Multi Touch First",
@@ -2252,7 +2261,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="mixed_timeline",
             conversion_goal_name="Mixed Timeline",
@@ -2317,7 +2326,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="long_window",
             conversion_goal_name="Long Attribution Window",
@@ -2407,7 +2416,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="multi_conversion",
             conversion_goal_name="Multi Conversion",
@@ -2560,7 +2569,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="same_day_morning",
             conversion_goal_name="Same Day Morning",
@@ -2620,7 +2629,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="same_day_evening",
             conversion_goal_name="Same Day Evening",
@@ -2679,7 +2688,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="simultaneous",
             conversion_goal_name="Simultaneous",
@@ -2737,7 +2746,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="one_second",
             conversion_goal_name="One Second",
@@ -2809,7 +2818,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="multiple_conversions",
             conversion_goal_name="Multiple Conversions",
@@ -2882,7 +2891,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="multi_user_conversions",
             conversion_goal_name="Multi User Conversions",
@@ -2989,7 +2998,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="complex_journey",
             conversion_goal_name="Complex Journey",
@@ -3061,7 +3070,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="organic_paid",
             conversion_goal_name="Organic Paid",
@@ -3132,7 +3141,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="paid_organic",
             conversion_goal_name="Paid Organic",
@@ -3222,7 +3231,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="cross_channel",
             conversion_goal_name="Cross Channel",
@@ -3323,7 +3332,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="multi_session",
             conversion_goal_name="Multi Session",
@@ -3394,7 +3403,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="filtered_utm_test",
             conversion_goal_name="Filtered UTM Test",
@@ -3472,7 +3481,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="window_30day",
             conversion_goal_name="30 Day Window",
@@ -3574,7 +3583,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="beyond_limits",
             conversion_goal_name="Beyond Limits",
@@ -3658,7 +3667,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="malformed_utm",
             conversion_goal_name="Malformed UTM",
@@ -3729,7 +3738,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="duplicate_events",
             conversion_goal_name="Duplicate Events",
@@ -3801,7 +3810,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="duplicate_events",
             conversion_goal_name="Duplicate Events",
@@ -3868,7 +3877,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="special_chars",
             conversion_goal_name="Special Characters",
@@ -3929,7 +3938,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="long_utm",
             conversion_goal_name="Long UTM Values",
@@ -4009,7 +4018,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="case_sensitivity",
             conversion_goal_name="Case Sensitivity",
@@ -4088,7 +4097,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="null_empty",
             conversion_goal_name="Null Empty",
@@ -4177,7 +4186,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="non_pageview_utm",
             conversion_goal_name="Non Pageview UTM",
@@ -4306,7 +4315,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="real_world",
             conversion_goal_name="Real World Scenario",
@@ -4439,7 +4448,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
 
         # Test processor handles cross-device attribution correctly
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="cross_device_test",
             conversion_goal_name="Cross Device Test",
@@ -4546,7 +4555,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
 
         # Test the complex attribution
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="complex_journey",
             conversion_goal_name="Complex Journey",
@@ -4622,7 +4631,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="user signed up",
             conversion_goal_id="demo_signup",
             conversion_goal_name="Demo Signup",
@@ -4705,7 +4714,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="user signed up",
             conversion_goal_id="demo_signup",
             conversion_goal_name="Demo Signup",
@@ -4805,7 +4814,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
             flush_persons_and_events_in_batches()
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="user signed up",
             conversion_goal_id="signup_goal",
             conversion_goal_name="User Signup",
@@ -4901,8 +4910,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         )
 
         goal = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action.id),
+            kind="ActionsNode",
+            id=action.pk,
             conversion_goal_id="multi_events_total",
             conversion_goal_name="Multi Events Total",
             math=BaseMathType.TOTAL,
@@ -5007,8 +5016,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
 
         # Test with TOTAL math
         goal_total = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action.id),
+            kind="ActionsNode",
+            id=action.pk,
             conversion_goal_id="multi_users_total",
             conversion_goal_name="Multi Users Total",
             math=BaseMathType.TOTAL,
@@ -5037,8 +5046,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
 
         # Test with DAU math
         goal_dau = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action.id),
+            kind="ActionsNode",
+            id=action.pk,
             conversion_goal_id="multi_users_dau",
             conversion_goal_name="Multi Users DAU",
             math=BaseMathType.DAU,
@@ -5136,8 +5145,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         )
 
         goal = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action.id),
+            kind="ActionsNode",
+            id=action.pk,
             conversion_goal_id="filtered_multi_events",
             conversion_goal_name="Filtered Multi Events",
             math=BaseMathType.TOTAL,
@@ -5201,8 +5210,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         )
 
         goal = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action_both_events.id),
+            kind="ActionsNode",
+            id=action_both_events.pk,
             conversion_goal_id="semantics_test",
             conversion_goal_name="Semantics Test",
             math=BaseMathType.TOTAL,
@@ -5263,8 +5272,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         action = Action.objects.create(team=self.team, name="Sign Up Action", steps_json=[{"event": "sign_up"}])
 
         goal = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action.id),
+            kind="ActionsNode",
+            id=action.pk,
             conversion_goal_id="attribution_test",
             conversion_goal_name="Attribution Test",
             math=BaseMathType.TOTAL,
@@ -5333,7 +5342,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         schema_map = {"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"}
 
         events_goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="sign_up",
             conversion_goal_id="events_test",
             conversion_goal_name="Events Test",
@@ -5342,8 +5351,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         )
 
         actions_goal = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action.id),
+            kind="ActionsNode",
+            id=action.pk,
             conversion_goal_id="actions_test",
             conversion_goal_name="Actions Test",
             math=BaseMathType.TOTAL,
@@ -5426,8 +5435,8 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         action = _create_action(team=self.team, name="User Signup Action", event_name="sign_up")
 
         goal = ConversionGoalFilter2(
-            kind=NodeKind.ACTIONS_NODE,
-            id=str(action.id),
+            kind="ActionsNode",
+            id=action.pk,
             conversion_goal_id="signup_test",
             conversion_goal_name="Signup Test",
             math=BaseMathType.TOTAL,
@@ -5515,7 +5524,7 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         self.config.drill_down_level = MarketingAnalyticsDrillDownLevel.CHANNEL
 
         goal = ConversionGoalFilter1(
-            kind=NodeKind.EVENTS_NODE,
+            kind="EventsNode",
             event="purchase",
             conversion_goal_id="channel_test",
             conversion_goal_name="Channel Test",
@@ -5551,3 +5560,517 @@ class TestConversionGoalProcessor(ClickhouseTestMixin, BaseTest):
         # should be classified into different channels
         assert "Paid Search" in channels, f"Expected 'Paid Search' channel, got channels: {list(channels.keys())}"
         assert channels["Paid Search"] == 1, f"Expected 1 paid conversion, got {channels['Paid Search']}"
+
+    # ==================== Multi-touch Attribution Tests ====================
+
+    def test_linear_attribution_two_touchpoints(self):
+        """Linear attribution with 2 touchpoints should give 50% credit each."""
+        with freeze_time("2023-03-10"):
+            _create_person(distinct_ids=["linear_user"], team=self.team)
+            _create_event(
+                distinct_id="linear_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "email_blast", "utm_source": "email"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-15"):
+            _create_event(
+                distinct_id="linear_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "google_ad", "utm_source": "google"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-05-10"):
+            _create_event(distinct_id="linear_user", event="purchase", team=self.team, properties={})
+            flush_persons_and_events_in_batches()
+
+        goal = ConversionGoalFilter1(
+            kind="EventsNode",
+            event="purchase",
+            conversion_goal_id="linear_2tp",
+            conversion_goal_name="Linear 2 Touchpoints",
+            math=BaseMathType.TOTAL,
+            schema_map={"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"},
+        )
+
+        linear_config = MarketingAnalyticsConfig.from_team(self.team)
+        linear_config.attribution_mode = AttributionMode.LINEAR
+
+        processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=linear_config)
+
+        additional_conditions = [
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.GtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-05-01")]),
+            ),
+        ]
+
+        cte_query = processor.generate_cte_query(additional_conditions)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        # Should have 2 results — one per touchpoint
+        assert len(response.results) == 2, f"Expected 2 results, got {len(response.results)}"
+
+        # Schema: [0]=match_key, [1]=campaign, [2]=id, [3]=source, [4]=conversion_value
+        results_by_campaign = {row[1]: row[4] for row in response.results}
+        assert "email_blast" in results_by_campaign, f"Expected email_blast, got {list(results_by_campaign.keys())}"
+        assert "google_ad" in results_by_campaign, f"Expected google_ad, got {list(results_by_campaign.keys())}"
+
+        # Each should get 0.5 credit (50%)
+        assert abs(results_by_campaign["email_blast"] - 0.5) < 0.01, (
+            f"Expected ~0.5 for email_blast, got {results_by_campaign['email_blast']}"
+        )
+        assert abs(results_by_campaign["google_ad"] - 0.5) < 0.01, (
+            f"Expected ~0.5 for google_ad, got {results_by_campaign['google_ad']}"
+        )
+
+    def test_linear_attribution_three_touchpoints(self):
+        """Linear attribution with 3 touchpoints should give ~33% credit each."""
+        with freeze_time("2023-02-01"):
+            _create_person(distinct_ids=["linear3_user"], team=self.team)
+            _create_event(
+                distinct_id="linear3_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "campaign_a", "utm_source": "email"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-03-01"):
+            _create_event(
+                distinct_id="linear3_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "campaign_b", "utm_source": "google"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-01"):
+            _create_event(
+                distinct_id="linear3_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "campaign_c", "utm_source": "facebook"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-15"):
+            _create_event(distinct_id="linear3_user", event="purchase", team=self.team, properties={})
+            flush_persons_and_events_in_batches()
+
+        goal = ConversionGoalFilter1(
+            kind="EventsNode",
+            event="purchase",
+            conversion_goal_id="linear_3tp",
+            conversion_goal_name="Linear 3 Touchpoints",
+            math=BaseMathType.TOTAL,
+            schema_map={"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"},
+        )
+
+        linear_config = MarketingAnalyticsConfig.from_team(self.team)
+        linear_config.attribution_mode = AttributionMode.LINEAR
+
+        processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=linear_config)
+
+        additional_conditions = [
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.GtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-04-01")]),
+            ),
+        ]
+
+        cte_query = processor.generate_cte_query(additional_conditions)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        assert len(response.results) == 3, f"Expected 3 results, got {len(response.results)}"
+
+        results_by_campaign = {row[1]: row[4] for row in response.results}
+        for campaign in ["campaign_a", "campaign_b", "campaign_c"]:
+            assert campaign in results_by_campaign, f"Expected {campaign} in results"
+            assert abs(results_by_campaign[campaign] - 1 / 3) < 0.01, (
+                f"Expected ~0.333 for {campaign}, got {results_by_campaign[campaign]}"
+            )
+
+    def test_linear_attribution_single_touchpoint(self):
+        """Linear attribution with 1 touchpoint should give 100% credit."""
+        with freeze_time("2023-04-01"):
+            _create_person(distinct_ids=["linear1_user"], team=self.team)
+            _create_event(
+                distinct_id="linear1_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "only_campaign", "utm_source": "google"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-15"):
+            _create_event(distinct_id="linear1_user", event="purchase", team=self.team, properties={})
+            flush_persons_and_events_in_batches()
+
+        goal = ConversionGoalFilter1(
+            kind="EventsNode",
+            event="purchase",
+            conversion_goal_id="linear_1tp",
+            conversion_goal_name="Linear 1 Touchpoint",
+            math=BaseMathType.TOTAL,
+            schema_map={"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"},
+        )
+
+        linear_config = MarketingAnalyticsConfig.from_team(self.team)
+        linear_config.attribution_mode = AttributionMode.LINEAR
+
+        processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=linear_config)
+
+        additional_conditions = [
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.GtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-04-01")]),
+            ),
+        ]
+
+        cte_query = processor.generate_cte_query(additional_conditions)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        assert len(response.results) == 1, f"Expected 1 result, got {len(response.results)}"
+        campaign_name, conversion_value = response.results[0][1], response.results[0][4]
+        assert campaign_name == "only_campaign"
+        assert abs(conversion_value - 1.0) < 0.01, f"Expected 1.0 for single touchpoint, got {conversion_value}"
+
+    def test_time_decay_attribution_recent_gets_more_credit(self):
+        """Time-decay attribution should give more credit to recent touchpoints."""
+        with freeze_time("2023-01-01"):
+            _create_person(distinct_ids=["decay_user"], team=self.team)
+            _create_event(
+                distinct_id="decay_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "old_campaign", "utm_source": "email"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-03-25"):
+            _create_event(
+                distinct_id="decay_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "recent_campaign", "utm_source": "google"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-03-31"):
+            _create_event(distinct_id="decay_user", event="purchase", team=self.team, properties={})
+            flush_persons_and_events_in_batches()
+
+        goal = ConversionGoalFilter1(
+            kind="EventsNode",
+            event="purchase",
+            conversion_goal_id="decay_test",
+            conversion_goal_name="Decay Test",
+            math=BaseMathType.TOTAL,
+            schema_map={"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"},
+        )
+
+        decay_config = MarketingAnalyticsConfig.from_team(self.team)
+        decay_config.attribution_mode = AttributionMode.TIME_DECAY
+
+        processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=decay_config)
+
+        additional_conditions = [
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.GtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-03-01")]),
+            ),
+        ]
+
+        cte_query = processor.generate_cte_query(additional_conditions)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        assert len(response.results) == 2, f"Expected 2 results, got {len(response.results)}"
+
+        results_by_campaign = {row[1]: row[4] for row in response.results}
+        assert "old_campaign" in results_by_campaign
+        assert "recent_campaign" in results_by_campaign
+
+        # Recent campaign should get MORE credit than old campaign
+        assert results_by_campaign["recent_campaign"] > results_by_campaign["old_campaign"], (
+            f"Recent ({results_by_campaign['recent_campaign']}) should get more credit "
+            f"than old ({results_by_campaign['old_campaign']})"
+        )
+
+        # Total credit should still sum to ~1.0
+        total = sum(results_by_campaign.values())
+        assert abs(total - 1.0) < 0.01, f"Total credit should be ~1.0, got {total}"
+
+    def test_position_based_attribution_three_touchpoints(self):
+        """Position-based (40/20/40) with 3 touchpoints: first=40%, middle=20%, last=40%."""
+        with freeze_time("2023-02-01"):
+            _create_person(distinct_ids=["position_user"], team=self.team)
+            _create_event(
+                distinct_id="position_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "first_touch", "utm_source": "email"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-03-01"):
+            _create_event(
+                distinct_id="position_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "middle_touch", "utm_source": "google"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-01"):
+            _create_event(
+                distinct_id="position_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "last_touch", "utm_source": "facebook"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-15"):
+            _create_event(distinct_id="position_user", event="purchase", team=self.team, properties={})
+            flush_persons_and_events_in_batches()
+
+        goal = ConversionGoalFilter1(
+            kind="EventsNode",
+            event="purchase",
+            conversion_goal_id="position_3tp",
+            conversion_goal_name="Position 3 Touchpoints",
+            math=BaseMathType.TOTAL,
+            schema_map={"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"},
+        )
+
+        position_config = MarketingAnalyticsConfig.from_team(self.team)
+        position_config.attribution_mode = AttributionMode.POSITION_BASED
+
+        processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=position_config)
+
+        additional_conditions = [
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.GtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-04-01")]),
+            ),
+        ]
+
+        cte_query = processor.generate_cte_query(additional_conditions)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        assert len(response.results) == 3, f"Expected 3 results, got {len(response.results)}"
+
+        results_by_campaign = {row[1]: row[4] for row in response.results}
+
+        # First touch: 40%
+        assert abs(results_by_campaign["first_touch"] - 0.4) < 0.01, (
+            f"Expected ~0.4 for first_touch, got {results_by_campaign['first_touch']}"
+        )
+        # Middle touch: 20%
+        assert abs(results_by_campaign["middle_touch"] - 0.2) < 0.01, (
+            f"Expected ~0.2 for middle_touch, got {results_by_campaign['middle_touch']}"
+        )
+        # Last touch: 40%
+        assert abs(results_by_campaign["last_touch"] - 0.4) < 0.01, (
+            f"Expected ~0.4 for last_touch, got {results_by_campaign['last_touch']}"
+        )
+
+    def test_position_based_attribution_two_touchpoints(self):
+        """Position-based with 2 touchpoints should give 50% each (equal split)."""
+        with freeze_time("2023-03-01"):
+            _create_person(distinct_ids=["position2_user"], team=self.team)
+            _create_event(
+                distinct_id="position2_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "first_ad", "utm_source": "email"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-01"):
+            _create_event(
+                distinct_id="position2_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "second_ad", "utm_source": "google"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-15"):
+            _create_event(distinct_id="position2_user", event="purchase", team=self.team, properties={})
+            flush_persons_and_events_in_batches()
+
+        goal = ConversionGoalFilter1(
+            kind="EventsNode",
+            event="purchase",
+            conversion_goal_id="position_2tp",
+            conversion_goal_name="Position 2 Touchpoints",
+            math=BaseMathType.TOTAL,
+            schema_map={"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"},
+        )
+
+        position_config = MarketingAnalyticsConfig.from_team(self.team)
+        position_config.attribution_mode = AttributionMode.POSITION_BASED
+
+        processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=position_config)
+
+        additional_conditions = [
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.GtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-04-01")]),
+            ),
+        ]
+
+        cte_query = processor.generate_cte_query(additional_conditions)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        assert len(response.results) == 2, f"Expected 2 results, got {len(response.results)}"
+
+        results_by_campaign = {row[1]: row[4] for row in response.results}
+        for campaign in ["first_ad", "second_ad"]:
+            assert abs(results_by_campaign[campaign] - 0.5) < 0.01, (
+                f"Expected ~0.5 for {campaign}, got {results_by_campaign[campaign]}"
+            )
+
+    def test_position_based_attribution_five_touchpoints(self):
+        """Position-based with 5 touchpoints: first=40%, last=40%, 3 middle=6.67% each."""
+        with freeze_time("2023-01-10"):
+            _create_person(distinct_ids=["position5_user"], team=self.team)
+            _create_event(
+                distinct_id="position5_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "tp_1", "utm_source": "email"},
+            )
+            flush_persons_and_events_in_batches()
+
+        for i, (month, day) in enumerate([(2, 10), (3, 10), (3, 25)], start=2):
+            with freeze_time(f"2023-{month:02d}-{day:02d}"):
+                _create_event(
+                    distinct_id="position5_user",
+                    event="$pageview",
+                    team=self.team,
+                    properties={"utm_campaign": f"tp_{i}", "utm_source": "google"},
+                )
+                flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-05"):
+            _create_event(
+                distinct_id="position5_user",
+                event="$pageview",
+                team=self.team,
+                properties={"utm_campaign": "tp_5", "utm_source": "facebook"},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-10"):
+            _create_event(distinct_id="position5_user", event="purchase", team=self.team, properties={})
+            flush_persons_and_events_in_batches()
+
+        goal = ConversionGoalFilter1(
+            kind="EventsNode",
+            event="purchase",
+            conversion_goal_id="position_5tp",
+            conversion_goal_name="Position 5 Touchpoints",
+            math=BaseMathType.TOTAL,
+            schema_map={"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"},
+        )
+
+        position_config = MarketingAnalyticsConfig.from_team(self.team)
+        position_config.attribution_mode = AttributionMode.POSITION_BASED
+
+        processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=position_config)
+
+        additional_conditions = [
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.GtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-04-01")]),
+            ),
+        ]
+
+        cte_query = processor.generate_cte_query(additional_conditions)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        assert len(response.results) == 5, f"Expected 5 results, got {len(response.results)}"
+
+        results_by_campaign = {row[1]: row[4] for row in response.results}
+
+        # First and last get 40%
+        assert abs(results_by_campaign["tp_1"] - 0.4) < 0.01, (
+            f"Expected ~0.4 for tp_1 (first), got {results_by_campaign['tp_1']}"
+        )
+        assert abs(results_by_campaign["tp_5"] - 0.4) < 0.01, (
+            f"Expected ~0.4 for tp_5 (last), got {results_by_campaign['tp_5']}"
+        )
+
+        # Middle 3 get 20% / 3 = 6.67% each
+        middle_expected = 0.2 / 3
+        for tp in ["tp_2", "tp_3", "tp_4"]:
+            assert abs(results_by_campaign[tp] - middle_expected) < 0.01, (
+                f"Expected ~{middle_expected:.3f} for {tp} (middle), got {results_by_campaign[tp]}"
+            )
+
+        # Total should sum to ~1.0
+        total = sum(results_by_campaign.values())
+        assert abs(total - 1.0) < 0.01, f"Total credit should be ~1.0, got {total}"
+
+    def test_multi_touch_no_touchpoints_returns_no_results(self):
+        """Multi-touch attribution with no UTM touchpoints produces no attributed results.
+
+        When there are no UTM pageviews, the touchpoint array is empty and ARRAY JOIN
+        produces no rows. This is correct behavior — conversions without marketing
+        touchpoints cannot be attributed to any campaign in multi-touch mode.
+        """
+        with freeze_time("2023-04-01"):
+            _create_person(distinct_ids=["no_utm_user"], team=self.team)
+            _create_event(
+                distinct_id="no_utm_user",
+                event="$pageview",
+                team=self.team,
+                properties={},
+            )
+            flush_persons_and_events_in_batches()
+
+        with freeze_time("2023-04-15"):
+            _create_event(distinct_id="no_utm_user", event="purchase", team=self.team, properties={})
+            flush_persons_and_events_in_batches()
+
+        goal = ConversionGoalFilter1(
+            kind="EventsNode",
+            event="purchase",
+            conversion_goal_id="no_utm",
+            conversion_goal_name="No UTM",
+            math=BaseMathType.TOTAL,
+            schema_map={"utm_campaign_name": "utm_campaign", "utm_source_name": "utm_source"},
+        )
+
+        linear_config = MarketingAnalyticsConfig.from_team(self.team)
+        linear_config.attribution_mode = AttributionMode.LINEAR
+
+        processor = ConversionGoalProcessor(goal=goal, index=0, team=self.team, config=linear_config)
+
+        additional_conditions = [
+            ast.CompareOperation(
+                left=ast.Field(chain=["events", "timestamp"]),
+                op=ast.CompareOperationOp.GtEq,
+                right=ast.Call(name="toDate", args=[ast.Constant(value="2023-04-01")]),
+            ),
+        ]
+
+        cte_query = processor.generate_cte_query(additional_conditions)
+        response = execute_hogql_query(query=cte_query, team=self.team)
+
+        # No UTM touchpoints means no attributed conversions
+        assert len(response.results) == 0, f"Expected 0 results (no UTM data), got {len(response.results)}"
