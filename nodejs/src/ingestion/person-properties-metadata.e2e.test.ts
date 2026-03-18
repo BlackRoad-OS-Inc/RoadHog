@@ -13,8 +13,8 @@ import { v4 } from 'uuid'
 import { waitForExpect } from '~/tests/helpers/expectations'
 import { resetKafka } from '~/tests/helpers/kafka'
 
+import { createIngestionConsumerDeps } from '../../tests/helpers/cdp'
 import { createUserTeamAndOrganization, fetchPostgresPersons, resetTestDatabase } from '../../tests/helpers/sql'
-import { createHogTransformerService } from '../cdp/hog-transformations/hog-transformer.service'
 import { Hub, PipelineEvent, PluginsServerConfig, ProjectId, Team } from '../types'
 import { closeHub, createHub } from '../utils/db/hub'
 import { UUIDT } from '../utils/utils'
@@ -174,11 +174,7 @@ const createTestWithTeamIngester = (baseConfig: Partial<PluginsServerConfig> = {
                 throw new Error(`Failed to fetch team ${newTeam.id} from database`)
             }
 
-            const ingester = new IngestionConsumer(hub, {
-                ...hub,
-                kafkaMetricsProducer: hub.kafkaProducer,
-                hogTransformer: createHogTransformerService(hub, hub),
-            })
+            const ingester = new IngestionConsumer(hub, createIngestionConsumerDeps(hub))
             ingester['kafkaConsumer'] = {
                 connect: jest.fn(),
                 disconnect: jest.fn(),

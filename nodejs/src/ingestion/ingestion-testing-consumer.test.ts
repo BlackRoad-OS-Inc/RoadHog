@@ -83,7 +83,11 @@ describe('IngestionTestingConsumer', () => {
         hub: Hub,
         overrides?: ConstructorParameters<typeof IngestionTestingConsumer>[2]
     ) => {
-        const ingester = new IngestionTestingConsumer(hub, hub, overrides)
+        const ingester = new IngestionTestingConsumer(
+            hub,
+            { kafkaProducer: hub.kafkaProducer, teamManager: hub.teamManager },
+            overrides
+        )
         // NOTE: We don't actually use kafka so we skip instantiation for faster tests
         ingester['kafkaConsumer'] = {
             connect: jest.fn(),
