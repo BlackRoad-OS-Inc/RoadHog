@@ -25,6 +25,8 @@ import pytest
 from posthog.test.base import NonAtomicBaseTest
 from unittest.mock import patch
 
+from django.test import Client
+
 import requests
 from rest_framework.test import APIClient
 
@@ -70,7 +72,9 @@ def rust_flags_server() -> Generator[str, None, None]:
     yield server_url
 
 
-def create_cohort_via_api(client: APIClient, team_id: int, name: str, filters: dict[str, Any]) -> dict[str, Any]:
+def create_cohort_via_api(
+    client: Client | APIClient, team_id: int, name: str, filters: dict[str, Any]
+) -> dict[str, Any]:
     """
     Create a cohort via the Django API, ensuring proper serialization.
 
@@ -91,7 +95,7 @@ def create_cohort_via_api(client: APIClient, team_id: int, name: str, filters: d
 
 
 def create_flag_via_api(
-    client: APIClient,
+    client: Client | APIClient,
     team_id: int,
     key: str,
     filters: dict[str, Any],
