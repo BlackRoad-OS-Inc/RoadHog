@@ -25,7 +25,6 @@ In CI, these tests require FEATURE_FLAGS_SERVICE_URL to point to a running Rust 
 """
 
 import os
-from collections.abc import Generator
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -38,35 +37,12 @@ from django.test import Client
 import requests
 from rest_framework.test import APIClient
 
-from posthog.models import Cohort, FeatureFlag, Person
+from posthog.models import Cohort, Person
 from posthog.models.cohort.cohort import CohortPeople, CohortType
+from posthog.models.group.group import Group
+from posthog.models.group_type_mapping import GroupTypeMapping
 
-
-@pytest.fixture(scope="module")
-def rust_flags_server() -> Generator[str, None, None]:
-    """
-    Connect to an external Rust feature flags server for integration tests.
-
-    Requires FEATURE_FLAGS_SERVICE_URL to be set and pointing to a running server.
-    See module docstring for local setup instructions.
-    """
-    server_url = os.environ.get("FEATURE_FLAGS_SERVICE_URL")
-
-    if not server_url:
-        pytest.skip(
-            "FEATURE_FLAGS_SERVICE_URL not set. "
-            "Start the Rust flags server and set FEATURE_FLAGS_SERVICE_URL to run these tests."
-        )
-
-    # Verify the server is actually running
-    try:
-        response = requests.get(f"{server_url}/_readiness", timeout=5)
-        if response.status_code != 200:
-            pytest.skip(f"Rust flags server at {server_url} returned status {response.status_code}")
-    except requests.RequestException as e:
-        pytest.skip(f"Rust flags server at {server_url} is not reachable: {e}")
-
-    yield server_url
+RUST_FLAGS_SERVICE_URL = os.environ.get("FEATURE_FLAGS_SERVICE_URL", "")
 
 
 def create_cohort_via_api(
@@ -165,7 +141,7 @@ def call_flags_endpoint(
 
 @pytest.mark.skipif(
     os.environ.get("SKIP_RUST_INTEGRATION_TESTS", "1") == "1",
-    reason="Rust integration tests require SKIP_RUST_INTEGRATION_TESTS=0",
+    reason="Rust integration tests require SKIP_RUST_INTEGRATION_TESTS=0 and FEATURE_FLAGS_SERVICE_URL",
 )
 class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
     """
@@ -176,59 +152,26 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
     test data caused realtime cohorts to be incorrectly evaluated.
 
     Uses TransactionTestCase (via NonAtomicBaseTest) so data is committed
-    and visible to the external Rust server process.
+    and visible to the external Rust server process. Table cleanup between
+    tests is handled automatically by NonAtomicBaseTest._fixture_teardown.
     """
+
+    rust_server_url = RUST_FLAGS_SERVICE_URL
 
     def setUp(self):
         super().setUp()
-        # Set up DRF API client for making authenticated requests
         self.client = APIClient()
         self.client.force_login(self.user)
 
-        # Track created entities for cleanup
-        self._created_cohort_ids: list[int] = []
-        self._created_flag_ids: list[int] = []
-        self._created_person_distinct_ids: list[str] = []
-
-    def tearDown(self):
-        """Clean up test data to ensure isolation between test runs."""
-        # Delete created flags
-        if self._created_flag_ids:
-            FeatureFlag.objects.filter(id__in=self._created_flag_ids).delete()
-
-        # Delete created cohorts
-        if self._created_cohort_ids:
-            Cohort.objects.filter(id__in=self._created_cohort_ids).delete()
-
-        # Delete created persons
-        if self._created_person_distinct_ids:
-            Person.objects.filter(
-                team=self.team,
-                persondistinctid__distinct_id__in=self._created_person_distinct_ids,
-            ).delete()
-
-        super().tearDown()
-
-    @pytest.fixture(autouse=True)
-    def setup_rust_server(self, rust_flags_server):
-        """Inject the Rust server URL into each test."""
-        self.rust_server_url = rust_flags_server
-
     def _create_person(self, distinct_ids: list[str], properties: dict[str, Any]) -> Person:
-        """Helper to create a person and track for cleanup."""
-        person = Person.objects.create(
+        return Person.objects.create(
             team=self.team,
             distinct_ids=distinct_ids,
             properties=properties,
         )
-        self._created_person_distinct_ids.extend(distinct_ids)
-        return person
 
     def _create_cohort(self, name: str, filters: dict[str, Any]) -> dict[str, Any]:
-        """Helper to create a cohort via API and track for cleanup."""
-        cohort_data = create_cohort_via_api(self.client, self.team.id, name, filters)
-        self._created_cohort_ids.append(cohort_data["id"])
-        return cohort_data
+        return create_cohort_via_api(self.client, self.team.id, name, filters)
 
     def _create_flag(
         self,
@@ -237,10 +180,7 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         name: str | None = None,
         active: bool = True,
     ) -> dict[str, Any]:
-        """Helper to create a flag via API and track for cleanup."""
-        flag_data = create_flag_via_api(self.client, self.team.id, key, filters, name, active)
-        self._created_flag_ids.append(flag_data["id"])
-        return flag_data
+        return create_flag_via_api(self.client, self.team.id, key, filters, name, active)
 
     def test_realtime_cohort_with_person_property_filter(self):
         """
@@ -992,17 +932,46 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
     def test_group_based_flag(self):
         """
         Test flags that target groups (e.g., organizations) rather than persons.
+
+        Creates a group type mapping, a group entity with matching properties,
+        and verifies the flag evaluates correctly against group properties.
         """
         self._create_person(
             distinct_ids=["group_user"],
             properties={"email": "user@company.com"},
         )
 
-        # Create a flag that targets a group property
+        # Register "organization" as group type index 0
+        GroupTypeMapping.objects.create(
+            team=self.team,
+            project=self.team.project,
+            group_type="organization",
+            group_type_index=0,
+        )
+
+        # Create a group entity with properties that match the flag filter
+        Group.objects.create(
+            team=self.team,
+            group_key="org_123",
+            group_type_index=0,
+            group_properties={"plan": "enterprise", "name": "Acme Corp"},
+            version=0,
+        )
+
+        # Create a non-matching group
+        Group.objects.create(
+            team=self.team,
+            group_key="org_456",
+            group_type_index=0,
+            group_properties={"plan": "free", "name": "Small Co"},
+            version=0,
+        )
+
+        # Create a flag that targets organizations with plan=enterprise
         self._create_flag(
             "group-feature",
             {
-                "aggregation_group_type_index": 0,  # Assumes group type 0 is "organization"
+                "aggregation_group_type_index": 0,
                 "groups": [
                     {
                         "properties": [
@@ -1020,14 +989,20 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
             },
         )
 
-        # Call with group context
+        # Matching group should enable the flag
         result = call_flags_endpoint(
             self.rust_server_url,
             self.team.api_token,
             "group_user",
             groups={"organization": "org_123"},
         )
+        assert result["flags"]["group-feature"]["enabled"] is True
 
-        # The flag should be present in the response
-        # (actual result depends on whether the group exists and matches)
-        assert "group-feature" in result["flags"]
+        # Non-matching group should disable the flag
+        result = call_flags_endpoint(
+            self.rust_server_url,
+            self.team.api_token,
+            "group_user",
+            groups={"organization": "org_456"},
+        )
+        assert result["flags"]["group-feature"]["enabled"] is False
