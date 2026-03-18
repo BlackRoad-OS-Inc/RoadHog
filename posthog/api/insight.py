@@ -1177,8 +1177,6 @@ class InsightViewSet(
             elif key == "feature_flag":
                 feature_flag = request.GET["feature_flag"]
                 feature_flag_breakdown = f"$feature/{feature_flag}"
-                # Substring match on serialized query: single/multi breakdown, series filters, etc.
-                # $feature/{key} is the canonical flag property form; unlikely to collide with event/cohort names.
                 queryset = queryset.annotate(_ff_query_text=Cast("query", TextField())).filter(
                     Q(filters__breakdown__icontains=feature_flag_breakdown)
                     | Q(filters__properties__icontains=feature_flag)
