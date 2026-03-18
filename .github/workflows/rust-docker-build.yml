@@ -147,7 +147,7 @@ jobs:
                       SCCACHE_WEBDAV_TOKEN=${{ steps.sccache.outputs.token }}
 
             - name: report failure
-              if: failure()
+              if: failure() && github.ref == 'refs/heads/master'
               uses: PostHog/posthog-github-action@8c42e50f2c52e002eabb9bee3f69b152ee8fc1dd # v1.0.1
               with:
                   posthog-token: ${{secrets.POSTHOG_API_TOKEN}}
