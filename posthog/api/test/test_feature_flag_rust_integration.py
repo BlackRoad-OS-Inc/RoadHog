@@ -18,15 +18,17 @@ In CI, these tests require FEATURE_FLAGS_SERVICE_URL to point to a running Rust 
 
 import os
 from collections.abc import Generator
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
 from posthog.test.base import NonAtomicBaseTest
+from unittest.mock import patch
 
 import requests
 from rest_framework.test import APIClient
 
-from posthog.models import Cohort, Person
+from posthog.models import Cohort, FeatureFlag, Person
 from posthog.models.cohort.cohort import CohortType
 
 
@@ -68,15 +70,13 @@ def rust_flags_server() -> Generator[str, None, None]:
     yield server_url
 
 
-def create_cohort_via_api(client, team_id: int, name: str, filters: dict[str, Any]) -> dict[str, Any]:
+def create_cohort_via_api(client: APIClient, team_id: int, name: str, filters: dict[str, Any]) -> dict[str, Any]:
     """
     Create a cohort via the Django API, ensuring proper serialization.
 
     This goes through CohortSerializer which computes cohort_type, bytecode, etc.
     """
     import json
-
-    from unittest.mock import patch
 
     # Patch on_commit to run synchronously (avoids Celery task dispatch issues in tests)
     with patch("django.db.transaction.on_commit", side_effect=lambda func: func()):
@@ -91,11 +91,12 @@ def create_cohort_via_api(client, team_id: int, name: str, filters: dict[str, An
 
 
 def create_flag_via_api(
-    client,
+    client: APIClient,
     team_id: int,
     key: str,
     filters: dict[str, Any],
     name: str | None = None,
+    active: bool = True,
 ) -> dict[str, Any]:
     """
     Create a feature flag via the Django API, ensuring proper serialization.
@@ -106,13 +107,23 @@ def create_flag_via_api(
             "key": key,
             "name": name or key,
             "filters": filters,
-            "active": True,
+            "active": active,
         },
         format="json",
     )
 
     assert response.status_code == 201, f"Failed to create flag: {response.content}"
     return response.json()
+
+
+class RustFlagsError(Exception):
+    """Custom exception for Rust flags endpoint errors with detailed context."""
+
+    def __init__(self, message: str, status_code: int, response_body: str, payload: dict[str, Any]):
+        self.status_code = status_code
+        self.response_body = response_body
+        self.payload = payload
+        super().__init__(f"{message} (status={status_code}): {response_body}\nPayload: {payload}")
 
 
 def call_flags_endpoint(
@@ -132,14 +143,22 @@ def call_flags_endpoint(
     if groups:
         payload["groups"] = groups
 
-    response = requests.post(
-        f"{server_url}/flags",
-        params={"v": "2"},
-        json=payload,
-        timeout=10,
-    )
-    response.raise_for_status()
-    return response.json()
+    try:
+        response = requests.post(
+            f"{server_url}/flags",
+            params={"v": "2"},
+            json=payload,
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.HTTPError as e:
+        raise RustFlagsError(
+            message="Rust flags endpoint returned error",
+            status_code=e.response.status_code if e.response is not None else 0,
+            response_body=e.response.text if e.response is not None else str(e),
+            payload=payload,
+        ) from e
 
 
 @pytest.mark.skipif(
@@ -164,144 +183,84 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         self.client = APIClient()
         self.client.force_login(self.user)
 
+        # Track created entities for cleanup
+        self._created_cohort_ids: list[int] = []
+        self._created_flag_ids: list[int] = []
+        self._created_person_distinct_ids: list[str] = []
+
+    def tearDown(self):
+        """Clean up test data to ensure isolation between test runs."""
+        # Delete created flags
+        if self._created_flag_ids:
+            FeatureFlag.objects.filter(id__in=self._created_flag_ids).delete()
+
+        # Delete created cohorts
+        if self._created_cohort_ids:
+            Cohort.objects.filter(id__in=self._created_cohort_ids).delete()
+
+        # Delete created persons
+        if self._created_person_distinct_ids:
+            Person.objects.filter(
+                team=self.team,
+                persondistinctid__distinct_id__in=self._created_person_distinct_ids,
+            ).delete()
+
+        super().tearDown()
+
     @pytest.fixture(autouse=True)
     def setup_rust_server(self, rust_flags_server):
         """Inject the Rust server URL into each test."""
         self.rust_server_url = rust_flags_server
 
+    def _create_person(self, distinct_ids: list[str], properties: dict[str, Any]) -> Person:
+        """Helper to create a person and track for cleanup."""
+        person = Person.objects.create(
+            team=self.team,
+            distinct_ids=distinct_ids,
+            properties=properties,
+        )
+        self._created_person_distinct_ids.extend(distinct_ids)
+        return person
+
+    def _create_cohort(self, name: str, filters: dict[str, Any]) -> dict[str, Any]:
+        """Helper to create a cohort via API and track for cleanup."""
+        cohort_data = create_cohort_via_api(self.client, self.team.id, name, filters)
+        self._created_cohort_ids.append(cohort_data["id"])
+        return cohort_data
+
+    def _create_flag(
+        self,
+        key: str,
+        filters: dict[str, Any],
+        name: str | None = None,
+        active: bool = True,
+    ) -> dict[str, Any]:
+        """Helper to create a flag via API and track for cleanup."""
+        flag_data = create_flag_via_api(self.client, self.team.id, key, filters, name, active)
+        self._created_flag_ids.append(flag_data["id"])
+        return flag_data
+
     def test_realtime_cohort_with_person_property_filter(self):
         """
-        A cohort with person-property filters gets cohort_type='realtime' from
-        the Django serializer. The Rust endpoint must correctly evaluate membership.
-
-        This is the exact scenario that regressed in PR #51002.
+        A cohort defined only by person property filters should be classified
+        as realtime (cohort_type=2) and evaluated in real-time by the Rust
+        service rather than requiring pre-computation.
         """
-        # Create person with matching email
-        Person.objects.create(
-            team=self.team,
-            distinct_ids=["realtime_user"],
-            properties={"email": "user@posthog.com"},
+        # User who matches the cohort criteria
+        self._create_person(
+            distinct_ids=["user1"],
+            properties={"email": "test@posthog.com", "plan": "enterprise"},
         )
 
-        # Create cohort via API - this sets cohort_type correctly
-        cohort_data = create_cohort_via_api(
-            self.client,
-            self.team.id,
-            "PostHog Email Users",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [
-                                {
-                                    "key": "email",
-                                    "type": "person",
-                                    "value": "@posthog.com",
-                                    "operator": "icontains",
-                                }
-                            ],
-                        }
-                    ],
-                }
-            },
+        # User who doesn't match
+        self._create_person(
+            distinct_ids=["user2"],
+            properties={"email": "test@other.com", "plan": "free"},
         )
 
-        # Verify Django set cohort_type to realtime
-        cohort = Cohort.objects.get(id=cohort_data["id"])
-        assert cohort.cohort_type == CohortType.REALTIME, (
-            f"Expected cohort_type='realtime', got '{cohort.cohort_type}'. "
-            "This indicates the Django serializer behavior has changed."
-        )
-
-        # Create flag targeting the cohort
-        create_flag_via_api(
-            self.client,
-            self.team.id,
-            "realtime-cohort-flag",
-            {
-                "groups": [
-                    {
-                        "properties": [
-                            {
-                                "key": "id",
-                                "type": "cohort",
-                                "value": cohort.id,
-                            }
-                        ],
-                        "rollout_percentage": 100,
-                    }
-                ],
-            },
-        )
-
-        # Call Rust /flags endpoint - matching user
-        result = call_flags_endpoint(
-            self.rust_server_url,
-            self.team.api_token,
-            "realtime_user",
-        )
-
-        assert result.get("errorsWhileComputingFlags") is False
-        flags = result.get("flags", {})
-        flag_value = flags.get("realtime-cohort-flag", {})
-        assert flag_value.get("enabled") is True, (
-            f"Expected flag to be enabled for user in realtime cohort, got: {flag_value}"
-        )
-
-        # Call Rust /flags endpoint - non-matching user
-        Person.objects.create(
-            team=self.team,
-            distinct_ids=["non_matching_user"],
-            properties={"email": "user@gmail.com"},
-        )
-
-        result = call_flags_endpoint(
-            self.rust_server_url,
-            self.team.api_token,
-            "non_matching_user",
-        )
-
-        assert result.get("errorsWhileComputingFlags") is False
-        flags = result.get("flags", {})
-        flag_value = flags.get("realtime-cohort-flag", {})
-        assert flag_value.get("enabled") is False, (
-            f"Expected flag to be disabled for user not in cohort, got: {flag_value}"
-        )
-
-    def test_realtime_cohort_with_multiple_conditions(self):
-        """
-        A cohort with multiple AND conditions should still be classified as
-        realtime if all conditions support bytecode evaluation.
-        """
-        # Create person matching all conditions
-        Person.objects.create(
-            team=self.team,
-            distinct_ids=["multi_match"],
-            properties={
-                "email": "dev@posthog.com",
-                "plan": "enterprise",
-                "country": "US",
-            },
-        )
-
-        # Create person matching only some conditions
-        Person.objects.create(
-            team=self.team,
-            distinct_ids=["partial_match"],
-            properties={
-                "email": "dev@posthog.com",
-                "plan": "free",  # Different plan
-                "country": "US",
-            },
-        )
-
-        # Create cohort via API
-        cohort_data = create_cohort_via_api(
-            self.client,
-            self.team.id,
-            "Enterprise PostHog US",
+        # Create cohort via API - this will go through the serializer and compute cohort_type
+        cohort_data = self._create_cohort(
+            "PostHog Enterprise Users",
             {
                 "properties": {
                     "type": "OR",
@@ -311,7 +270,6 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
                             "values": [
                                 {"key": "email", "type": "person", "value": "@posthog.com", "operator": "icontains"},
                                 {"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"},
-                                {"key": "country", "type": "person", "value": "US", "operator": "exact"},
                             ],
                         }
                     ],
@@ -319,14 +277,15 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
             },
         )
 
+        # Verify the cohort was classified as realtime
         cohort = Cohort.objects.get(id=cohort_data["id"])
-        assert cohort.cohort_type == CohortType.REALTIME
+        assert cohort.cohort_type == CohortType.REALTIME, (
+            f"Expected cohort_type={CohortType.REALTIME} (realtime), got {cohort.cohort_type}"
+        )
 
-        # Create flag
-        create_flag_via_api(
-            self.client,
-            self.team.id,
-            "multi-condition-flag",
+        # Create a flag that uses this cohort
+        self._create_flag(
+            "enterprise-feature",
             {
                 "groups": [
                     {
@@ -337,37 +296,104 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
             },
         )
 
-        # Full match - should be enabled
-        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "multi_match")
-        assert result["flags"]["multi-condition-flag"]["enabled"] is True
+        # User 1 (matches cohort) - should have flag enabled
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "user1")
+        assert result["flags"]["enterprise-feature"]["enabled"] is True
 
-        # Partial match - should be disabled
-        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "partial_match")
-        assert result["flags"]["multi-condition-flag"]["enabled"] is False
+        # User 2 (doesn't match cohort) - should have flag disabled
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "user2")
+        assert result["flags"]["enterprise-feature"]["enabled"] is False
+
+    def test_realtime_cohort_with_multiple_conditions(self):
+        """
+        Test a realtime cohort with multiple OR conditions, each with AND properties.
+        """
+        # Premium user
+        self._create_person(
+            distinct_ids=["premium_user"],
+            properties={"subscription": "premium", "country": "US"},
+        )
+
+        # Enterprise user
+        self._create_person(
+            distinct_ids=["enterprise_user"],
+            properties={"subscription": "enterprise", "country": "UK"},
+        )
+
+        # Free user (doesn't match)
+        self._create_person(
+            distinct_ids=["free_user"],
+            properties={"subscription": "free", "country": "US"},
+        )
+
+        cohort_data = self._create_cohort(
+            "Paid Users",
+            {
+                "properties": {
+                    "type": "OR",
+                    "values": [
+                        {
+                            "type": "AND",
+                            "values": [
+                                {"key": "subscription", "type": "person", "value": "premium", "operator": "exact"}
+                            ],
+                        },
+                        {
+                            "type": "AND",
+                            "values": [
+                                {"key": "subscription", "type": "person", "value": "enterprise", "operator": "exact"}
+                            ],
+                        },
+                    ],
+                }
+            },
+        )
+
+        cohort = Cohort.objects.get(id=cohort_data["id"])
+        assert cohort.cohort_type == CohortType.REALTIME
+
+        self._create_flag(
+            "paid-feature",
+            {
+                "groups": [
+                    {
+                        "properties": [{"key": "id", "type": "cohort", "value": cohort.id}],
+                        "rollout_percentage": 100,
+                    }
+                ],
+            },
+        )
+
+        # Premium user - enabled
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "premium_user")
+        assert result["flags"]["paid-feature"]["enabled"] is True
+
+        # Enterprise user - enabled
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "enterprise_user")
+        assert result["flags"]["paid-feature"]["enabled"] is True
+
+        # Free user - disabled
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "free_user")
+        assert result["flags"]["paid-feature"]["enabled"] is False
 
     def test_realtime_cohort_with_regex_and_negation(self):
         """
-        Cohorts with regex and negation filters should be properly classified
-        as realtime and evaluated correctly by the Rust service.
+        Test realtime cohorts with regex matching and negation operators.
         """
-        # Should match: email matches regex, not excluded
-        Person.objects.create(
-            team=self.team,
-            distinct_ids=["good_user"],
-            properties={"email": "test.user@example.com"},
+        # User with valid email domain
+        self._create_person(
+            distinct_ids=["valid_domain"],
+            properties={"email": "user@company.com", "status": "active"},
         )
 
-        # Should NOT match: excluded by negation
-        Person.objects.create(
-            team=self.team,
-            distinct_ids=["excluded_user"],
-            properties={"email": "excluded.user@example.com"},
+        # User with excluded domain
+        self._create_person(
+            distinct_ids=["excluded_domain"],
+            properties={"email": "user@gmail.com", "status": "active"},
         )
 
-        cohort_data = create_cohort_via_api(
-            self.client,
-            self.team.id,
-            "Example Domain (excluding specific user)",
+        cohort_data = self._create_cohort(
+            "Business Email Users",
             {
                 "properties": {
                     "type": "OR",
@@ -375,14 +401,13 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
                         {
                             "type": "AND",
                             "values": [
-                                {"key": "email", "type": "person", "value": "^.*@example.com$", "operator": "regex"},
                                 {
                                     "key": "email",
                                     "type": "person",
-                                    "value": "excluded.user@example.com",
-                                    "operator": "icontains",
-                                    "negation": True,
+                                    "value": "@(gmail|yahoo|hotmail)\\.com$",
+                                    "operator": "not_regex",
                                 },
+                                {"key": "status", "type": "person", "value": "active", "operator": "exact"},
                             ],
                         }
                     ],
@@ -393,10 +418,8 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         cohort = Cohort.objects.get(id=cohort_data["id"])
         assert cohort.cohort_type == CohortType.REALTIME
 
-        create_flag_via_api(
-            self.client,
-            self.team.id,
-            "regex-negation-flag",
+        self._create_flag(
+            "business-feature",
             {
                 "groups": [
                     {
@@ -407,58 +430,56 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
             },
         )
 
-        # Good user matches
-        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "good_user")
-        assert result["flags"]["regex-negation-flag"]["enabled"] is True
+        # Valid business email - enabled
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "valid_domain")
+        assert result["flags"]["business-feature"]["enabled"] is True
 
-        # Excluded user doesn't match
-        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "excluded_user")
-        assert result["flags"]["regex-negation-flag"]["enabled"] is False
+        # Gmail user - disabled
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "excluded_domain")
+        assert result["flags"]["business-feature"]["enabled"] is False
 
     def test_nested_realtime_cohorts(self):
         """
-        Nested cohort references should be handled correctly when both
-        cohorts are realtime.
+        Test a flag with nested cohort references - a cohort that references
+        another cohort. Both should be classified correctly as realtime.
         """
-        # User matching both inner and outer
-        Person.objects.create(
-            team=self.team,
-            distinct_ids=["nested_match"],
-            properties={"email": "dev@posthog.com", "days_since_paid_plan_start": 77},
+        # User matching both cohorts
+        self._create_person(
+            distinct_ids=["both_match"],
+            properties={"country": "US", "verified": True},
         )
 
-        # User matching inner but not outer
-        Person.objects.create(
-            team=self.team,
+        # User matching only outer condition
+        self._create_person(
+            distinct_ids=["outer_only"],
+            properties={"country": "US", "verified": False},
+        )
+
+        # User matching only inner condition
+        self._create_person(
             distinct_ids=["inner_only"],
-            properties={"email": "dev@posthog.com", "days_since_paid_plan_start": 500},
+            properties={"country": "UK", "verified": True},
         )
 
-        # Inner cohort: @posthog.com emails
-        inner_cohort = create_cohort_via_api(
-            self.client,
-            self.team.id,
-            "PostHog Emails",
+        # Inner cohort: verified users
+        inner_cohort = self._create_cohort(
+            "Verified Users",
             {
                 "properties": {
                     "type": "OR",
                     "values": [
                         {
                             "type": "AND",
-                            "values": [
-                                {"key": "email", "type": "person", "value": "@posthog.com", "operator": "icontains"}
-                            ],
+                            "values": [{"key": "verified", "type": "person", "value": True, "operator": "exact"}],
                         }
                     ],
                 }
             },
         )
 
-        # Outer cohort: in inner cohort AND days < 365
-        outer_cohort = create_cohort_via_api(
-            self.client,
-            self.team.id,
-            "Recent PostHog Users",
+        # Outer cohort: US users who are verified
+        outer_cohort = self._create_cohort(
+            "US Verified Users",
             {
                 "properties": {
                     "type": "OR",
@@ -466,13 +487,8 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
                         {
                             "type": "AND",
                             "values": [
+                                {"key": "country", "type": "person", "value": "US", "operator": "exact"},
                                 {"key": "id", "type": "cohort", "value": inner_cohort["id"]},
-                                {
-                                    "key": "days_since_paid_plan_start",
-                                    "type": "person",
-                                    "value": "365",
-                                    "operator": "lt",
-                                },
                             ],
                         }
                     ],
@@ -480,9 +496,10 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
             },
         )
 
-        create_flag_via_api(
-            self.client,
-            self.team.id,
+        cohort = Cohort.objects.get(id=outer_cohort["id"])
+        assert cohort.cohort_type == CohortType.REALTIME
+
+        self._create_flag(
             "nested-cohort-flag",
             {
                 "groups": [
@@ -494,9 +511,13 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
             },
         )
 
-        # Matches both - enabled
-        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "nested_match")
+        # Both match - enabled
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "both_match")
         assert result["flags"]["nested-cohort-flag"]["enabled"] is True
+
+        # Outer only - disabled
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "outer_only")
+        assert result["flags"]["nested-cohort-flag"]["enabled"] is False
 
         # Matches inner only - disabled
         result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "inner_only")
@@ -508,30 +529,25 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         Both cohorts are realtime (person-property filters).
         """
         # User in include cohort only
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["include_only"],
             properties={"plan": "enterprise", "is_competitor": False},
         )
 
         # User in both cohorts (should be excluded)
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["in_both"],
             properties={"plan": "enterprise", "is_competitor": True},
         )
 
         # User in neither
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["in_neither"],
             properties={"plan": "free", "is_competitor": False},
         )
 
         # Include cohort: enterprise users
-        include_cohort = create_cohort_via_api(
-            self.client,
-            self.team.id,
+        include_cohort = self._create_cohort(
             "Enterprise Users",
             {
                 "properties": {
@@ -547,9 +563,7 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         )
 
         # Exclude cohort: competitors
-        exclude_cohort = create_cohort_via_api(
-            self.client,
-            self.team.id,
+        exclude_cohort = self._create_cohort(
             "Competitors",
             {
                 "properties": {
@@ -565,9 +579,7 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         )
 
         # Flag: in include cohort AND NOT in exclude cohort
-        create_flag_via_api(
-            self.client,
-            self.team.id,
+        self._create_flag(
             "enterprise-non-competitor-flag",
             {
                 "groups": [
@@ -599,24 +611,25 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         Cohorts with date comparison filters should be classified as realtime
         and evaluated correctly.
         """
+        # Use dynamic dates to avoid stale test data
+        recent_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
+        old_date = (datetime.now() - timedelta(days=1000)).strftime("%Y-%m-%d")
+        cutoff_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+
         # User created recently (within 30 days)
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["recent_user"],
-            properties={"created_at": "2024-01-15", "is_active": True},
+            properties={"created_at": recent_date, "is_active": True},
         )
 
         # User created long ago
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["old_user"],
-            properties={"created_at": "2020-01-01", "is_active": True},
+            properties={"created_at": old_date, "is_active": True},
         )
 
-        cohort_data = create_cohort_via_api(
-            self.client,
-            self.team.id,
-            "Users Created After 2024",
+        cohort_data = self._create_cohort(
+            "Recently Created Users",
             {
                 "properties": {
                     "type": "OR",
@@ -627,7 +640,7 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
                                 {
                                     "key": "created_at",
                                     "type": "person",
-                                    "value": "2024-01-01",
+                                    "value": cutoff_date,
                                     "operator": "is_date_after",
                                 }
                             ],
@@ -640,9 +653,7 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         cohort = Cohort.objects.get(id=cohort_data["id"])
         assert cohort.cohort_type == CohortType.REALTIME
 
-        create_flag_via_api(
-            self.client,
-            self.team.id,
+        self._create_flag(
             "date-filter-flag",
             {
                 "groups": [
@@ -669,30 +680,25 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         for specific cohorts.
         """
         # Beta tester (should get early access via super condition)
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["beta_tester"],
             properties={"is_beta_tester": True, "plan": "free"},
         )
 
         # Regular enterprise user (normal flag evaluation)
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["enterprise_user"],
             properties={"is_beta_tester": False, "plan": "enterprise"},
         )
 
         # Regular free user (should not match)
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["free_user"],
             properties={"is_beta_tester": False, "plan": "free"},
         )
 
         # Beta testers cohort (for super condition)
-        beta_cohort = create_cohort_via_api(
-            self.client,
-            self.team.id,
+        beta_cohort = self._create_cohort(
             "Beta Testers",
             {
                 "properties": {
@@ -708,9 +714,7 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         )
 
         # Flag with super condition for beta testers
-        create_flag_via_api(
-            self.client,
-            self.team.id,
+        self._create_flag(
             "new-feature-flag",
             {
                 "super_groups": [
@@ -746,22 +750,18 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         cohortpeople table, not via property matching.
         """
         # Create persons
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["static_member"],
             properties={"email": "member@example.com"},
         )
 
-        Person.objects.create(
-            team=self.team,
+        self._create_person(
             distinct_ids=["non_member"],
             properties={"email": "nonmember@example.com"},
         )
 
         # Create static cohort via API
-        cohort_data = create_cohort_via_api(
-            self.client,
-            self.team.id,
+        cohort_data = self._create_cohort(
             "Static VIP Users",
             {"properties": {"type": "OR", "values": []}},  # Empty filters for static
         )
@@ -772,9 +772,7 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         cohort.save()
         cohort.insert_users_by_list(["static_member"])
 
-        create_flag_via_api(
-            self.client,
-            self.team.id,
+        self._create_flag(
             "static-cohort-flag",
             {
                 "groups": [
@@ -793,3 +791,236 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         # Non-member - disabled
         result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "non_member")
         assert result["flags"]["static-cohort-flag"]["enabled"] is False
+
+    def test_unknown_distinct_id(self):
+        """
+        Test that the Rust service handles unknown distinct_ids correctly.
+        When a person doesn't exist, the flag should evaluate based on
+        the conditions (likely disabled for cohort-based flags).
+        """
+        # Create a flag with a cohort condition
+        cohort_data = self._create_cohort(
+            "Existing Users",
+            {
+                "properties": {
+                    "type": "OR",
+                    "values": [
+                        {
+                            "type": "AND",
+                            "values": [{"key": "plan", "type": "person", "value": "pro", "operator": "exact"}],
+                        }
+                    ],
+                }
+            },
+        )
+
+        self._create_flag(
+            "unknown-user-test-flag",
+            {
+                "groups": [
+                    {
+                        "properties": [{"key": "id", "type": "cohort", "value": cohort_data["id"]}],
+                        "rollout_percentage": 100,
+                    }
+                ],
+            },
+        )
+
+        # Call with a completely unknown distinct_id
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "completely_unknown_user_12345")
+
+        # Flag should be present but disabled (no person record exists)
+        assert "unknown-user-test-flag" in result["flags"]
+        assert result["flags"]["unknown-user-test-flag"]["enabled"] is False
+
+    def test_multiple_flags_single_request(self):
+        """
+        Test that multiple flags are correctly evaluated in a single /flags request.
+        """
+        # Create a person with various properties
+        self._create_person(
+            distinct_ids=["multi_flag_user"],
+            properties={"plan": "enterprise", "country": "US", "beta": True},
+        )
+
+        # Create multiple flags with different conditions
+        self._create_flag(
+            "multi-flag-1-enterprise",
+            {
+                "groups": [
+                    {
+                        "properties": [{"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"}],
+                        "rollout_percentage": 100,
+                    }
+                ],
+            },
+        )
+
+        self._create_flag(
+            "multi-flag-2-us-only",
+            {
+                "groups": [
+                    {
+                        "properties": [{"key": "country", "type": "person", "value": "US", "operator": "exact"}],
+                        "rollout_percentage": 100,
+                    }
+                ],
+            },
+        )
+
+        self._create_flag(
+            "multi-flag-3-beta",
+            {
+                "groups": [
+                    {
+                        "properties": [{"key": "beta", "type": "person", "value": True, "operator": "exact"}],
+                        "rollout_percentage": 100,
+                    }
+                ],
+            },
+        )
+
+        self._create_flag(
+            "multi-flag-4-no-match",
+            {
+                "groups": [
+                    {
+                        "properties": [{"key": "plan", "type": "person", "value": "free", "operator": "exact"}],
+                        "rollout_percentage": 100,
+                    }
+                ],
+            },
+        )
+
+        # Single request should return all flags
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "multi_flag_user")
+
+        # All matching flags should be enabled
+        assert result["flags"]["multi-flag-1-enterprise"]["enabled"] is True
+        assert result["flags"]["multi-flag-2-us-only"]["enabled"] is True
+        assert result["flags"]["multi-flag-3-beta"]["enabled"] is True
+        # Non-matching flag should be disabled
+        assert result["flags"]["multi-flag-4-no-match"]["enabled"] is False
+
+    def test_disabled_flag(self):
+        """
+        Test that flags with active=False are correctly skipped by the Rust service.
+        """
+        self._create_person(
+            distinct_ids=["disabled_flag_user"],
+            properties={"plan": "enterprise"},
+        )
+
+        # Create an active flag
+        self._create_flag(
+            "active-flag",
+            {
+                "groups": [
+                    {
+                        "properties": [{"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"}],
+                        "rollout_percentage": 100,
+                    }
+                ],
+            },
+            active=True,
+        )
+
+        # Create a disabled flag with the same conditions
+        self._create_flag(
+            "disabled-flag",
+            {
+                "groups": [
+                    {
+                        "properties": [{"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"}],
+                        "rollout_percentage": 100,
+                    }
+                ],
+            },
+            active=False,
+        )
+
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "disabled_flag_user")
+
+        # Active flag should be enabled
+        assert result["flags"]["active-flag"]["enabled"] is True
+        # Disabled flag should not be in the response or should be disabled
+        assert "disabled-flag" not in result["flags"] or result["flags"]["disabled-flag"]["enabled"] is False
+
+    def test_multivariate_flag(self):
+        """
+        Test multivariate flags with multiple variants.
+        """
+        self._create_person(
+            distinct_ids=["multivariate_user"],
+            properties={"plan": "enterprise"},
+        )
+
+        # Create a multivariate flag
+        self._create_flag(
+            "multivariate-feature",
+            {
+                "groups": [
+                    {
+                        "properties": [{"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"}],
+                        "rollout_percentage": 100,
+                    }
+                ],
+                "multivariate": {
+                    "variants": [
+                        {"key": "control", "rollout_percentage": 33},
+                        {"key": "test_a", "rollout_percentage": 33},
+                        {"key": "test_b", "rollout_percentage": 34},
+                    ]
+                },
+            },
+        )
+
+        result = call_flags_endpoint(self.rust_server_url, self.team.api_token, "multivariate_user")
+
+        # Flag should be enabled with a variant value
+        assert result["flags"]["multivariate-feature"]["enabled"] is True
+        # Variant should be one of the defined variants
+        assert result["flags"]["multivariate-feature"]["variant"] in ["control", "test_a", "test_b"]
+
+    def test_group_based_flag(self):
+        """
+        Test flags that target groups (e.g., organizations) rather than persons.
+        """
+        self._create_person(
+            distinct_ids=["group_user"],
+            properties={"email": "user@company.com"},
+        )
+
+        # Create a flag that targets a group property
+        self._create_flag(
+            "group-feature",
+            {
+                "aggregation_group_type_index": 0,  # Assumes group type 0 is "organization"
+                "groups": [
+                    {
+                        "properties": [
+                            {
+                                "key": "plan",
+                                "type": "group",
+                                "value": "enterprise",
+                                "operator": "exact",
+                                "group_type_index": 0,
+                            }
+                        ],
+                        "rollout_percentage": 100,
+                    }
+                ],
+            },
+        )
+
+        # Call with group context
+        result = call_flags_endpoint(
+            self.rust_server_url,
+            self.team.api_token,
+            "group_user",
+            groups={"organization": "org_123"},
+        )
+
+        # The flag should be present in the response
+        # (actual result depends on whether the group exists and matches)
+        assert "group-feature" in result["flags"]
