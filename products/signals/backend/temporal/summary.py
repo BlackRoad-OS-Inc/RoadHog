@@ -10,8 +10,6 @@ import temporalio
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 
-from posthog.schema import EmbeddingModelName
-
 from posthog.hogql import ast
 
 from posthog.models import Team
@@ -36,17 +34,16 @@ from products.signals.backend.temporal.agentic.select_repository import (
     select_repository_activity,
 )
 from products.signals.backend.temporal.clickhouse import execute_hogql_query_with_retry
-from products.signals.backend.temporal.safety_judge import SafetyJudgeInput, safety_judge_activity
+from products.signals.backend.temporal.report_safety_judge import SafetyJudgeInput, report_safety_judge_activity
 from products.signals.backend.temporal.summarize_signals import (
     SummarizeSignalsInput,
     SummarizeSignalsOutput,
     summarize_signals_activity,
 )
 from products.signals.backend.temporal.types import SignalData, SignalReportSummaryWorkflowInputs
+from products.signals.backend.utils import EMBEDDING_MODEL
 
 logger = structlog.get_logger(__name__)
-
-EMBEDDING_MODEL = EmbeddingModelName.TEXT_EMBEDDING_3_SMALL_1536
 
 
 @dataclass
@@ -118,7 +115,7 @@ class SignalReportSummaryWorkflow:
                 workflow.logger.info(f"Report {inputs.report_id} using agentic summary path")
                 # 3. Run safety judge first to avoid passing unsafe report into the agentic research
                 safety_result = await workflow.execute_activity(
-                    safety_judge_activity,
+                    report_safety_judge_activity,
                     SafetyJudgeInput(
                         team_id=inputs.team_id,
                         report_id=inputs.report_id,
@@ -190,7 +187,7 @@ class SignalReportSummaryWorkflow:
                 safety_result, actionability_result = await asyncio.gather(
                     # 5. Decide if the report is safe to process
                     workflow.execute_activity(
-                        safety_judge_activity,
+                        report_safety_judge_activity,
                         SafetyJudgeInput(
                             team_id=inputs.team_id,
                             report_id=inputs.report_id,

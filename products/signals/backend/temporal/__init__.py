@@ -32,7 +32,8 @@ from products.signals.backend.temporal.reingestion import (
     reingest_signals_activity,
     soft_delete_report_signals_activity,
 )
-from products.signals.backend.temporal.safety_judge import safety_judge_activity
+from products.signals.backend.temporal.report_safety_judge import report_safety_judge_activity
+from products.signals.backend.temporal.safety_filter import safety_filter_activity
 from products.signals.backend.temporal.summarize_signals import summarize_signals_activity
 from products.signals.backend.temporal.summary import (
     SignalReportSummaryWorkflow,
@@ -78,7 +79,8 @@ ACTIVITIES = [
     reset_report_to_potential_activity,
     run_agentic_report_activity,
     run_signal_semantic_search_activity,
-    safety_judge_activity,
+    report_safety_judge_activity,
+    safety_filter_activity,
     select_repository_activity,
     signals_agentic_report_gate_activity,
     soft_delete_report_signals_activity,
