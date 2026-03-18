@@ -106,6 +106,10 @@ class FunnelEventQuery(DataWarehouseSchemaMixin):
     def to_query(self, skip_entity_filter=False, skip_step_filter=False) -> ast.SelectQuery:
         table_configs_to_steps: dict[str, TableConfigWithSteps] = {}
         seen_config_keys: dict[tuple[str, str, str, str], int] = {}
+        seen_event_config_keys: dict[tuple[str | None, str | None], int] = {}
+        shared_event_sources_with_different_aggregation_targets = (
+            self._shared_event_sources_with_different_aggregation_targets()
+        )
 
         # collect the steps by their source table and configuration, so we can build one query per source table/configuration
         for step_index, node in enumerate(self.context.query.series):
@@ -127,7 +131,14 @@ class FunnelEventQuery(DataWarehouseSchemaMixin):
                     )
                 table_configs_to_steps[key].steps_with_index.append((step_index, node))
             else:
-                key = "events"
+                source_key = self._event_step_source_key(node)
+                if source_key in shared_event_sources_with_different_aggregation_targets:
+                    config_key = self._event_step_aggregation_target_key(node)
+                    if config_key not in seen_event_config_keys:
+                        seen_event_config_keys[config_key] = len(seen_event_config_keys)
+                    key = f"events_{seen_event_config_keys[config_key]}"
+                else:
+                    key = "events"
 
                 if key not in table_configs_to_steps:
                     table_configs_to_steps[key] = TableConfigWithSteps(
@@ -141,12 +152,13 @@ class FunnelEventQuery(DataWarehouseSchemaMixin):
         queries: list[ast.SelectQuery] = []
 
         for key, config in table_configs_to_steps.items():
-            if key == "events":
+            if config.table_name == "events":
                 queries.append(
                     self._build_events_table_query(
                         steps_with_index=cast(Sequence[tuple[int, EventsNode | ActionsNode]], config.steps_with_index),
                         skip_entity_filter=skip_entity_filter,
                         skip_step_filter=skip_step_filter,
+                        included_step_indices=None if key == "events" else {idx for idx, _ in config.steps_with_index},
                     )
                 )
             else:
@@ -178,8 +190,9 @@ class FunnelEventQuery(DataWarehouseSchemaMixin):
         steps_with_index: Sequence[tuple[int, EventsNode | ActionsNode]],
         skip_entity_filter: bool,
         skip_step_filter: bool,
+        included_step_indices: set[int] | None = None,
     ) -> ast.SelectQuery:
-        all_step_cols = self._get_funnel_cols()
+        all_step_cols = self._get_funnel_cols(included_step_indices=included_step_indices)
 
         select: list[ast.Expr] = [
             ast.Alias(alias="timestamp", expr=ast.Field(chain=[self.EVENT_TABLE_ALIAS, "timestamp"])),
@@ -276,6 +289,7 @@ class FunnelEventQuery(DataWarehouseSchemaMixin):
         self,
         table_entity: Optional[DataWarehouseNode] = None,
         table_config_index: Optional[int] = None,
+        included_step_indices: set[int] | None = None,
     ) -> list[ast.Expr]:
         cols: list[ast.Expr] = []
 
@@ -284,12 +298,20 @@ class FunnelEventQuery(DataWarehouseSchemaMixin):
 
         # step cols
         for index, entity in enumerate(self.context.query.series):
-            step_col = self._get_step_col(step_entity=entity, table_entity=table_entity, step_index=index)
+            step_col = self._get_step_col(
+                step_entity=entity,
+                table_entity=table_entity,
+                step_index=index,
+                included_step_indices=included_step_indices,
+            )
             cols.append(step_col)
 
         # exclusion cols
         if self.context.funnelsFilter.exclusions:
             for index, exclusions in enumerate(self.exclusions_by_index):
+                if included_step_indices is not None and index not in included_step_indices:
+                    cols.append(parse_expr(f"0 as exclusion_{index}"))
+                    continue
                 exclusion_col_expr = self._get_exclusions_col(
                     exclusions=exclusions, table_entity=table_entity, step_index=index
                 )
@@ -305,7 +327,11 @@ class FunnelEventQuery(DataWarehouseSchemaMixin):
         step_entity: EntityNode,
         table_entity: DataWarehouseNode | None,
         step_index: int,
+        included_step_indices: set[int] | None = None,
     ) -> ast.Expr:
+        if included_step_indices is not None and step_index not in included_step_indices:
+            return parse_expr(f"0 as step_{step_index}")
+
         # when the entity for which we're building the step column, is on a different table/config
         if entity_config_mismatch(step_entity, table_entity):
             return parse_expr(f"0 as step_{step_index}")
@@ -589,6 +615,36 @@ class FunnelEventQuery(DataWarehouseSchemaMixin):
             return parse_expr(f"group_{group_type_index}.properties.{escaped_target}")
 
         raise ValidationError(detail=f"Unsupported funnel aggregation target type: {aggregation_target_type}")
+
+    def _event_step_source_key(self, step_entity: EventsNode | ActionsNode) -> tuple[str, str]:
+        if isinstance(step_entity, ActionsNode):
+            return ("action", str(step_entity.id))
+        return ("event", str(step_entity.event))
+
+    def _event_step_aggregation_target_key(self, step_entity: EventsNode | ActionsNode) -> tuple[str | None, str | None]:
+        if not step_entity.funnelAggregationTarget:
+            return (None, None)
+
+        aggregation_target_type = step_entity.funnelAggregationTargetType or TaxonomicFilterGroupType.EVENT_PROPERTIES
+        return (step_entity.funnelAggregationTarget, str(aggregation_target_type))
+
+    def _shared_event_sources_with_different_aggregation_targets(self) -> set[tuple[str, str]]:
+        source_to_aggregation_keys: dict[tuple[str, str], set[tuple[str | None, str | None]]] = {}
+
+        for node in self.context.query.series:
+            if isinstance(node, DataWarehouseNode):
+                continue
+
+            source_key = self._event_step_source_key(node)
+            if source_key not in source_to_aggregation_keys:
+                source_to_aggregation_keys[source_key] = set()
+            source_to_aggregation_keys[source_key].add(self._event_step_aggregation_target_key(node))
+
+        return {
+            source_key
+            for source_key, aggregation_keys in source_to_aggregation_keys.items()
+            if len(aggregation_keys) > 1
+        }
 
     def _aggregation_target_expr(self, steps_with_index: Sequence[tuple[int, EventsNode | ActionsNode]]) -> ast.Expr:
         default_aggregation_target_expr = self._default_aggregation_target_expr()

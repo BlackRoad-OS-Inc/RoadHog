@@ -11,6 +11,7 @@ from posthog.test.base import (
     _create_person,
     also_test_with_materialized_columns,
     create_person_id_override_by_distinct_id,
+    flush_persons_and_events,
     snapshot_clickhouse_queries,
 )
 
@@ -3686,6 +3687,78 @@ class TestFOSSFunnelUDF(ClickhouseTestMixin, APIBaseTest):
             series=[
                 EventsNode(
                     event="user signed up",
+                    funnelAggregationTarget="dashboard_id",
+                    funnelAggregationTargetType=TaxonomicFilterGroupType.EVENT_PROPERTIES,
+                ),
+                EventsNode(
+                    event="$pageview",
+                    funnelAggregationTarget="replaceRegexpOne(properties.$pathname, '^/dashboard/', '')",
+                    funnelAggregationTargetType=TaxonomicFilterGroupType.HOGQL_EXPRESSION,
+                ),
+            ],
+            dateRange=DateRange(date_from="2024-03-20", date_to="2024-03-21"),
+            funnelsFilter=FunnelsFilter(funnelWindowInterval=14),
+        )
+
+        results = FunnelsQueryRunner(query=query, team=self.team).calculate().results
+
+        self.assertEqual(results[0]["count"], 3)
+        self.assertEqual(results[1]["count"], 2)
+
+    @snapshot_clickhouse_queries
+    def test_custom_step_aggregation_targets_work_for_repeated_events(self):
+        for distinct_id in ["creator_1", "creator_2", "creator_3", "viewer_1", "viewer_2", "viewer_3"]:
+            _create_person(distinct_ids=[distinct_id], team_id=self.team.pk)
+
+        _create_event(
+            team=self.team,
+            event="$pageview",
+            distinct_id="creator_1",
+            timestamp="2024-03-20T12:00:00Z",
+            properties={"dashboard_id": "1"},
+        )
+        _create_event(
+            team=self.team,
+            event="$pageview",
+            distinct_id="creator_2",
+            timestamp="2024-03-20T12:01:00Z",
+            properties={"dashboard_id": "2"},
+        )
+        _create_event(
+            team=self.team,
+            event="$pageview",
+            distinct_id="creator_3",
+            timestamp="2024-03-20T12:02:00Z",
+            properties={"dashboard_id": "3"},
+        )
+
+        _create_event(
+            team=self.team,
+            event="$pageview",
+            distinct_id="viewer_1",
+            timestamp="2024-03-20T12:10:00Z",
+            properties={"$pathname": "/dashboard/1"},
+        )
+        _create_event(
+            team=self.team,
+            event="$pageview",
+            distinct_id="viewer_2",
+            timestamp="2024-03-20T12:11:00Z",
+            properties={"$pathname": "/dashboard/2"},
+        )
+        _create_event(
+            team=self.team,
+            event="$pageview",
+            distinct_id="viewer_3",
+            timestamp="2024-03-20T12:12:00Z",
+            properties={"$pathname": "/dashboard/4"},
+        )
+        flush_persons_and_events()
+
+        query = FunnelsQuery(
+            series=[
+                EventsNode(
+                    event="$pageview",
                     funnelAggregationTarget="dashboard_id",
                     funnelAggregationTargetType=TaxonomicFilterGroupType.EVENT_PROPERTIES,
                 ),
