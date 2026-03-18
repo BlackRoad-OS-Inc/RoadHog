@@ -38,6 +38,7 @@ from products.data_warehouse.backend.models.external_data_source import External
 from products.data_warehouse.backend.models.table import DataWarehouseTable as DataWarehouseTableModel
 from products.error_tracking.backend.models import ErrorTrackingIssue
 from products.experiments.backend.models.experiment import Experiment
+from products.logs.backend.models import LogsAlertConfiguration
 from products.notebooks.backend.models import Notebook
 
 ALL_SYSTEM_TABLE_NAMES = sorted(SystemTables().children.keys())
@@ -227,6 +228,10 @@ def _create_group_type_mapping(team: Team, label: str) -> GroupTypeMapping:
     )
 
 
+def _create_logs_alert_configuration(team: Team, label: str) -> LogsAlertConfiguration:
+    return LogsAlertConfiguration.objects.create(team=team, name=f"logs_alert_{label}", threshold_count=10)
+
+
 def _create_insight(team: Team, label: str) -> Insight:
     return Insight.objects.create(team=team, name=f"insight_{label}")
 
@@ -271,6 +276,7 @@ SYSTEM_TABLE_FACTORIES = [
     ("hog_functions", _create_hog_function),
     ("insights", _create_insight),
     ("insight_variables", _create_insight_variable),
+    ("logs_alert_configurations", _create_logs_alert_configuration),
     ("notebooks", _create_notebook),
     ("source_schemas", _create_source_schema),
     ("surveys", _create_survey),

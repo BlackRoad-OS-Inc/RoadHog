@@ -309,6 +309,35 @@ insight_variables: PostgresTable = PostgresTable(
     },
 )
 
+logs_alert_configurations: PostgresTable = PostgresTable(
+    name="logs_alert_configurations",
+    postgres_table_name="logs_logsalertconfiguration",
+    access_scope="logs",
+    fields={
+        "id": StringDatabaseField(name="id"),
+        "team_id": IntegerDatabaseField(name="team_id"),
+        "name": StringDatabaseField(name="name"),
+        "_enabled": BooleanDatabaseField(name="enabled", hidden=True),
+        "enabled": ExpressionField(name="enabled", expr=ast.Call(name="toInt", args=[ast.Field(chain=["_enabled"])])),
+        "filters": StringJSONDatabaseField(name="filters"),
+        "threshold_count": IntegerDatabaseField(name="threshold_count"),
+        "threshold_operator": StringDatabaseField(name="threshold_operator"),
+        "window_minutes": IntegerDatabaseField(name="window_minutes"),
+        "check_interval_minutes": IntegerDatabaseField(name="check_interval_minutes"),
+        "state": StringDatabaseField(name="state"),
+        "evaluation_periods": IntegerDatabaseField(name="evaluation_periods"),
+        "datapoints_to_alarm": IntegerDatabaseField(name="datapoints_to_alarm"),
+        "cooldown_minutes": IntegerDatabaseField(name="cooldown_minutes"),
+        "snooze_until": DateTimeDatabaseField(name="snooze_until"),
+        "next_check_at": DateTimeDatabaseField(name="next_check_at"),
+        "last_notified_at": DateTimeDatabaseField(name="last_notified_at"),
+        "last_checked_at": DateTimeDatabaseField(name="last_checked_at"),
+        "consecutive_failures": IntegerDatabaseField(name="consecutive_failures"),
+        "created_at": DateTimeDatabaseField(name="created_at"),
+        "updated_at": DateTimeDatabaseField(name="updated_at"),
+    },
+)
+
 surveys: PostgresTable = PostgresTable(
     name="surveys",
     postgres_table_name="posthog_survey",
@@ -543,6 +572,7 @@ class SystemTables(TableNode):
         "ingestion_warnings": TableNode(name="ingestion_warnings", table=IngestionWarningsTable()),
         "insight_variables": TableNode(name="insight_variables", table=insight_variables),
         "insights": TableNode(name="insights", table=insights),
+        "logs_alert_configurations": TableNode(name="logs_alert_configurations", table=logs_alert_configurations),
         "notebooks": TableNode(name="notebooks", table=notebooks),
         "source_schemas": TableNode(name="source_schemas", table=source_schemas),
         "source_sync_jobs": TableNode(name="source_sync_jobs", table=source_sync_jobs),
