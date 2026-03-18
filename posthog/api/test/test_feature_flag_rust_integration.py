@@ -90,7 +90,7 @@ def create_cohort_via_api(
             format="multipart",
         )
 
-    assert response.status_code == 201, f"Failed to create cohort: {response.content}"
+    assert response.status_code == 201, f"Failed to create cohort: {response.content.decode()}"
     return response.json()
 
 
@@ -116,7 +116,7 @@ def create_flag_via_api(
         format="json",
     )
 
-    assert response.status_code == 201, f"Failed to create flag: {response.content}"
+    assert response.status_code == 201, f"Failed to create flag: {response.content.decode()}"
     return response.json()
 
 
