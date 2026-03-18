@@ -45,6 +45,26 @@ from posthog.models.group_type_mapping import GroupTypeMapping
 RUST_FLAGS_SERVICE_URL = os.environ.get("FEATURE_FLAGS_SERVICE_URL", "")
 
 
+def _cohort_filters(*and_groups: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build a standard OR-of-AND cohort filter envelope.
+
+    Each argument is a list of property conditions that form an AND group.
+    Multiple arguments create multiple OR branches.
+
+    Example:
+        _cohort_filters(
+            [{"key": "email", "type": "person", "value": "@posthog.com", "operator": "icontains"}],
+            [{"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"}],
+        )
+    """
+    return {
+        "properties": {
+            "type": "OR",
+            "values": [{"type": "AND", "values": conditions} for conditions in and_groups],
+        }
+    }
+
+
 def create_cohort_via_api(
     client: Client | APIClient, team_id: int, name: str, filters: dict[str, Any]
 ) -> dict[str, Any]:
@@ -203,20 +223,12 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         # Create cohort via API - this will go through the serializer and compute cohort_type
         cohort_data = self._create_cohort(
             "PostHog Enterprise Users",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [
-                                {"key": "email", "type": "person", "value": "@posthog.com", "operator": "icontains"},
-                                {"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"},
-                            ],
-                        }
-                    ],
-                }
-            },
+            _cohort_filters(
+                [
+                    {"key": "email", "type": "person", "value": "@posthog.com", "operator": "icontains"},
+                    {"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"},
+                ],
+            ),
         )
 
         # Verify the cohort was classified as realtime
@@ -270,25 +282,10 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
 
         cohort_data = self._create_cohort(
             "Paid Users",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [
-                                {"key": "subscription", "type": "person", "value": "premium", "operator": "exact"}
-                            ],
-                        },
-                        {
-                            "type": "AND",
-                            "values": [
-                                {"key": "subscription", "type": "person", "value": "enterprise", "operator": "exact"}
-                            ],
-                        },
-                    ],
-                }
-            },
+            _cohort_filters(
+                [{"key": "subscription", "type": "person", "value": "premium", "operator": "exact"}],
+                [{"key": "subscription", "type": "person", "value": "enterprise", "operator": "exact"}],
+            ),
         )
 
         cohort = Cohort.objects.get(id=cohort_data["id"])
@@ -336,25 +333,17 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
 
         cohort_data = self._create_cohort(
             "Business Email Users",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [
-                                {
-                                    "key": "email",
-                                    "type": "person",
-                                    "value": "@(gmail|yahoo|hotmail)\\.com$",
-                                    "operator": "not_regex",
-                                },
-                                {"key": "status", "type": "person", "value": "active", "operator": "exact"},
-                            ],
-                        }
-                    ],
-                }
-            },
+            _cohort_filters(
+                [
+                    {
+                        "key": "email",
+                        "type": "person",
+                        "value": "@(gmail|yahoo|hotmail)\\.com$",
+                        "operator": "not_regex",
+                    },
+                    {"key": "status", "type": "person", "value": "active", "operator": "exact"},
+                ],
+            ),
         )
 
         cohort = Cohort.objects.get(id=cohort_data["id"])
@@ -406,36 +395,20 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         # Inner cohort: verified users
         inner_cohort = self._create_cohort(
             "Verified Users",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [{"key": "verified", "type": "person", "value": True, "operator": "exact"}],
-                        }
-                    ],
-                }
-            },
+            _cohort_filters(
+                [{"key": "verified", "type": "person", "value": True, "operator": "exact"}],
+            ),
         )
 
         # Outer cohort: US users who are verified
         outer_cohort = self._create_cohort(
             "US Verified Users",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [
-                                {"key": "country", "type": "person", "value": "US", "operator": "exact"},
-                                {"key": "id", "type": "cohort", "value": inner_cohort["id"]},
-                            ],
-                        }
-                    ],
-                }
-            },
+            _cohort_filters(
+                [
+                    {"key": "country", "type": "person", "value": "US", "operator": "exact"},
+                    {"key": "id", "type": "cohort", "value": inner_cohort["id"]},
+                ],
+            ),
         )
 
         cohort = Cohort.objects.get(id=outer_cohort["id"])
@@ -491,33 +464,17 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         # Include cohort: enterprise users
         include_cohort = self._create_cohort(
             "Enterprise Users",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [{"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"}],
-                        }
-                    ],
-                }
-            },
+            _cohort_filters(
+                [{"key": "plan", "type": "person", "value": "enterprise", "operator": "exact"}],
+            ),
         )
 
         # Exclude cohort: competitors
         exclude_cohort = self._create_cohort(
             "Competitors",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [{"key": "is_competitor", "type": "person", "value": True, "operator": "exact"}],
-                        }
-                    ],
-                }
-            },
+            _cohort_filters(
+                [{"key": "is_competitor", "type": "person", "value": True, "operator": "exact"}],
+            ),
         )
 
         # Flag: in include cohort AND NOT in exclude cohort
@@ -572,24 +529,9 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
 
         cohort_data = self._create_cohort(
             "Recently Created Users",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [
-                                {
-                                    "key": "created_at",
-                                    "type": "person",
-                                    "value": cutoff_date,
-                                    "operator": "is_date_after",
-                                }
-                            ],
-                        }
-                    ],
-                }
-            },
+            _cohort_filters(
+                [{"key": "created_at", "type": "person", "value": cutoff_date, "operator": "is_date_after"}],
+            ),
         )
 
         cohort = Cohort.objects.get(id=cohort_data["id"])
@@ -642,17 +584,9 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         # Beta testers cohort (for super condition)
         beta_cohort = self._create_cohort(
             "Beta Testers",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [{"key": "is_beta_tester", "type": "person", "value": True, "operator": "exact"}],
-                        }
-                    ],
-                }
-            },
+            _cohort_filters(
+                [{"key": "is_beta_tester", "type": "person", "value": True, "operator": "exact"}],
+            ),
         )
 
         # Flag with super condition for beta testers
@@ -705,7 +639,7 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         # Create static cohort via API
         cohort_data = self._create_cohort(
             "Static VIP Users",
-            {"properties": {"type": "OR", "values": []}},  # Empty filters for static
+            _cohort_filters(),  # Empty filters for static
         )
 
         # Manually add person to static cohort via direct Postgres insert
@@ -748,17 +682,9 @@ class TestFeatureFlagRustIntegration(NonAtomicBaseTest):
         # Create a flag with a cohort condition
         cohort_data = self._create_cohort(
             "Existing Users",
-            {
-                "properties": {
-                    "type": "OR",
-                    "values": [
-                        {
-                            "type": "AND",
-                            "values": [{"key": "plan", "type": "person", "value": "pro", "operator": "exact"}],
-                        }
-                    ],
-                }
-            },
+            _cohort_filters(
+                [{"key": "plan", "type": "person", "value": "pro", "operator": "exact"}],
+            ),
         )
 
         self._create_flag(
