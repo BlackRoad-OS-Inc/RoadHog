@@ -10,8 +10,16 @@ match production serialization behavior - specifically the cohort_type computati
 that determines how cohorts are evaluated at runtime.
 
 To run these tests locally:
-    1. Start the Rust flags service: cd rust/feature-flags && cargo run
-    2. Run the tests: pytest posthog/api/test/test_feature_flag_rust_integration.py -v
+    1. Start the Rust server:
+       cd rust/feature-flags
+       READ_DATABASE_URL=postgres://posthog:posthog@localhost:5432/test_posthog \
+       WRITE_DATABASE_URL=postgres://posthog:posthog@localhost:5432/test_posthog \
+       cargo run --bin feature-flags
+
+    2. Run tests:
+       SKIP_RUST_INTEGRATION_TESTS=0 \
+       FEATURE_FLAGS_SERVICE_URL=http://127.0.0.1:3001 \
+       pytest posthog/api/test/test_feature_flag_rust_integration.py -v
 
 In CI, these tests require FEATURE_FLAGS_SERVICE_URL to point to a running Rust service.
 """
@@ -40,18 +48,7 @@ def rust_flags_server() -> Generator[str, None, None]:
     Connect to an external Rust feature flags server for integration tests.
 
     Requires FEATURE_FLAGS_SERVICE_URL to be set and pointing to a running server.
-
-    To run locally:
-        1. Start the Rust server:
-           cd rust/feature-flags
-           READ_DATABASE_URL=postgres://posthog:posthog@localhost:5432/test_posthog \\
-           WRITE_DATABASE_URL=postgres://posthog:posthog@localhost:5432/test_posthog \\
-           cargo run --bin feature-flags
-
-        2. Run tests:
-           SKIP_RUST_INTEGRATION_TESTS=0 \\
-           FEATURE_FLAGS_SERVICE_URL=http://127.0.0.1:3001 \\
-           pytest posthog/api/test/test_feature_flag_rust_integration.py -v
+    See module docstring for local setup instructions.
     """
     server_url = os.environ.get("FEATURE_FLAGS_SERVICE_URL")
 
