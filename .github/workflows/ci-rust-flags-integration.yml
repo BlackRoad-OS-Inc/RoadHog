@@ -1,163 +1,172 @@
 name: Rust Flags Integration Tests
 
 on:
-    workflow_dispatch:
-    pull_request:
-        paths:
-            - 'rust/feature-flags/**'
-            - 'posthog/api/test/test_feature_flag_rust_integration.py'
-            - 'posthog/api/feature_flags/**'
-            - 'posthog/api/cohort.py'
-            - 'posthog/models/feature_flag/**'
-            - 'posthog/models/cohort/**'
-            - '.github/workflows/ci-rust-flags-integration.yml'
-    push:
-        branches:
-            - master
-        paths:
-            - 'rust/feature-flags/**'
-            - 'posthog/api/test/test_feature_flag_rust_integration.py'
-            - 'posthog/api/feature_flags/**'
-            - 'posthog/api/cohort.py'
-            - 'posthog/models/feature_flag/**'
-            - 'posthog/models/cohort/**'
-            - '.github/workflows/ci-rust-flags-integration.yml'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "rust/feature-flags/**"
+      - "posthog/api/test/test_feature_flag_rust_integration.py"
+      - "posthog/api/feature_flags/**"
+      - "posthog/api/cohort.py"
+      - "posthog/models/feature_flag/**"
+      - "posthog/models/cohort/**"
+      - ".github/workflows/ci-rust-flags-integration.yml"
+  push:
+    branches:
+      - master
+    paths:
+      - "rust/feature-flags/**"
+      - "posthog/api/test/test_feature_flag_rust_integration.py"
+      - "posthog/api/feature_flags/**"
+      - "posthog/api/cohort.py"
+      - "posthog/models/feature_flag/**"
+      - "posthog/models/cohort/**"
+      - ".github/workflows/ci-rust-flags-integration.yml"
 
 permissions:
-    contents: read
+  contents: read
 
 concurrency:
-    group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-    cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 env:
-    # Django SECRET_KEY for cryptographic signing (sessions, CSRF, etc.) - test-only, not used in production
-    SECRET_KEY: '6b01eee4f945ca25045b5aab440b953461b81b72'
-    DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/test_posthog'
-    REDIS_URL: 'redis://localhost:6379/'
-    TEST: 1
-    UV_HTTP_TIMEOUT: 300
+  # Django SECRET_KEY for cryptographic signing (sessions, CSRF, etc.) - test-only, not used in production
+  SECRET_KEY: "6b01eee4f945ca25045b5aab440b953461b81b72"
+  DATABASE_URL: "postgres://posthog:posthog@localhost:5432/test_posthog"
+  REDIS_URL: "redis://localhost:6379/"
+  TEST: 1
+  UV_HTTP_TIMEOUT: 300
 
 jobs:
-    rust-flags-integration:
-        name: Rust /flags Integration Tests
-        runs-on: depot-ubuntu-latest
-        timeout-minutes: 30
+  rust-flags-integration:
+    name: Rust /flags Integration Tests
+    runs-on: depot-ubuntu-latest
+    timeout-minutes: 30
 
-        services:
-            postgres:
-                image: postgres:16-alpine
-                env:
-                    POSTGRES_USER: posthog
-                    POSTGRES_PASSWORD: posthog
-                    POSTGRES_DB: test_posthog
-                ports:
-                    - 5432:5432
-                options: >-
-                    --health-cmd pg_isready
-                    --health-interval 10s
-                    --health-timeout 5s
-                    --health-retries 5
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: posthog
+          POSTGRES_PASSWORD: posthog
+          POSTGRES_DB: test_posthog
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-            redis:
-                image: redis:7-alpine
-                ports:
-                    - 6379:6379
-                options: >-
-                    --health-cmd "redis-cli ping"
-                    --health-interval 10s
-                    --health-timeout 5s
-                    --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-        steps:
-            - uses: actions/checkout@v6
+    steps:
+      - uses: actions/checkout@v6
 
-            - name: Set up Python
-              uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-              with:
-                  python-version: '3.12.12'
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12.12"
 
-            - name: Install uv
-              uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
-              with:
-                  version: '0.10.2'
-                  enable-cache: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        with:
+          version: "0.10.2"
+          enable-cache: true
 
-            - name: Install system dependencies
-              run: sudo apt-get update && sudo apt-get install -y libxml2-dev libxmlsec1-dev libxmlsec1-openssl postgresql-client
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libxml2-dev libxmlsec1-dev libxmlsec1-openssl postgresql-client
 
-            - name: Install Rust
-              uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e
-              with:
-                  toolchain: 1.91.1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e
+        with:
+          toolchain: 1.91.1
 
-            - name: Cache Rust dependencies
-              uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-              with:
-                  shared-key: 'v2-rust-flags-integration'
-                  workspaces: rust
-                  save-if: ${{ github.ref == 'refs/heads/master' }}
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          shared-key: "v2-rust-flags-integration"
+          workspaces: rust
+          save-if: ${{ github.ref == 'refs/heads/master' }}
 
-            - name: Install Python dependencies
-              run: UV_PROJECT_ENVIRONMENT=$pythonLocation uv sync --frozen --dev
+      - name: Install Python dependencies
+        run: UV_PROJECT_ENVIRONMENT=$pythonLocation uv sync --frozen --dev
 
-            - name: Create persons database
-              run: |
-                  PGPASSWORD=posthog psql -h localhost -U posthog -d test_posthog -c "CREATE DATABASE test_posthog_persons;"
+      - name: Create persons database
+        run: |
+          PGPASSWORD=posthog psql -h localhost -U posthog -d test_posthog -c "CREATE DATABASE test_posthog_persons;"
 
-            - name: Set up test database schema
-              run: |
-                  python manage.py migrate --run-syncdb
-              env:
-                  DEBUG: '1'
-                  DATABASE_URL: 'postgres://posthog:posthog@localhost:5432/test_posthog'
+      - name: Install sqlx-cli
+        uses: ./.github/actions/setup-sqlx-cli
 
-            - name: Build Rust flags service
-              working-directory: rust
-              run: cargo build --release -p feature-flags
+      - name: Set up test database schema
+        run: |
+          python manage.py migrate --run-syncdb
+        env:
+          DEBUG: "1"
+          DATABASE_URL: "postgres://posthog:posthog@localhost:5432/test_posthog"
 
-            - name: Download MaxMind Database
-              run: |
-                  ./bin/download-mmdb
+      - name: Run persons database migrations
+        run: |
+          sqlx migrate run --source rust/persons_migrations/
+        env:
+          DATABASE_URL: "postgres://posthog:posthog@localhost:5432/test_posthog_persons"
 
-            - name: Start Rust flags service
-              working-directory: rust
-              run: |
-                  ./target/release/feature-flags &
-                  echo "RUST_FLAGS_PID=$!" >> $GITHUB_ENV
-                  # Wait for service to be ready
-                  for i in {1..30}; do
-                      if curl -s http://127.0.0.1:3001/_readiness > /dev/null 2>&1; then
-                          echo "Rust flags service is ready"
-                          break
-                      fi
-                      echo "Waiting for Rust flags service... ($i/30)"
-                      sleep 2
-                  done
-                  # Fail if service is not ready after all retries
-                  if ! curl -s http://127.0.0.1:3001/_readiness > /dev/null 2>&1; then
-                      echo "ERROR: Rust flags service failed to start after 30 attempts"
-                      exit 1
-                  fi
-              env:
-                  BIND_HOST: '127.0.0.1'
-                  BIND_PORT: '3001'
-                  READ_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog
-                  WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog
-                  PERSONS_READ_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog_persons
-                  PERSONS_WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog_persons
-                  REDIS_URL: redis://localhost:6379/
+      - name: Build Rust flags service
+        working-directory: rust
+        run: cargo build --release -p feature-flags
 
-            - name: Run integration tests
-              run: |
-                  pytest posthog/api/test/test_feature_flag_rust_integration.py -v --tb=short
-              env:
-                  SKIP_RUST_INTEGRATION_TESTS: '0'
-                  FEATURE_FLAGS_SERVICE_URL: 'http://127.0.0.1:3001'
+      - name: Download MaxMind Database
+        run: |
+          ./bin/download-mmdb
 
-            - name: Stop Rust flags service
-              if: always()
-              run: |
-                  if [ -n "$RUST_FLAGS_PID" ]; then
-                      kill $RUST_FLAGS_PID || true
-                  fi
+      - name: Start Rust flags service
+        working-directory: rust
+        run: |
+          ./target/release/feature-flags &
+          echo "RUST_FLAGS_PID=$!" >> $GITHUB_ENV
+          # Wait for service to be ready
+          for i in {1..30}; do
+              if curl -s http://127.0.0.1:3001/_readiness > /dev/null 2>&1; then
+                  echo "Rust flags service is ready"
+                  break
+              fi
+              echo "Waiting for Rust flags service... ($i/30)"
+              sleep 2
+          done
+          # Fail if service is not ready after all retries
+          if ! curl -s http://127.0.0.1:3001/_readiness > /dev/null 2>&1; then
+              echo "ERROR: Rust flags service failed to start after 30 attempts"
+              exit 1
+          fi
+        env:
+          BIND_HOST: "127.0.0.1"
+          BIND_PORT: "3001"
+          READ_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog
+          WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog
+          PERSONS_READ_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog_persons
+          PERSONS_WRITE_DATABASE_URL: postgres://posthog:posthog@localhost:5432/test_posthog_persons
+          REDIS_URL: redis://localhost:6379/
+
+      - name: Run integration tests
+        run: |
+          pytest posthog/api/test/test_feature_flag_rust_integration.py -v --tb=short
+        env:
+          SKIP_RUST_INTEGRATION_TESTS: "0"
+          FEATURE_FLAGS_SERVICE_URL: "http://127.0.0.1:3001"
+
+      - name: Stop Rust flags service
+        if: always()
+        run: |
+          if [ -n "$RUST_FLAGS_PID" ]; then
+              kill $RUST_FLAGS_PID || true
+          fi
