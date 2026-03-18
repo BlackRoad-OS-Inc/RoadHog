@@ -81,7 +81,13 @@ class PriorityAssessment(BaseModel):
 
 
 class ReportPresentationOutput(BaseModel):
-    title: str = Field(description="A short, descriptive title for the report", max_length=100)
+    title: str = Field(
+        description=(
+            "A PR-style title (max 70 chars) scoped to one concrete concern. "
+            "It should read like a pull request title that one engineer could ship."
+        ),
+        max_length=70,
+    )
     summary: str = Field(
         description=(
             "A very short factual summary of the report in 1-3 sentences. "
@@ -406,7 +412,14 @@ def build_report_presentation_prompt(
 
 ## Output goals
 
-- **Title**: a short, concrete headline describing the report's core issue or theme.
+- **Title**: a PR-style title (max 70 chars) scoped to one concrete concern. 
+- If the report already has a title that is PR-specific and still accurate after your research, keep it — don't replace a good PR title with a vaguer one.
+- It should read like a pull request title that one engineer could ship in a single PR. Target one feature, one bug, one component, or one tightly-scoped change.
+  - Good: "Fix date picker timezone handling in insights"
+  - Good: "Add percentile options to funnel Time to Convert"
+  - Bad: "Various funnel improvements and bug fixes"
+  - Bad: "Multiple analytics issues"
+
 - **Summary**: 1-3 short factual sentences explaining what the signals collectively indicate and what area of the product or codebase is involved.
 - Do **not** restate actionability, priority, urgency, or next steps unless they are part of the factual issue itself.
 - Keep the summary compact and information-dense.
