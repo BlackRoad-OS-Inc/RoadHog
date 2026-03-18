@@ -5,16 +5,16 @@ import * as React from 'react'
 import { cn } from './lib/utils'
 
 const buttonVariants = cva(
-    "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-xs/relaxed font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+    "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-xs/relaxed font-medium whitespace-nowrap transition-all duration-100 outline-none select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 active:translate-y-px",
     {
         variants: {
             variant: {
                 default: 'bg-primary text-primary-foreground hover:bg-primary/80',
                 outline:
                     'bg-accent/30 border-foreground/10 dark:border-foreground/15 hover:bg-accent/90 hover:text-foreground dark:hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground data-[popup-open]:bg-input/50',
-                ghost: 'hover:bg-foreground/10 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground data-[popup-open]:bg-foreground/10',
+                ghost: 'hover:bg-foreground/10 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground data-[popup-open]:bg-foreground/10 border-none',
                 destructive:
-                    'bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40 data-[popup-open]:bg-destructive/20',
+                    'bg-destructive text-destructive-foreground hover:bg-destructive/50 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40 data-[popup-open]:bg-destructive/20',
                 link: 'text-primary underline-offset-4 hover:underline data-[popup-open]:underline cursor-pointer',
             },
             size: {
