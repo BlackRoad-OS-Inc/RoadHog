@@ -1,3 +1,4 @@
+import re
 import json
 import math
 import secrets
@@ -511,8 +512,7 @@ class TeamSerializer(serializers.ModelSerializer, UserPermissionsSerializerMixin
 
         return value
 
-    @staticmethod
-    def validate_session_recording_trigger_groups(value) -> dict | None:
+    def validate_session_recording_trigger_groups(self, value) -> dict | None:
         """
         Validate V2 trigger groups configuration.
 
@@ -559,49 +559,50 @@ class TeamSerializer(serializers.ModelSerializer, UserPermissionsSerializerMixin
 
         # Validate each group
         for idx, group in enumerate(value["groups"]):
-            TeamSerializer._validate_trigger_group(group, idx)
+            self._validate_trigger_group(group, idx)
 
-        # Validate evaluation mode
-        if "groupEvaluationMode" in value:
-            valid_modes = ["first_match", "highest_priority"]
-            if value["groupEvaluationMode"] not in valid_modes:
-                raise exceptions.ValidationError(
-                    f"Invalid groupEvaluationMode: '{value['groupEvaluationMode']}'. "
-                    f"Must be one of: {', '.join(valid_modes)}."
-                )
+        # Note: All matching groups are evaluated independently
+        # If any group's sample rate hits, the session is recorded (union behavior)
 
         # Validate fallback sample rate if present
         if "fallbackSampleRate" in value:
             rate = value["fallbackSampleRate"]
-            if not isinstance(rate, (int, float)) or not (0 <= rate <= 1):
+            if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not (0 <= rate <= 1):
                 raise exceptions.ValidationError(
                     f"Invalid fallbackSampleRate: {rate}. Must be a number between 0 and 1."
                 )
 
         return value
 
-    @staticmethod
-    def _validate_trigger_group(group: dict, index: int) -> None:
+    def _validate_trigger_group(self, group: dict, index: int) -> None:
         """Validate a single trigger group."""
         if not isinstance(group, dict):
             raise exceptions.ValidationError(f"Group {index}: must be a dictionary.")
 
         # Required fields
-        required_fields = ["id", "sampleRate", "order", "conditions"]
+        required_fields = ["id", "sampleRate", "conditions"]
         for field in required_fields:
             if field not in group:
                 raise exceptions.ValidationError(f"Group {index}: missing required field '{field}'.")
 
         # Validate sampleRate
         rate = group["sampleRate"]
-        if not isinstance(rate, (int, float)) or not (0 <= rate <= 1):
+        if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not (0 <= rate <= 1):
             raise exceptions.ValidationError(
                 f"Group {index}: invalid sampleRate '{rate}'. Must be a number between 0 and 1."
             )
 
-        # Validate order
-        if not isinstance(group["order"], int):
-            raise exceptions.ValidationError(f"Group {index}: field 'order' must be an integer.")
+        # Validate minDurationMs if present
+        if "minDurationMs" in group:
+            min_duration = group["minDurationMs"]
+            if isinstance(min_duration, bool) or not isinstance(min_duration, int):
+                raise exceptions.ValidationError(
+                    f"Group {index}: 'minDurationMs' must be an integer, got {type(min_duration).__name__}."
+                )
+            if min_duration < 0 or min_duration > 30000:
+                raise exceptions.ValidationError(
+                    f"Group {index}: 'minDurationMs' must be between 0 and 30000 (30 seconds). Got: {min_duration}."
+                )
 
         # Validate conditions
         conditions = group["conditions"]
@@ -640,29 +641,28 @@ class TeamSerializer(serializers.ModelSerializer, UserPermissionsSerializerMixin
                     )
                 # Validate regex pattern
                 try:
-                    import re
-
                     re.compile(url_config["url"])
-                except re.error as e:
+                except re.error:
                     raise exceptions.ValidationError(
-                        f"Group {index}: invalid regex pattern '{url_config['url']}': {str(e)}."
+                        f"Group {index}: invalid regex pattern in URL: '{url_config['url']}'."
                     )
 
-        # Validate flags array if present
-        if "flags" in conditions:
-            if not isinstance(conditions["flags"], list):
-                raise exceptions.ValidationError(f"Group {index}: field 'flags' must be an array.")
-            for flag_config in conditions["flags"]:
-                if isinstance(flag_config, str):
-                    continue  # Simple flag name is valid
-                elif isinstance(flag_config, dict):
-                    if "flag" not in flag_config:
-                        raise exceptions.ValidationError(f"Group {index}: flag object must have 'flag' field.")
-                    # variant is optional
-                else:
-                    raise exceptions.ValidationError(
-                        f"Group {index}: flag must be a string or object with 'flag' field."
-                    )
+        # Validate flag (single) if present
+        if "flag" in conditions:
+            flag_config = conditions["flag"]
+            if isinstance(flag_config, str):
+                pass  # Simple flag key is valid
+            elif isinstance(flag_config, dict):
+                # LinkedFeatureFlag object with id, key, and optional variant
+                if "key" not in flag_config:
+                    raise exceptions.ValidationError(f"Group {index}: flag object must have 'key' field.")
+                if not isinstance(flag_config["key"], str):
+                    raise exceptions.ValidationError(f"Group {index}: flag 'key' must be a string.")
+                # id and variant are optional
+            elif flag_config is not None:
+                raise exceptions.ValidationError(
+                    f"Group {index}: 'flag' must be a string (flag key), object (LinkedFeatureFlag), or null."
+                )
 
     @staticmethod
     def validate_session_recording_retention_period(value) -> Literal["30d", "90d", "1y", "5y"] | None:

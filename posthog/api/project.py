@@ -156,6 +156,12 @@ class ProjectBackwardCompatSerializer(ProjectBackwardCompatBasicSerializer, User
             "session_recording_linked_flag",  # Compat with TeamSerializer
             "session_recording_network_payload_capture_config",  # Compat with TeamSerializer
             "session_recording_masking_config",  # Compat with TeamSerializer
+            "session_recording_url_trigger_config",  # Compat with TeamSerializer
+            "session_recording_url_blocklist_config",  # Compat with TeamSerializer
+            "session_recording_event_trigger_config",  # Compat with TeamSerializer
+            "session_recording_trigger_match_type_config",  # Compat with TeamSerializer
+            "session_recording_trigger_groups",  # Compat with TeamSerializer
+            "session_recording_retention_period",  # Compat with TeamSerializer
             "session_replay_config",  # Compat with TeamSerializer
             "survey_config",  # Compat with TeamSerializer
             "access_control",  # Compat with TeamSerializer

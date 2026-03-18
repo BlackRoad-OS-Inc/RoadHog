@@ -3,7 +3,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("posthog", "1054_add_detector_fields"),
+        ("posthog", "1060_alter_integration_kind"),
     ]
 
     operations = [
