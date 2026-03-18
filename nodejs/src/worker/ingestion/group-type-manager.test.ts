@@ -1,3 +1,5 @@
+import { getDefaultCdpConfig } from '~/cdp/config'
+
 import { createTeam, getTeam, resetTestDatabase } from '../../../tests/helpers/sql'
 import { Hub, ProjectId } from '../../types'
 import { closeHub, createHub } from '../../utils/db/hub'
@@ -15,7 +17,7 @@ describe('GroupTypeManager()', () => {
     beforeEach(async () => {
         hub = await createHub()
         await resetTestDatabase()
-        groupTypeManager = new GroupTypeManager(hub.groupRepository, hub.teamManager)
+        groupTypeManager = new GroupTypeManager(hub.groupRepository, hub.teamManager, getDefaultCdpConfig())
 
         jest.spyOn(hub.postgres, 'query')
         jest.spyOn(hub.groupRepository, 'insertGroupType')

@@ -77,6 +77,8 @@ export type CdpCoreServicesConfig = Pick<
     | 'HOG_FUNCTION_MONITORING_APP_METRICS_TOPIC'
     | 'HOG_FUNCTION_MONITORING_LOG_ENTRIES_TOPIC'
     | 'CDP_EMAIL_TRACKING_URL'
+    | 'LAZY_LOADER_MAX_SIZE'
+    | 'LAZY_LOADER_BUFFER_MS'
 >
 
 export interface CdpCoreServicesDeps {
@@ -106,8 +108,8 @@ export function createCdpCoreServices(
         poolMaxSize: config.REDIS_POOL_MAX_SIZE,
     })
 
-    const hogFunctionManager = new HogFunctionManagerService(deps.postgres, deps.pubSub, deps.encryptedFields)
-    const hogFlowManager = new HogFlowManagerService(deps.postgres, deps.pubSub)
+    const hogFunctionManager = new HogFunctionManagerService(deps.postgres, deps.pubSub, deps.encryptedFields, config)
+    const hogFlowManager = new HogFlowManagerService(deps.postgres, deps.pubSub, config)
 
     const hogWatcher = new HogWatcherService(
         deps.teamManager,
@@ -128,7 +130,8 @@ export function createCdpCoreServices(
             observeResultsBufferTimeMs: config.CDP_WATCHER_OBSERVE_RESULTS_BUFFER_TIME_MS,
             observeResultsBufferMaxResults: config.CDP_WATCHER_OBSERVE_RESULTS_BUFFER_MAX_RESULTS,
         },
-        redis
+        redis,
+        config
     )
 
     const hogInputsService = new HogInputsService(deps.integrationManager, config.ENCRYPTION_SALT_KEYS, config.SITE_URL)
@@ -160,14 +163,14 @@ export function createCdpCoreServices(
         recipientTokensService
     )
 
-    const hogFunctionTemplateManager = new HogFunctionTemplateManagerService(deps.postgres)
+    const hogFunctionTemplateManager = new HogFunctionTemplateManagerService(deps.postgres, config)
     const hogFlowFunctionsService = new HogFlowFunctionsService(
         config.SITE_URL,
         hogFunctionTemplateManager,
         hogExecutor
     )
 
-    const recipientsManager = new RecipientsManagerService(deps.postgres)
+    const recipientsManager = new RecipientsManagerService(deps.postgres, config)
     const recipientPreferencesService = new RecipientPreferencesService(recipientsManager)
     const hogFlowExecutor = new HogFlowExecutorService(hogFlowFunctionsService, recipientPreferencesService)
 

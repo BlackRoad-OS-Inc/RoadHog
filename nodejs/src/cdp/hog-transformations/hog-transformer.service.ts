@@ -428,6 +428,8 @@ export type HogTransformerServiceConfig = Pick<
     | 'SES_ENDPOINT'
     | 'HOG_FUNCTION_MONITORING_APP_METRICS_TOPIC'
     | 'HOG_FUNCTION_MONITORING_LOG_ENTRIES_TOPIC'
+    | 'LAZY_LOADER_MAX_SIZE'
+    | 'LAZY_LOADER_BUFFER_MS'
 > &
     Pick<
         CommonConfig,
@@ -465,7 +467,7 @@ export function createHogTransformerService(
         poolMinSize: config.REDIS_POOL_MIN_SIZE,
         poolMaxSize: config.REDIS_POOL_MAX_SIZE,
     })
-    const hogFunctionManager = new HogFunctionManagerService(deps.postgres, deps.pubSub, deps.encryptedFields)
+    const hogFunctionManager = new HogFunctionManagerService(deps.postgres, deps.pubSub, deps.encryptedFields, config)
     const hogInputsService = new HogInputsService(deps.integrationManager, config.ENCRYPTION_SALT_KEYS, config.SITE_URL)
     const emailService = new EmailService(
         {
@@ -520,7 +522,8 @@ export function createHogTransformerService(
             observeResultsBufferTimeMs: config.CDP_WATCHER_OBSERVE_RESULTS_BUFFER_TIME_MS,
             observeResultsBufferMaxResults: config.CDP_WATCHER_OBSERVE_RESULTS_BUFFER_MAX_RESULTS,
         },
-        redis
+        redis,
+        config
     )
 
     return new HogTransformerService(

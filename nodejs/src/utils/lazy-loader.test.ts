@@ -1,4 +1,6 @@
-import { LazyLoader } from './lazy-loader'
+import { getDefaultCdpConfig } from '~/cdp/config'
+
+import { LazyLoader, LazyLoaderConfig } from './lazy-loader'
 import { delay } from './utils'
 
 describe('LazyLoader', () => {
@@ -7,14 +9,17 @@ describe('LazyLoader', () => {
     let loader: jest.Mock
     let lazyLoader: LazyLoader<string>
     let start: number
-
+    let lazyLoaderConfig: LazyLoaderConfig
     beforeEach(() => {
+        lazyLoaderConfig = getDefaultCdpConfig()
         start = Date.now()
         jest.spyOn(Date, 'now').mockReturnValue(start)
         loader = jest.fn()
         lazyLoader = new LazyLoader({
             name: 'test',
             loader,
+            bufferMs: lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
+            maxSize: lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
         })
     })
 
@@ -31,6 +36,8 @@ describe('LazyLoader', () => {
                         loader,
                         refreshAgeMs: 1000 * 60 * 2,
                         refreshBackgroundAgeMs: 1000 * 60 * 3,
+                        bufferMs: lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
+                        maxSize: lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
                     })
             ).toThrow('refreshBackgroundAgeMs must be smaller than refreshAgeMs')
         })
@@ -39,6 +46,8 @@ describe('LazyLoader', () => {
             const lazyLoader = new LazyLoader({
                 name: 'test',
                 loader,
+                bufferMs: lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
+                maxSize: lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
             })
 
             expect(lazyLoader['refreshAgeMs']).toBe(300000)
@@ -53,6 +62,8 @@ describe('LazyLoader', () => {
                 name: 'test',
                 loader,
                 refreshAgeMs,
+                bufferMs: lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
+                maxSize: lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
             })
 
             expect(lazyLoader['refreshAgeMs']).toBe(refreshAgeMs)
@@ -169,6 +180,8 @@ describe('LazyLoader', () => {
                 name: 'test',
                 loader,
                 refreshAgeMs: 1000 * 60 * 2, // 2 minutes
+                bufferMs: lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
+                maxSize: lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
             })
 
             loader.mockResolvedValueOnce({ key1: 'value1' }).mockResolvedValueOnce({ key1: 'value2' })
@@ -292,6 +305,8 @@ describe('LazyLoader', () => {
                 refreshAgeMs: 1000 * 60 * 2, // 2 minutes
                 refreshBackgroundAgeMs: 1000 * 60 * 1, // 1 minute
                 refreshJitterMs: 0, // Simplify the tests
+                bufferMs: lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
+                maxSize: lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
             })
 
             loadSpy = jest.spyOn(lazyLoader as any, 'load')
@@ -343,6 +358,7 @@ describe('LazyLoader', () => {
                 loader,
                 maxSize: 3,
                 refreshJitterMs: 0,
+                bufferMs: lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
             })
 
             // Add 3 entries
@@ -372,6 +388,7 @@ describe('LazyLoader', () => {
                 loader,
                 maxSize: 2,
                 refreshJitterMs: 0,
+                bufferMs: lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
             })
 
             // Add 5 entries at once - should keep only 2

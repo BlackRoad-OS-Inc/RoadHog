@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
 
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { HogFunctionType } from '~/cdp/types'
 import { forSnapshot } from '~/tests/helpers/snapshots'
 import { createTeam, getTeam, resetTestDatabase } from '~/tests/helpers/sql'
@@ -23,7 +24,7 @@ describe('HogFunctionManager', () => {
     beforeEach(async () => {
         hub = await createHub()
         await resetTestDatabase()
-        manager = new HogFunctionManagerService(hub.postgres, hub.pubSub, hub.encryptedFields)
+        manager = new HogFunctionManagerService(hub.postgres, hub.pubSub, hub.encryptedFields, getDefaultCdpConfig())
 
         const team = await getTeam(hub.postgres, 2)
 
@@ -272,7 +273,7 @@ describe('Hogfunction Manager - Execution Order', () => {
 
         hub = await createHub()
         await resetTestDatabase()
-        manager = new HogFunctionManagerService(hub.postgres, hub.pubSub, hub.encryptedFields)
+        manager = new HogFunctionManagerService(hub.postgres, hub.pubSub, hub.encryptedFields, getDefaultCdpConfig())
 
         const team = await getTeam(hub.postgres, 2)
         teamId = await createTeam(hub.postgres, team!.organization_id)
@@ -460,7 +461,7 @@ describe('sanitize', () => {
 
     beforeEach(async () => {
         hub = await createHub()
-        manager = new HogFunctionManagerService(hub.postgres, hub.pubSub, hub.encryptedFields)
+        manager = new HogFunctionManagerService(hub.postgres, hub.pubSub, hub.encryptedFields, getDefaultCdpConfig())
     })
 
     afterEach(async () => {

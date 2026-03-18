@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
 
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { createTeam, getFirstTeam, getTeam, resetTestDatabase } from '~/tests/helpers/sql'
 import { Hub, Person, Team } from '~/types'
 import { closeHub, createHub } from '~/utils/db/hub'
@@ -44,7 +45,12 @@ describe('PersonsManager', () => {
         hub = await createHub()
         personRepository = new PostgresPersonRepository(hub.postgres)
         await resetTestDatabase()
-        manager = new PersonsManagerService(hub.teamManager, hub.personRepository, 'http://localhost:8000')
+        manager = new PersonsManagerService(
+            hub.teamManager,
+            hub.personRepository,
+            'http://localhost:8000',
+            getDefaultCdpConfig()
+        )
         team = await getFirstTeam(hub.postgres)
         const team2Id = await createTeam(hub.postgres, team.organization_id)
         team2 = (await getTeam(hub.postgres, team2Id))!

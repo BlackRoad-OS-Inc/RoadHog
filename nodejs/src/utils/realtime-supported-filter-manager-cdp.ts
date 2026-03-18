@@ -1,5 +1,5 @@
 import { PostgresRouter, PostgresUse } from './db/postgres'
-import { LazyLoader } from './lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from './lazy-loader'
 import { logger } from './logger'
 
 /**
@@ -32,7 +32,10 @@ interface CohortRow {
 export class RealtimeSupportedFilterManagerCDP {
     private lazyLoader: LazyLoader<RealtimeSupportedFiltersByType>
 
-    constructor(private postgres: PostgresRouter) {
+    constructor(
+        private postgres: PostgresRouter,
+        private lazyLoaderConfig: LazyLoaderConfig
+    ) {
         this.lazyLoader = new LazyLoader({
             name: 'RealtimeSupportedFilterManagerCDP',
             refreshAgeMs: 5 * 60 * 1000, // 5 minutes
@@ -40,6 +43,8 @@ export class RealtimeSupportedFilterManagerCDP {
             loader: async (teamIds: string[]) => {
                 return await this.fetchRealtimeSupportedFilters(teamIds)
             },
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
     }
 

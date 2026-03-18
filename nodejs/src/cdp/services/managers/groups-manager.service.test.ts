@@ -1,3 +1,4 @@
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { TeamManager } from '~/utils/team-manager'
 import { GroupRepository } from '~/worker/ingestion/groups/repositories/group-repository.interface'
 
@@ -27,7 +28,7 @@ describe('Groups Manager', () => {
     beforeEach(() => {
         jest.restoreAllMocks()
         mockHasAvailableFeature.mockReturnValue(Promise.resolve(true))
-        groupsManager = new GroupsManagerService(mockTeamManager, mockGroupRepository)
+        groupsManager = new GroupsManagerService(mockTeamManager, mockGroupRepository, getDefaultCdpConfig())
 
         mockFetchGroupTypesByTeamIds.mockImplementation((teamIds: number[]): Promise<any> => {
             const result: Record<string, { group_type: string; group_type_index: number }[]> = {}

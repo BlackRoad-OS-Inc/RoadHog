@@ -12,6 +12,7 @@ import { HealthCheckResult, HealthCheckResultError, PluginServerService, RedisPo
 import { PostgresRouter } from '../utils/db/postgres'
 import { EventIngestionRestrictionManager } from '../utils/event-ingestion-restrictions'
 import { EventSchemaEnforcementManager } from '../utils/event-schema-enforcement-manager'
+import { LazyLoaderConfig } from '../utils/lazy-loader'
 import { logger } from '../utils/logger'
 import { PromiseScheduler } from '../utils/promise-scheduler'
 import { TeamManager } from '../utils/team-manager'
@@ -44,6 +45,7 @@ import { OverflowRedirectService } from './utils/overflow-redirect/overflow-redi
 import { RedisOverflowRepository } from './utils/overflow-redirect/overflow-redis-repository'
 
 export type IngestionConsumerFullConfig = IngestionConsumerConfig &
+    LazyLoaderConfig &
     Pick<CommonConfig, 'KAFKA_CLIENT_RACK' | 'CDP_HOG_WATCHER_SAMPLE_RATE'>
 
 export interface IngestionConsumerDeps {
@@ -128,7 +130,7 @@ export class IngestionConsumer {
             staticSkipPersonTokens: this.tokenDistinctIdsToSkipPersons,
             staticForceOverflowTokens: this.tokenDistinctIdsToForceOverflow,
         })
-        this.eventSchemaEnforcementManager = new EventSchemaEnforcementManager(deps.postgres)
+        this.eventSchemaEnforcementManager = new EventSchemaEnforcementManager(deps.postgres, config)
 
         this.name = `ingestion-consumer-${this.topic}`
 

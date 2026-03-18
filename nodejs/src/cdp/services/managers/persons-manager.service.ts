@@ -1,4 +1,4 @@
-import { LazyLoader } from '../../../utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '../../../utils/lazy-loader'
 import { logger } from '../../../utils/logger'
 import { TeamManager } from '../../../utils/team-manager'
 import { PersonRepository } from '../../../worker/ingestion/persons/repositories/person-repository'
@@ -34,17 +34,22 @@ export class PersonsManagerService {
     constructor(
         private teamManager: TeamManager,
         private personRepository: PersonRepository,
-        private siteUrl: string
+        private siteUrl: string,
+        private lazyLoaderConfig: LazyLoaderConfig
     ) {
         this.lazyLoaderByPersonId = new LazyLoader({
             name: 'person_manager_lookup_by_person_id',
             loader: async (ids) => await this.fetchPersonsByPersonIds(ids),
             refreshAgeMs: 1000 * 60, // 1 minute, so that we don't hold stale person data for too long
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
         this.lazyLoaderByDistinctId = new LazyLoader({
             name: 'person_manager_lookup_by_distinct_id',
             loader: async (ids) => await this.fetchPersonsByDistinctIds(ids),
             refreshAgeMs: 1000 * 60, // 1 minute, so that we don't hold stale person data for too long
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
     }
 

@@ -1,6 +1,6 @@
 import { Team } from '../../types'
 import { PostgresRouter, PostgresUse } from '../../utils/db/postgres'
-import { LazyLoader } from '../../utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '../../utils/lazy-loader'
 import { logger } from '../../utils/logger'
 import { PubSub } from '../../utils/pubsub'
 import { Evaluation, EvaluationInfo } from '../types'
@@ -25,16 +25,21 @@ export class EvaluationManagerService {
 
     constructor(
         private postgres: PostgresRouter,
-        private pubSub: PubSub
+        private pubSub: PubSub,
+        private lazyLoaderConfig: LazyLoaderConfig
     ) {
         this.lazyLoaderByTeam = new LazyLoader({
             name: 'evaluation_manager_by_team',
             loader: async (teamIds) => await this.fetchTeamEvaluations(teamIds),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
 
         this.lazyLoader = new LazyLoader({
             name: 'evaluation_manager',
             loader: async (ids) => await this.fetchEvaluations(ids),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
 
         this.pubSub.on<{ teamId: Team['id']; evaluationIds: Evaluation['id'][] }>(

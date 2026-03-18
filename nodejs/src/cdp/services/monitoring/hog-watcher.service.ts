@@ -1,7 +1,7 @@
 import { Counter } from 'prom-client'
 
 import { RedisV2, getRedisPipelineResults } from '~/common/redis/redis-v2'
-import { LazyLoader } from '~/utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '~/utils/lazy-loader'
 import { logger } from '~/utils/logger'
 import { captureTeamEvent } from '~/utils/posthog'
 import { TeamManager } from '~/utils/team-manager'
@@ -98,7 +98,8 @@ export class HogWatcherService {
     constructor(
         private teamManager: TeamManager,
         private config: HogWatcherConfig,
-        private redis: RedisV2
+        private redis: RedisV2,
+        private lazyLoaderConfig: LazyLoaderConfig
     ) {
         this.costsMapping = {
             hog: {
@@ -126,6 +127,8 @@ export class HogWatcherService {
             refreshAgeMs: 30_000, // Cache for 30 seconds
             refreshJitterMs: 10_000,
             loader: async (ids) => await this.getPersistedStates(ids),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
     }
 

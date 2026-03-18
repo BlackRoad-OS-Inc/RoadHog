@@ -1,3 +1,4 @@
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { defaultConfig } from '~/config/config'
 import { createTeam, getFirstTeam, getTeam, resetTestDatabase } from '~/tests/helpers/sql'
 import { Team } from '~/types'
@@ -15,7 +16,7 @@ describe('RecipientsManager', () => {
     beforeEach(async () => {
         await resetTestDatabase()
         postgres = new PostgresRouter(defaultConfig)
-        manager = new RecipientsManagerService(postgres)
+        manager = new RecipientsManagerService(postgres, getDefaultCdpConfig())
         team = await getFirstTeam(postgres)
         const team2Id = await createTeam(postgres, team.organization_id)
         team2 = (await getTeam(postgres, team2Id))!

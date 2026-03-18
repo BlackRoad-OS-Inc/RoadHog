@@ -1,6 +1,6 @@
 import { EventSchemaEnforcement } from '../types'
 import { PostgresRouter, PostgresUse } from './db/postgres'
-import { LazyLoader } from './lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from './lazy-loader'
 
 /**
  * Raw row from the database query - one row per property per event.
@@ -25,7 +25,10 @@ export type EventSchemaMap = Map<string, EventSchemaEnforcement>
 export class EventSchemaEnforcementManager {
     private lazyLoader: LazyLoader<EventSchemaMap>
 
-    constructor(private postgres: PostgresRouter) {
+    constructor(
+        private postgres: PostgresRouter,
+        private lazyLoaderConfig: LazyLoaderConfig
+    ) {
         this.lazyLoader = new LazyLoader({
             name: 'EventSchemaEnforcementManager',
             refreshAgeMs: 2 * 60 * 1000, // 2 minutes
@@ -33,6 +36,8 @@ export class EventSchemaEnforcementManager {
             loader: async (teamIds: string[]) => {
                 return await this.fetchSchemas(teamIds)
             },
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
     }
 

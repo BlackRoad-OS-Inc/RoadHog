@@ -1,3 +1,4 @@
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { IntegrationType } from '~/cdp/types'
 import { createTeam, getTeam, resetTestDatabase } from '~/tests/helpers/sql'
 import { Hub } from '~/types'
@@ -17,7 +18,7 @@ describe('IntegrationManager', () => {
     beforeEach(async () => {
         hub = await createHub()
         await resetTestDatabase()
-        manager = new IntegrationManagerService(hub.pubSub, hub.postgres, hub.encryptedFields)
+        manager = new IntegrationManagerService(hub.pubSub, hub.postgres, hub.encryptedFields, getDefaultCdpConfig())
 
         const team = await getTeam(hub.postgres, 2)
 

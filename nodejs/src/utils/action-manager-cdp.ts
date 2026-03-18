@@ -1,5 +1,5 @@
 import { PostgresRouter, PostgresUse } from './db/postgres'
-import { LazyLoader } from './lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from './lazy-loader'
 
 export interface Action {
     id: number
@@ -16,7 +16,10 @@ export interface Action {
 export class ActionManagerCDP {
     private lazyLoader: LazyLoader<Action[]>
 
-    constructor(private postgres: PostgresRouter) {
+    constructor(
+        private postgres: PostgresRouter,
+        private lazyLoaderConfig: LazyLoaderConfig
+    ) {
         this.lazyLoader = new LazyLoader({
             name: 'ActionManagerCDP',
             refreshAgeMs: 5 * 60 * 1000, // 5 minutes
@@ -24,6 +27,8 @@ export class ActionManagerCDP {
             loader: async (teamIds: string[]) => {
                 return await this.fetchActions(teamIds)
             },
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
     }
 

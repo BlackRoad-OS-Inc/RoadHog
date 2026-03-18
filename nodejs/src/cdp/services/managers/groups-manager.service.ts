@@ -1,5 +1,5 @@
 import { sanitizeString } from '~/utils/db/utils'
-import { LazyLoader } from '~/utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '~/utils/lazy-loader'
 import { logger } from '~/utils/logger'
 import { TeamManager } from '~/utils/team-manager'
 import { GroupRepository } from '~/worker/ingestion/groups/repositories/group-repository.interface'
@@ -31,18 +31,23 @@ export class GroupsManagerService {
 
     constructor(
         private teamManager: TeamManager,
-        private groupRepository: GroupRepository
+        private groupRepository: GroupRepository,
+        private lazyLoaderConfig: LazyLoaderConfig
     ) {
         this.groupTypesLoader = new LazyLoader({
             name: 'groups_manager_types',
             refreshAgeMs: 10 * 60 * 1000, // 10 minutes - group types rarely change
             loader: async (teamIds) => this.fetchGroupTypes(teamIds),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
 
         this.groupPropertiesLoader = new LazyLoader({
             name: 'groups_manager_properties',
             refreshAgeMs: 60 * 1000, // 1 minute
             loader: async (keys) => this.fetchGroupPropertiesBatch(keys),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
     }
 

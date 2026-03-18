@@ -93,6 +93,9 @@ export type CdpConfig = {
 
     APP_METRICS_FLUSH_FREQUENCY_MS: number
     APP_METRICS_FLUSH_MAX_QUEUE_SIZE: number
+
+    LAZY_LOADER_MAX_SIZE: number
+    LAZY_LOADER_BUFFER_MS: number
 }
 
 export function getDefaultCdpConfig(): CdpConfig {
@@ -194,5 +197,8 @@ export function getDefaultCdpConfig(): CdpConfig {
 
         APP_METRICS_FLUSH_FREQUENCY_MS: isTestEnv() ? 5 : 20_000,
         APP_METRICS_FLUSH_MAX_QUEUE_SIZE: isTestEnv() ? 5 : 1000,
+
+        LAZY_LOADER_MAX_SIZE: 100_000,
+        LAZY_LOADER_BUFFER_MS: 10,
     }
 }

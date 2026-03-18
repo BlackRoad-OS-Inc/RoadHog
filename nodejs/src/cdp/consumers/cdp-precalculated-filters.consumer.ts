@@ -64,7 +64,7 @@ export class CdpPrecalculatedFiltersConsumer extends CdpConsumerBase {
             groupId: 'cdp-precalculated-filters-consumer',
             topic: KAFKA_EVENTS_JSON,
         })
-        this.realtimeSupportedFilterManager = new RealtimeSupportedFilterManagerCDP(deps.postgres)
+        this.realtimeSupportedFilterManager = new RealtimeSupportedFilterManagerCDP(deps.postgres, config)
     }
 
     @instrumented('cdpPrecalculatedFiltersConsumer.publishBehavioralEvents')

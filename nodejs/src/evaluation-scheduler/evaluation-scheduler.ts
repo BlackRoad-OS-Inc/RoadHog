@@ -18,10 +18,11 @@ import { Evaluation, EvaluationConditionSet } from '../llm-analytics/types'
 import { PluginServerService, RawKafkaEvent } from '../types'
 import { PostgresRouter } from '../utils/db/postgres'
 import { parseJSON } from '../utils/json-parse'
+import { LazyLoaderConfig } from '../utils/lazy-loader'
 import { logger } from '../utils/logger'
 import { PubSub } from '../utils/pubsub'
 
-export type EvaluationSchedulerConfig = TemporalServiceConfig
+export type EvaluationSchedulerConfig = TemporalServiceConfig & LazyLoaderConfig
 
 export interface EvaluationSchedulerDeps {
     postgres: PostgresRouter
@@ -212,7 +213,7 @@ export const startEvaluationScheduler = async (
     logger.info('🤖', 'Starting evaluation scheduler')
 
     const temporalService = new TemporalService(config)
-    const evaluationManager = new EvaluationManagerService(deps.postgres, deps.pubSub)
+    const evaluationManager = new EvaluationManagerService(deps.postgres, deps.pubSub, config)
 
     const kafkaConsumer = new KafkaConsumer({
         groupId: `${KAFKA_PREFIX}evaluation-scheduler`,

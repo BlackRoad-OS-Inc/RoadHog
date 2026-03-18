@@ -1,3 +1,4 @@
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { createTeam, getTeam, resetTestDatabase } from '~/tests/helpers/sql'
 import { Hub } from '~/types'
 import { closeHub, createHub } from '~/utils/db/hub'
@@ -20,7 +21,7 @@ describe('EvaluationManagerService', () => {
     beforeEach(async () => {
         hub = await createHub()
         await resetTestDatabase()
-        manager = new EvaluationManagerService(hub.postgres, hub.pubSub)
+        manager = new EvaluationManagerService(hub.postgres, hub.pubSub, getDefaultCdpConfig())
 
         const team = await getTeam(hub.postgres, 2)
 

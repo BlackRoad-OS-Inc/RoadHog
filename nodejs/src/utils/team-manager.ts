@@ -2,7 +2,7 @@ import { Properties } from '~/plugin-scaffold'
 
 import { OrganizationAvailableFeature, ProjectId, Team } from '../types'
 import { PostgresRouter, PostgresUse } from './db/postgres'
-import { LazyLoader } from './lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from './lazy-loader'
 import { captureTeamEvent } from './posthog'
 
 type RawTeam = Omit<Team, 'available_features'> & {
@@ -12,7 +12,10 @@ type RawTeam = Omit<Team, 'available_features'> & {
 export class TeamManager {
     private lazyLoader: LazyLoader<Team>
 
-    constructor(private postgres: PostgresRouter) {
+    constructor(
+        private postgres: PostgresRouter,
+        private lazyLoaderConfig: LazyLoaderConfig
+    ) {
         this.lazyLoader = new LazyLoader({
             name: 'TeamManager',
             refreshAgeMs: 2 * 60 * 1000, // 2 minute
@@ -20,6 +23,8 @@ export class TeamManager {
             loader: async (teamIdOrTokens: string[]) => {
                 return await this.fetchTeams(teamIdOrTokens)
             },
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
     }
 

@@ -1,7 +1,7 @@
 import { TeamManager } from '~/utils/team-manager'
 
 import { RedisPool } from '../../types'
-import { LazyLoader } from '../../utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '../../utils/lazy-loader'
 import { logger } from '../../utils/logger'
 
 // subset of resources that we care about in this service
@@ -29,7 +29,8 @@ export class QuotaLimiting {
 
     constructor(
         private readonly redisPool: RedisPool,
-        private readonly teamManager: TeamManager
+        private readonly teamManager: TeamManager,
+        private readonly lazyLoaderConfig: LazyLoaderConfig
     ) {
         this.limitedTokensLoader = new LazyLoader({
             name: 'quota_limited_tokens',
@@ -38,6 +39,8 @@ export class QuotaLimiting {
             },
             refreshAgeMs: 1000 * 60 * 60, // 1 hour cache here - we never need to hard refresh
             refreshBackgroundAgeMs: 1000 * 60, // 1 minute age is more than good enough
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
         })
     }
 

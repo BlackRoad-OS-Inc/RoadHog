@@ -5,6 +5,7 @@ import { DateTime } from 'luxon'
 import { FixtureHogFlowBuilder } from '~/cdp/_tests/builders/hogflow.builder'
 import { insertHogFunctionTemplate, insertIntegration } from '~/cdp/_tests/fixtures'
 import { createExampleHogFlowInvocation } from '~/cdp/_tests/fixtures-hogflows'
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { createInvocationResult } from '~/cdp/utils/invocation-utils'
 import { getFirstTeam, resetTestDatabase } from '~/tests/helpers/sql'
 import { Hub, Team } from '~/types'
@@ -67,7 +68,7 @@ describe('HogFunctionHandler', () => {
             emailService,
             recipientTokensService
         )
-        mockHogFunctionTemplateManager = new HogFunctionTemplateManagerService(hub.postgres)
+        mockHogFunctionTemplateManager = new HogFunctionTemplateManagerService(hub.postgres, getDefaultCdpConfig())
         mockHogFlowFunctionsService = new HogFlowFunctionsService(
             hub.SITE_URL,
             mockHogFunctionTemplateManager,

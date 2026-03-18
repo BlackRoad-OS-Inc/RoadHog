@@ -1,6 +1,7 @@
 import '~/tests/helpers/mocks/date.mock'
 
 import { FixtureHogFlowBuilder } from '~/cdp/_tests/builders/hogflow.builder'
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { HogFlow } from '~/schema/hogflow'
 import { forSnapshot } from '~/tests/helpers/snapshots'
 import { createTeam, getTeam, resetTestDatabase } from '~/tests/helpers/sql'
@@ -24,7 +25,7 @@ describe('HogFlowManager', () => {
     beforeEach(async () => {
         hub = await createHub()
         await resetTestDatabase()
-        manager = new HogFlowManagerService(hub.postgres, hub.pubSub)
+        manager = new HogFlowManagerService(hub.postgres, hub.pubSub, getDefaultCdpConfig())
 
         const team = await getTeam(hub.postgres, 2)
 

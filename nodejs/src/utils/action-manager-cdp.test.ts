@@ -1,3 +1,5 @@
+import { getDefaultCdpConfig } from '~/cdp/config'
+
 import { createAction, createTeam, getFirstTeam, resetTestDatabase } from '../../tests/helpers/sql'
 import { defaultConfig } from '../config/config'
 import { Hub, Team } from '../types'
@@ -20,7 +22,7 @@ describe('ActionManagerCDP()', () => {
         await resetTestDatabase()
 
         postgres = new PostgresRouter(defaultConfig)
-        actionManager = new ActionManagerCDP(postgres)
+        actionManager = new ActionManagerCDP(postgres, getDefaultCdpConfig())
         const team = await getFirstTeam(hub.postgres)
         teamId = team.id
         fetchActionsSpy = jest.spyOn(actionManager as any, 'fetchActions')

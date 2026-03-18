@@ -16,7 +16,7 @@ import {
 } from '../../types'
 import { PostgresUse } from '../../utils/db/postgres'
 import { parseJSON } from '../../utils/json-parse'
-import { LazyLoader } from '../../utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '../../utils/lazy-loader'
 import { logger } from '../../utils/logger'
 import { PromiseScheduler } from '../../utils/promise-scheduler'
 import { GroupTypeManager } from '../../worker/ingestion/group-type-manager'
@@ -66,7 +66,8 @@ export type CdpLegacyEventsConsumerConfig = CdpConsumerBaseConfig &
         | 'APP_METRICS_FLUSH_FREQUENCY_MS'
         | 'APP_METRICS_FLUSH_MAX_QUEUE_SIZE'
         | 'SITE_URL'
-    >
+    > &
+    Pick<LazyLoaderConfig, 'LAZY_LOADER_MAX_SIZE'>
 
 export interface CdpLegacyEventsConsumerDeps extends CdpConsumerBaseDeps {
     kafkaProducer: KafkaProducerWrapper
@@ -115,6 +116,7 @@ export class CdpLegacyEventsConsumer extends CdpConsumerBase<CdpLegacyEventsCons
             refreshAgeMs: 600000, // 10 minutes
             refreshBackgroundAgeMs: 300000, // 5 minutes
             bufferMs: 10, // 10ms buffer for batching
+            maxSize: config.LAZY_LOADER_MAX_SIZE,
         })
 
         this.appMetrics = new LegacyPluginAppMetrics(

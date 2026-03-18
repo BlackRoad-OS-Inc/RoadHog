@@ -1,6 +1,6 @@
 import { GroupTypeIndex, GroupTypeToColumnIndex, ProjectId, Team, TeamId } from '../../types'
 import { timeoutGuard } from '../../utils/db/utils'
-import { LazyLoader } from '../../utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '../../utils/lazy-loader'
 import { captureTeamEvent } from '../../utils/posthog'
 import { TeamManager } from '../../utils/team-manager'
 import { GroupRepository } from './groups/repositories/group-repository.interface'
@@ -15,7 +15,8 @@ export class GroupTypeManager {
 
     constructor(
         private groupRepository: GroupRepository,
-        private teamManager: TeamManager
+        private teamManager: TeamManager,
+        private lazyLoaderConfig: LazyLoaderConfig
     ) {
         this.loader = new LazyLoader({
             name: 'GroupTypeManager',
@@ -45,6 +46,8 @@ export class GroupTypeManager {
                 }
                 return response
             },
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
     }
 

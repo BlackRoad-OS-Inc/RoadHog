@@ -366,7 +366,11 @@ export class PluginServer {
             if (capabilities.cdpLegacyOnEvent) {
                 const legacyDeps: CdpLegacyEventsConsumerDeps = {
                     ...cdpDeps!,
-                    groupTypeManager: new GroupTypeManager(ingestionCdpServices!.groupRepository, teamManager),
+                    groupTypeManager: new GroupTypeManager(
+                        ingestionCdpServices!.groupRepository,
+                        teamManager,
+                        this.config
+                    ),
                 }
                 serviceLoaders.push(async () => {
                     const consumer = new CdpLegacyEventsConsumer(this.config, legacyDeps)
@@ -539,7 +543,7 @@ export class PluginServer {
         this.pubsub = new PubSub(this.redisPool)
         await this.pubsub.start()
 
-        const teamManager = new TeamManager(this.postgres)
+        const teamManager = new TeamManager(this.postgres!, this.config)
 
         return { teamManager }
     }
@@ -560,7 +564,12 @@ export class PluginServer {
         })
         const groupRepository = new PostgresGroupRepository(this.postgres!)
         const encryptedFields = new EncryptedFields(this.config.ENCRYPTION_SALT_KEYS)
-        const integrationManager = new IntegrationManagerService(this.pubsub!, this.postgres!, encryptedFields)
+        const integrationManager = new IntegrationManagerService(
+            this.pubsub!,
+            this.postgres!,
+            encryptedFields,
+            this.config
+        )
         const internalCaptureService = new InternalCaptureService(this.config)
 
         return {
@@ -589,7 +598,7 @@ export class PluginServer {
         logger.info('👍', 'Cookieless Redis ready')
 
         this.cookielessManager = new CookielessManager(this.config, this.cookielessRedisPool)
-        const groupTypeManager = new GroupTypeManager(groupRepository, teamManager)
+        const groupTypeManager = new GroupTypeManager(groupRepository, teamManager, this.config)
         const clickhouseGroupRepository = new ClickhouseGroupRepository(this.kafkaProducer!)
 
         return { groupTypeManager, clickhouseGroupRepository }
@@ -604,7 +613,7 @@ export class PluginServer {
         })
         logger.info('👍', 'PostHog Redis ready')
 
-        const quotaLimiting = new QuotaLimiting(this.posthogRedisPool, teamManager)
+        const quotaLimiting = new QuotaLimiting(this.posthogRedisPool, teamManager, this.config)
 
         return { quotaLimiting }
     }

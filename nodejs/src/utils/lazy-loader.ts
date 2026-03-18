@@ -2,7 +2,6 @@ import { Counter, Gauge } from 'prom-client'
 
 import { instrumentFn } from '~/common/tracing/tracing-utils'
 
-import { defaultConfig } from '../config/config'
 import { logger } from './logger'
 
 const lazyLoaderCacheHits = new Counter({
@@ -48,6 +47,11 @@ const lazyLoaderCacheSize = new Gauge({
  * - Parallel loading defense - multiple calls for the same value in parallel only loads once
  */
 
+export type LazyLoaderConfig = {
+    LAZY_LOADER_BUFFER_MS: number
+    LAZY_LOADER_MAX_SIZE: number
+}
+
 export type LazyLoaderOptions<T> = {
     name: string
     /** Function to load the values */
@@ -61,9 +65,9 @@ export type LazyLoaderOptions<T> = {
     /** How much jitter to add to the refresh time */
     refreshJitterMs?: number
     /** How long to buffer loads for - if set to 0 then it will load immediately without buffering */
-    bufferMs?: number
+    bufferMs: number
     /** Maximum number of entries in the cache - LRU eviction when exceeded */
-    maxSize?: number
+    maxSize: number
 }
 
 type LazyLoaderMap<T> = Record<string, T | null | undefined>
@@ -100,7 +104,7 @@ export class LazyLoader<T> {
         this.refreshNullAgeMs = this.options.refreshNullAgeMs ?? this.refreshAgeMs
         this.refreshBackgroundAgeMs = this.options.refreshBackgroundAgeMs
         this.refreshJitterMs = this.options.refreshJitterMs ?? this.refreshAgeMs / 5
-        this.maxSize = this.options.maxSize ?? defaultConfig.LAZY_LOADER_MAX_SIZE
+        this.maxSize = this.options.maxSize
 
         if (this.refreshBackgroundAgeMs && this.refreshBackgroundAgeMs > this.refreshAgeMs) {
             throw new Error('refreshBackgroundAgeMs must be smaller than refreshAgeMs')
@@ -229,7 +233,7 @@ export class LazyLoader<T> {
      * This is somewhat complex but simplifies the usage around the codebase as you can safely do multiple gets without worrying about firing off duplicate DB requests
      */
     private async load(keys: string[]): Promise<LazyLoaderMap<T>> {
-        const bufferMs = this.options.bufferMs ?? defaultConfig.LAZY_LOADER_DEFAULT_BUFFER_MS
+        const bufferMs = this.options.bufferMs
         const keyPromises: Promise<T | null>[] = []
 
         for (const key of keys) {

@@ -23,6 +23,7 @@ import { RecipientsManagerService } from '../managers/recipients-manager.service
 import { RecipientPreferencesService } from '../messaging/recipient-preferences.service'
 import { HogFlowExecutorService, createHogFlowInvocation } from './hogflow-executor.service'
 import { HogFlowFunctionsService } from './hogflow-functions.service'
+import { getDefaultCdpConfig } from '~/cdp/config'
 
 // Mock before importing fetch
 jest.mock('~/utils/request', () => {
@@ -87,13 +88,13 @@ describe('Hogflow Executor', () => {
             emailService,
             recipientTokensService
         )
-        const hogFunctionTemplateManager = new HogFunctionTemplateManagerService(hub.postgres)
+        const hogFunctionTemplateManager = new HogFunctionTemplateManagerService(hub.postgres, getDefaultCdpConfig())
         const hogFlowFunctionsService = new HogFlowFunctionsService(
             hub.SITE_URL,
             hogFunctionTemplateManager,
             hogExecutor
         )
-        const recipientsManager = new RecipientsManagerService(hub.postgres)
+        const recipientsManager = new RecipientsManagerService(hub.postgres, getDefaultCdpConfig())
         const recipientPreferencesService = new RecipientPreferencesService(recipientsManager)
 
         await insertHogFunctionTemplate(hub.postgres, {

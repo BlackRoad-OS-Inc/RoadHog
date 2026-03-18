@@ -1,3 +1,5 @@
+import { getDefaultCdpConfig } from '~/cdp/config'
+
 import {
     buildInlineFiltersForCohorts,
     createCohort,
@@ -26,7 +28,7 @@ describe('RealtimeSupportedFilterManagerCDP()', () => {
         await resetTestDatabase()
 
         postgres = new PostgresRouter(defaultConfig)
-        realtimeSupportedFilterManager = new RealtimeSupportedFilterManagerCDP(postgres)
+        realtimeSupportedFilterManager = new RealtimeSupportedFilterManagerCDP(postgres, getDefaultCdpConfig())
         const team = await getFirstTeam(hub.postgres)
         teamId = team.id
         fetchRealtimeSupportedFiltersSpy = jest.spyOn(

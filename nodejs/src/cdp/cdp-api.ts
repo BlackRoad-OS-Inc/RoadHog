@@ -91,7 +91,7 @@ export class CdpApi {
         this.batchExportHogFunctionService = new BatchExportHogFunctionService(
             config.SITE_URL,
             deps.teamManager,
-            new GroupsManagerService(deps.teamManager, deps.groupRepository),
+            new GroupsManagerService(deps.teamManager, deps.groupRepository, config),
             this.hogFunctionManager,
             this.hogExecutor,
             this.hogWatcher,

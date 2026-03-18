@@ -1,7 +1,7 @@
 import { Team } from '../../../types'
 import { PostgresRouter, PostgresUse } from '../../../utils/db/postgres'
 import { parseJSON } from '../../../utils/json-parse'
-import { LazyLoader } from '../../../utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '../../../utils/lazy-loader'
 import { logger } from '../../../utils/logger'
 import { captureException } from '../../../utils/posthog'
 import { PubSub } from '../../../utils/pubsub'
@@ -69,16 +69,21 @@ export class HogFunctionManagerService {
     constructor(
         private postgres: PostgresRouter,
         private pubSub: PubSub,
-        private encryptedFields: EncryptedFields
+        private encryptedFields: EncryptedFields,
+        private lazyLoaderConfig: LazyLoaderConfig
     ) {
         this.lazyLoaderByTeam = new LazyLoader({
             name: 'hog_function_manager_by_team',
             loader: async (teamIds) => await this.fetchTeamHogFunctions(teamIds),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
 
         this.lazyLoader = new LazyLoader({
             name: 'hog_function_manager',
             loader: async (ids) => await this.fetchHogFunctions(ids),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
 
         this.pubSub.on<{ teamId: Team['id']; hogFunctionIds: HogFunctionType['id'][] }>(

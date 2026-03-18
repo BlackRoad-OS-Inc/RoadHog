@@ -1,5 +1,5 @@
 import { PostgresRouter, PostgresUse } from '../../../utils/db/postgres'
-import { LazyLoader } from '../../../utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '../../../utils/lazy-loader'
 import { logger } from '../../../utils/logger'
 import { DBHogFunctionTemplate } from '../../types'
 
@@ -9,12 +9,17 @@ export class HogFunctionTemplateManagerService {
     private lazyLoader: LazyLoader<DBHogFunctionTemplate>
     // private started: boolean
 
-    constructor(private postgres: PostgresRouter) {
+    constructor(
+        private postgres: PostgresRouter,
+        private lazyLoaderConfig: LazyLoaderConfig
+    ) {
         // this.started = false
 
         this.lazyLoader = new LazyLoader({
             name: 'hog_function_template_manager',
             loader: async (ids) => await this.fetchHogFunctionTemplates(ids),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
     }
 

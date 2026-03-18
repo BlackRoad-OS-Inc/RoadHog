@@ -1,3 +1,4 @@
+import { defaultConfig } from '~/config/config'
 import { createTeam, getFirstTeam, getTeam, resetTestDatabase } from '~/tests/helpers/sql'
 import { Hub, RedisPool, Team } from '~/types'
 import { closeHub, createHub } from '~/utils/db/hub'
@@ -26,7 +27,7 @@ describe('QuotaLimiting', () => {
         hub = await createHub()
         await resetTestDatabase()
         redisPool = hub.redisPool
-        service = new QuotaLimiting(redisPool, hub.teamManager)
+        service = new QuotaLimiting(redisPool, hub.teamManager, defaultConfig)
         team = await getFirstTeam(hub.postgres)
 
         const otherTeamId = await createTeam(hub.postgres, team!.organization_id)

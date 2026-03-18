@@ -3,7 +3,7 @@ import { EncryptedFields } from '~/cdp/utils/encryption-utils'
 import { PubSub } from '~/utils/pubsub'
 
 import { PostgresRouter, PostgresUse } from '../../../utils/db/postgres'
-import { LazyLoader } from '../../../utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '../../../utils/lazy-loader'
 import { logger } from '../../../utils/logger'
 
 export class IntegrationManagerService {
@@ -12,11 +12,14 @@ export class IntegrationManagerService {
     constructor(
         private pubSub: PubSub,
         private postgres: PostgresRouter,
-        private encryptedFields: EncryptedFields
+        private encryptedFields: EncryptedFields,
+        private lazyLoaderConfig: LazyLoaderConfig
     ) {
         this.lazyLoader = new LazyLoader({
             name: 'integration_manager',
             loader: async (ids) => await this.fetchIntegrations(ids),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
         this.pubSub.on<{ integrationIds: IntegrationType['id'][] }>('reload-integrations', (message) => {
             logger.debug('⚡', '[PubSub] Reloading integrations!', { integrationIds: message.integrationIds })

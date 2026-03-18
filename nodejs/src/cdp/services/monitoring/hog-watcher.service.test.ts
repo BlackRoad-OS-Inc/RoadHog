@@ -1,3 +1,4 @@
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { RedisV2, createRedisV2PoolFromConfig } from '~/common/redis/redis-v2'
 
 import { Hub, ProjectId, Team } from '../../../types'
@@ -70,7 +71,7 @@ describe('HogWatcher', () => {
         await deleteKeysWithPrefix(redis, BASE_REDIS_KEY)
         watcherConfig = { ...DEFAULT_WATCHER_CONFIG }
 
-        watcher = new HogWatcherService(hub.teamManager, watcherConfig, redis)
+        watcher = new HogWatcherService(hub.teamManager, watcherConfig, redis, getDefaultCdpConfig())
         onStateChangeSpy = jest.spyOn(watcher as any, 'onStateChange') as jest.SpyInstance
         hogFunction = createHogFunction({ id: hogFunctionId, team_id: 2 })
     })
@@ -123,7 +124,8 @@ describe('HogWatcher', () => {
                         asyncCostTimingUpperMs: 100,
                         asyncCostTiming: 1,
                     },
-                    redis
+                    redis,
+                    getDefaultCdpConfig()
                 )
             }).toThrow(
                 'Lower bound for kind hog of 100ms must be lower than upper bound of 100ms. This is a configuration error.'
@@ -312,7 +314,7 @@ describe('HogWatcher', () => {
 
             it('should not transition to disabled if not enabled', async () => {
                 watcherConfig.automaticallyDisableFunctions = false
-                watcher = new HogWatcherService(hub.teamManager, watcherConfig, redis)
+                watcher = new HogWatcherService(hub.teamManager, watcherConfig, redis, getDefaultCdpConfig())
                 onStateChangeSpy = jest.spyOn(watcher as any, 'onStateChange') as jest.SpyInstance
                 await watcher.observeResults(Array(1000).fill(createResult({ duration: 1000, kind: 'hog' })))
                 expect(await watcher.getPersistedState(hogFunctionId)).toMatchInlineSnapshot(`

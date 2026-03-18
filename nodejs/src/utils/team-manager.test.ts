@@ -26,7 +26,7 @@ describe('TeamManager()', () => {
         await resetTestDatabase()
 
         postgres = new PostgresRouter(defaultConfig)
-        teamManager = new TeamManager(postgres)
+        teamManager = new TeamManager(postgres, defaultConfig)
         const team = await getFirstTeam(postgres)
         teamId = team.id
         teamToken = team.api_token

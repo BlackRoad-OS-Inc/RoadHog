@@ -74,7 +74,7 @@ export async function createHub(config: Partial<PluginsServerConfig> = {}): Prom
     })
     logger.info('👍', `Cookieless Redis ready`)
 
-    const teamManager = new TeamManager(postgres)
+    const teamManager = new TeamManager(postgres, serverConfig)
     logger.info('🤔', `Connecting to PostHog Redis...`)
     const posthogRedisPool = createRedisPoolFromConfig({
         connection: createPosthogRedisConnectionConfig(serverConfig),
@@ -87,7 +87,7 @@ export async function createHub(config: Partial<PluginsServerConfig> = {}): Prom
     await pubSub.start()
 
     const groupRepository = new PostgresGroupRepository(postgres)
-    const groupTypeManager = new GroupTypeManager(groupRepository, teamManager)
+    const groupTypeManager = new GroupTypeManager(groupRepository, teamManager, serverConfig)
 
     const personRepositoryOptions = {
         calculatePropertiesSize: serverConfig.PERSON_UPDATE_CALCULATE_PROPERTIES_SIZE,
@@ -99,8 +99,8 @@ export async function createHub(config: Partial<PluginsServerConfig> = {}): Prom
     const geoipService = new GeoIPService(serverConfig.MMDB_FILE_LOCATION)
     await geoipService.get()
     const encryptedFields = new EncryptedFields(serverConfig.ENCRYPTION_SALT_KEYS)
-    const integrationManager = new IntegrationManagerService(pubSub, postgres, encryptedFields)
-    const quotaLimiting = new QuotaLimiting(posthogRedisPool, teamManager)
+    const integrationManager = new IntegrationManagerService(pubSub, postgres, encryptedFields, serverConfig)
+    const quotaLimiting = new QuotaLimiting(posthogRedisPool, teamManager, serverConfig)
     const internalCaptureService = new InternalCaptureService(serverConfig)
     const internalFetchService = new InternalFetchService(
         serverConfig.INTERNAL_API_BASE_URL,

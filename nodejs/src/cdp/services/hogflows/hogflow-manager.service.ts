@@ -1,7 +1,7 @@
 import { HogFlow } from '~/schema/hogflow'
 import { Team } from '~/types'
 import { PostgresRouter, PostgresUse } from '~/utils/db/postgres'
-import { LazyLoader } from '~/utils/lazy-loader'
+import { LazyLoader, LazyLoaderConfig } from '~/utils/lazy-loader'
 import { logger } from '~/utils/logger'
 import { PubSub } from '~/utils/pubsub'
 
@@ -33,16 +33,21 @@ export class HogFlowManagerService {
 
     constructor(
         private postgres: PostgresRouter,
-        private pubSub: PubSub
+        private pubSub: PubSub,
+        private lazyLoaderConfig: LazyLoaderConfig
     ) {
         this.lazyLoaderByTeam = new LazyLoader({
             name: 'hog_flow_manager_by_team',
             loader: async (teamIds) => await this.fetchTeamHogFlows(teamIds),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
 
         this.lazyLoader = new LazyLoader({
             name: 'hog_flow_manager',
             loader: async (ids) => await this.fetchHogFlows(ids),
+            maxSize: this.lazyLoaderConfig.LAZY_LOADER_MAX_SIZE,
+            bufferMs: this.lazyLoaderConfig.LAZY_LOADER_BUFFER_MS,
         })
 
         this.pubSub.on<{ teamId: Team['id']; hogFlowIds: HogFlow['id'][] }>('reload-hog-flows', (message) => {

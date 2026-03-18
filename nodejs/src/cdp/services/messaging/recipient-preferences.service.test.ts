@@ -1,5 +1,6 @@
 import { FixtureHogFlowBuilder } from '~/cdp/_tests/builders/hogflow.builder'
 import { createExampleInvocation } from '~/cdp/_tests/fixtures'
+import { getDefaultCdpConfig } from '~/cdp/config'
 import { CyclotronJobInvocationHogFunction } from '~/cdp/types'
 import { getFirstTeam, resetTestDatabase } from '~/tests/helpers/sql'
 import { Hub, Team } from '~/types'
@@ -27,7 +28,7 @@ describe('RecipientPreferencesService', () => {
         await resetTestDatabase()
         hub = await createHub()
         team = await getFirstTeam(hub.postgres)
-        mockRecipientsManager = new RecipientsManagerService(hub.postgres)
+        mockRecipientsManager = new RecipientsManagerService(hub.postgres, getDefaultCdpConfig())
         mockRecipientsManagerGet = jest.spyOn(mockRecipientsManager, 'get')
         mockRecipientsManagerGetPreference = jest.spyOn(mockRecipientsManager, 'getPreference')
         mockRecipientsManagerGetAllMarketingMessagingPreference = jest.spyOn(

@@ -1,3 +1,5 @@
+import { getDefaultCdpConfig } from '~/cdp/config'
+
 import { createTeam, getFirstTeam, resetTestDatabase } from '../../tests/helpers/sql'
 import { defaultConfig } from '../config/config'
 import { Team } from '../types'
@@ -18,7 +20,7 @@ describe('EventSchemaEnforcementManager', () => {
         await resetTestDatabase()
 
         postgres = new PostgresRouter(defaultConfig)
-        schemaManager = new EventSchemaEnforcementManager(postgres)
+        schemaManager = new EventSchemaEnforcementManager(postgres, getDefaultCdpConfig())
         const team = await getFirstTeam(postgres)
         teamId = team.id
         projectId = team.project_id
