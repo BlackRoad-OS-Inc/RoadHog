@@ -22,6 +22,7 @@ class HealthCheckRegistration:
     dry_run: bool
     active_since_days: int | None
     product: Product | None
+    stale_after_hours: int | None
 
 
 def _register_health_check(cls: type[HealthCheck]) -> None:
@@ -41,6 +42,7 @@ def _register_health_check(cls: type[HealthCheck]) -> None:
         dry_run=cls.dry_run,
         active_since_days=cls.active_since_days,
         product=cls.product,
+        stale_after_hours=cls.stale_after_hours,
     )
 
     HEALTH_CHECKS[cls.kind] = registration
@@ -58,6 +60,7 @@ class HealthCheck:
     not_processed_threshold: float = 0.1
     dry_run: bool = False
     active_since_days: int | None = DEFAULT_ACTIVE_SINCE_DAYS
+    stale_after_hours: int | None = None
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)

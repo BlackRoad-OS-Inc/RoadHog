@@ -28,6 +28,7 @@ class HealthCheckWorkflowInputs:
     not_processed_threshold: float = 0.1
     dry_run: bool = False
     active_since_days: int | None = DEFAULT_ACTIVE_SINCE_DAYS
+    stale_after_hours: int | None = None
     owner: str = ""
 
     @classmethod
@@ -41,6 +42,7 @@ class HealthCheckWorkflowInputs:
             not_processed_threshold=config.not_processed_threshold,
             dry_run=config.dry_run,
             active_since_days=config.active_since_days,
+            stale_after_hours=config.stale_after_hours,
             owner=config.owner.value,
         )
 

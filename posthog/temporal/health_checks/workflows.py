@@ -36,18 +36,22 @@ class HealthCheckWorkflow(PostHogWorkflow):
 
     @temporalio.workflow.run
     async def run(self, inputs: HealthCheckWorkflowInputs) -> dict:
-        batches = await temporalio.workflow.execute_activity(
+        fetch_result = await temporalio.workflow.execute_activity(
             get_team_id_batches,
             inputs,
             start_to_close_timeout=timedelta(minutes=5),
             retry_policy=ACTIVITY_RETRY_POLICY,
         )
 
+        batches = fetch_result["batches"]
+        teams_skipped_as_fresh = fetch_result.get("teams_skipped_as_fresh", 0)
+
         if not batches:
             return {
                 "kind": inputs.kind,
                 "total_teams": 0,
                 "batches": 0,
+                "teams_skipped_as_fresh": teams_skipped_as_fresh,
             }
 
         semaphore = asyncio.Semaphore(inputs.max_concurrent)
@@ -76,7 +80,7 @@ class HealthCheckWorkflow(PostHogWorkflow):
         threshold_exceeded = totals.batch_size > 0 and totals.not_processed_rate > inputs.not_processed_threshold
         await temporalio.workflow.execute_activity(
             push_health_check_metrics_activity,
-            args=[inputs.kind, dataclasses.asdict(totals), not threshold_exceeded],
+            args=[inputs.kind, dataclasses.asdict(totals), not threshold_exceeded, teams_skipped_as_fresh],
             start_to_close_timeout=timedelta(minutes=2),
             retry_policy=ACTIVITY_RETRY_POLICY,
         )
@@ -98,5 +102,6 @@ class HealthCheckWorkflow(PostHogWorkflow):
             "issues_resolved": totals.issues_resolved,
             "teams_with_issues": totals.teams_with_issues,
             "teams_healthy": totals.teams_healthy,
+            "teams_skipped_as_fresh": teams_skipped_as_fresh,
             "duration_seconds": totals.total_duration,
         }

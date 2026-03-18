@@ -14,7 +14,9 @@ import temporalio.activity
 from posthog.clickhouse.client.execute import KillSwitchLevel, get_kill_switch_level
 from posthog.clickhouse.query_tagging import Feature, tag_queries
 from posthog.dags.common.health.observability import push_health_check_metrics
+from posthog.models.health_check_team_status import HealthCheckTeamStatus
 from posthog.models.organization import OrganizationMembership
+from posthog.models.team import Team
 from posthog.sync import database_sync_to_async
 from posthog.temporal.health_checks.models import BatchResult, HealthCheckWorkflowInputs
 from posthog.temporal.health_checks.processing import _process_batch_detection
@@ -41,10 +43,14 @@ def _filter_team_ids_for_rollout(team_ids: list[int], rollout_percentage: float)
     return ranked_team_ids[:target_count]
 
 
-@database_sync_to_async
-def _get_team_id_batches_sync(inputs: HealthCheckWorkflowInputs) -> list[list[int]]:
-    from posthog.models.team import Team
+@dataclasses.dataclass
+class TeamBatchResult:
+    batches: list[list[int]]
+    teams_skipped_as_fresh: int = 0
 
+
+@database_sync_to_async
+def _get_team_id_batches_sync(inputs: HealthCheckWorkflowInputs) -> dict:
     # Temporal activities run in a thread pool where DB connections can go stale
     # between executions. close_old_connections() ensures we get a fresh connection.
     close_old_connections()
@@ -56,11 +62,27 @@ def _get_team_id_batches_sync(inputs: HealthCheckWorkflowInputs) -> list[list[in
             kind=inputs.kind,
             kill_switch_level=kill_switch_level.value,
         )
-        return []
+        return dataclasses.asdict(TeamBatchResult(batches=[]))
+
+    use_freshness = inputs.stale_after_hours is not None and inputs.stale_after_hours > 0
+    freshness_cutoff = timezone.now() - timedelta(hours=inputs.stale_after_hours) if use_freshness else None
+
+    teams_skipped_as_fresh = 0
 
     if inputs.team_ids:
         team_ids = inputs.team_ids
         logger.info("processing configured teams", count=len(team_ids))
+
+        if freshness_cutoff is not None:
+            fresh_team_ids = set(
+                HealthCheckTeamStatus.objects.filter(
+                    team_id__in=team_ids,
+                    kind=inputs.kind,
+                    last_checked_at__gte=freshness_cutoff,
+                ).values_list("team_id", flat=True)
+            )
+            teams_skipped_as_fresh = len(fresh_team_ids)
+            team_ids = [tid for tid in team_ids if tid not in fresh_team_ids]
     else:
         qs = Team.objects.exclude(id=0)
         cutoff = None
@@ -74,7 +96,23 @@ def _get_team_id_batches_sync(inputs: HealthCheckWorkflowInputs) -> list[list[in
                     )
                 )
             )
+
+        count_before_freshness = qs.count() if use_freshness else 0
+
+        if freshness_cutoff is not None:
+            qs = qs.exclude(
+                Exists(
+                    HealthCheckTeamStatus.objects.filter(
+                        team_id=OuterRef("id"),
+                        kind=inputs.kind,
+                        last_checked_at__gte=freshness_cutoff,
+                    )
+                )
+            )
+
         team_ids = list(qs.values_list("id", flat=True))
+        teams_skipped_as_fresh = max(0, count_before_freshness - len(team_ids))
+
         logger.info(
             "team query complete",
             count=len(team_ids),
@@ -88,12 +126,18 @@ def _get_team_id_batches_sync(inputs: HealthCheckWorkflowInputs) -> list[list[in
 
     batches = [list(b) for b in batched(team_ids, inputs.batch_size)]
 
-    logger.info("created team batches", batch_count=len(batches), batch_size=inputs.batch_size)
-    return batches
+    logger.info(
+        "created team batches",
+        batch_count=len(batches),
+        batch_size=inputs.batch_size,
+        teams_skipped_as_fresh=teams_skipped_as_fresh,
+    )
+    result = TeamBatchResult(batches=batches, teams_skipped_as_fresh=teams_skipped_as_fresh)
+    return dataclasses.asdict(result)
 
 
 @temporalio.activity.defn
-async def get_team_id_batches(inputs: HealthCheckWorkflowInputs) -> list[list[int]]:
+async def get_team_id_batches(inputs: HealthCheckWorkflowInputs) -> dict:
     return await _get_team_id_batches_sync(inputs)
 
 
@@ -132,6 +176,7 @@ async def push_health_check_metrics_activity(
     kind: str,
     totals_dict: dict,
     success: bool,
+    teams_skipped_as_fresh: int = 0,
 ) -> None:
     totals = BatchResult(**totals_dict)
-    push_health_check_metrics(kind, totals, success=success)
+    push_health_check_metrics(kind, totals, success=success, teams_skipped_as_fresh=teams_skipped_as_fresh)

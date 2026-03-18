@@ -1,12 +1,25 @@
 import time
 
+from django.utils import timezone
+
 import structlog
 
 from posthog.dags.common.health.db import _resolve_stale_issues, _upsert_issues
+from posthog.models.health_check_team_status import HealthCheckTeamStatus
 from posthog.temporal.health_checks.models import BatchDetectFn, BatchResult
 from posthog.temporal.health_checks.validation import _validate_batch_output
 
 logger = structlog.get_logger(__name__)
+
+
+def _update_team_check_status(team_ids: list[int], kind: str) -> None:
+    now = timezone.now()
+    HealthCheckTeamStatus.objects.bulk_create(
+        [HealthCheckTeamStatus(team_id=tid, kind=kind, last_checked_at=now) for tid in team_ids],
+        update_conflicts=True,
+        unique_fields=["team_id", "kind"],
+        update_fields=["last_checked_at"],
+    )
 
 
 def _process_batch_detection(
@@ -48,5 +61,7 @@ def _process_batch_detection(
     start = time.monotonic()
     result.issues_resolved = _resolve_stale_issues(kind, issues_by_team, healthy_team_ids)
     result.resolve_duration = time.monotonic() - start
+
+    _update_team_check_status(team_ids, kind)
 
     return result

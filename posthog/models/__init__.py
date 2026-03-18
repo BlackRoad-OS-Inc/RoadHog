@@ -52,6 +52,7 @@ from .host_definition import HostDefinition
 from .hog_flow import HogFlow
 from .hog_functions import HogFunction
 from .hog_function_template import HogFunctionTemplate
+from .health_check_team_status import HealthCheckTeamStatus
 from .health_issue import HealthIssue
 from .insight import Insight, InsightViewed
 from .insight_caching_state import InsightCachingState
@@ -158,6 +159,7 @@ __all__ = [
     "GroupUsageMetric",
     "GroupTypeMapping",
     "HeatmapSnapshot",
+    "HealthCheckTeamStatus",
     "HealthIssue",
     "HogFlow",
     "HogFunction",

@@ -255,6 +255,12 @@
             {{ form.active_since_days.errors }}
         </div>
 
+        <div class="checkbox-row">
+            <label>{{ form.skip_staleness_check }} Skip staleness check</label>
+            {% if form.skip_staleness_check.help_text %}<p class="help-text">{{ form.skip_staleness_check.help_text }}</p>{% endif %}
+            {{ form.skip_staleness_check.errors }}
+        </div>
+
         <div class="form-row">
             <label for="{{ form.team_ids.id_for_label }}">Team IDs</label>
             {{ form.team_ids }}

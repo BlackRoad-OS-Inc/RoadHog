@@ -12,7 +12,9 @@ from posthog.metrics import pushed_metrics_registry
 logger = structlog.get_logger(__name__)
 
 
-def push_health_check_metrics(kind: str, totals: BatchResult, *, success: bool = True) -> None:
+def push_health_check_metrics(
+    kind: str, totals: BatchResult, *, success: bool = True, teams_skipped_as_fresh: int = 0
+) -> None:
     if not settings.PROM_PUSHGATEWAY_ADDRESS:
         return
 
@@ -79,6 +81,14 @@ def push_health_check_metrics(kind: str, totals: BatchResult, *, success: bool =
                 registry=registry,
             )
             error_rate_gauge.labels(kind=kind).set(totals.not_processed_rate)
+
+            freshness_gauge = Gauge(
+                "posthog_health_check_teams_skipped_as_fresh",
+                "Teams skipped because they were recently checked",
+                labelnames=["kind"],
+                registry=registry,
+            )
+            freshness_gauge.labels(kind=kind).set(teams_skipped_as_fresh)
 
             last_run_gauge = Gauge(
                 "posthog_health_check_last_run_timestamp",

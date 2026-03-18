@@ -29,6 +29,10 @@ class HealthCheckTriggerForm(forms.Form):
         min_value=0,
         help_text="Only process teams with org members who logged in within the last N days. 0 or blank = all teams.",
     )
+    skip_staleness_check = forms.BooleanField(
+        required=False,
+        help_text="Force a full re-check, ignoring freshness window",
+    )
     team_ids = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={"rows": 3, "placeholder": "e.g. 1, 2, 3"}),
@@ -87,6 +91,7 @@ def health_check_trigger_view(request, kind: str):
         form = HealthCheckTriggerForm(request.POST)
         if form.is_valid():
             workflow_inputs = HealthCheckWorkflowInputs.from_config(config)
+            stale_after_hours = None if form.cleaned_data["skip_staleness_check"] else config.stale_after_hours
             workflow_inputs = dataclasses.replace(
                 workflow_inputs,
                 dry_run=form.cleaned_data["dry_run"],
@@ -94,6 +99,7 @@ def health_check_trigger_view(request, kind: str):
                 max_concurrent=form.cleaned_data["max_concurrent"],
                 rollout_percentage=form.cleaned_data["rollout_percentage"],
                 active_since_days=form.cleaned_data["active_since_days"],
+                stale_after_hours=stale_after_hours,
                 team_ids=form.cleaned_data["team_ids"],
             )
 
@@ -129,6 +135,7 @@ def health_check_trigger_view(request, kind: str):
                 "max_concurrent": config.max_concurrent,
                 "rollout_percentage": config.rollout_percentage,
                 "active_since_days": config.active_since_days,
+                "skip_staleness_check": False,
             }
         )
 
