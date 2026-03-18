@@ -824,7 +824,7 @@ class TestMetadata(ClickhouseTestMixin, APIBaseTest):
         )
 
         self.assertTrue(any("very similar to 1 other subqueries" in warning.message for warning in metadata.warnings))
-        self.assertTrue(any((warning.fix or "").startswith("ai_prompt:") for warning in metadata.warnings))
+        self.assertTrue(all(warning.fix is None for warning in metadata.warnings))
 
     def test_metadata_does_not_warn_for_distinct_subquery_sources(self):
         metadata = self._select(

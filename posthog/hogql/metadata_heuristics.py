@@ -5,8 +5,6 @@ from posthog.schema import HogQLNotice
 
 from posthog.hogql import ast
 
-AI_FIX_PROMPT_PREFIX = "ai_prompt:"
-
 
 @dataclass(frozen=True)
 class SubqueryFingerprint:
@@ -46,10 +44,6 @@ class SimilarSubqueryHeuristic(MetadataHeuristic):
                         message=(
                             f"This subquery is very similar to {similar_count} other subqueries. "
                             "You can usually make this query faster by combining repeated table scans."
-                        ),
-                        fix=(
-                            f"{AI_FIX_PROMPT_PREFIX}Rewrite this HogQL query to reduce repeated scans across "
-                            "similar subqueries, preserving the same output columns and semantics"
                         ),
                     )
                 )
