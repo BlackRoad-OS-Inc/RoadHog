@@ -9,12 +9,12 @@ import { insertHogFunction as _insertHogFunction } from '~/cdp/_tests/fixtures'
 import { template as geoipTemplate } from '~/cdp/templates/_transformations/geoip/geoip.template'
 import { compileHog } from '~/cdp/templates/compiler'
 import { COOKIELESS_MODE_FLAG_PROPERTY, COOKIELESS_SENTINEL_VALUE } from '~/ingestion/cookieless/cookieless-manager'
+import { createIngestionConsumerDeps } from '~/tests/helpers/cdp'
 import { forSnapshot } from '~/tests/helpers/snapshots'
 import { createTeam, getFirstTeam, getTeam, resetTestDatabase } from '~/tests/helpers/sql'
 
 import { CookielessServerHashMode, Hub, PipelineEvent, Team } from '../../src/types'
 import { closeHub, createHub } from '../../src/utils/db/hub'
-import { createHogTransformerService } from '../cdp/hog-transformations/hog-transformer.service'
 import { HogFunctionType } from '../cdp/types'
 import { PostgresUse } from '../utils/db/postgres'
 import { parseJSON } from '../utils/json-parse'
@@ -101,11 +101,7 @@ describe('IngestionConsumer', () => {
         hub: Hub,
         overrides?: ConstructorParameters<typeof IngestionConsumer>[2]
     ) => {
-        const ingester = new IngestionConsumer(
-            hub,
-            { ...hub, kafkaMetricsProducer: hub.kafkaProducer, hogTransformer: createHogTransformerService(hub, hub) },
-            overrides
-        )
+        const ingester = new IngestionConsumer(hub, createIngestionConsumerDeps(hub), overrides)
         // NOTE: We don't actually use kafka so we skip instantiation for faster tests
         ingester['kafkaConsumer'] = {
             connect: jest.fn(),

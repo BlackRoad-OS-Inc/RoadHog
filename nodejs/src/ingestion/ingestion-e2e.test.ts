@@ -5,9 +5,9 @@ import { v4 } from 'uuid'
 import { waitForExpect } from '~/tests/helpers/expectations'
 import { resetKafka } from '~/tests/helpers/kafka'
 
+import { createIngestionConsumerDeps } from '../../tests/helpers/cdp'
 import { Clickhouse } from '../../tests/helpers/clickhouse'
 import { createUserTeamAndOrganization, fetchPostgresPersons, resetTestDatabase } from '../../tests/helpers/sql'
-import { createHogTransformerService } from '../cdp/hog-transformations/hog-transformer.service'
 import { KAFKA_INGESTION_WARNINGS } from '../config/kafka-topics'
 import { KafkaProducerWrapper } from '../kafka/producer'
 import { Hub, InternalPerson, PipelineEvent, PluginsServerConfig, ProjectId, RawClickHouseEvent, Team } from '../types'
@@ -247,11 +247,7 @@ const createTestWithTeamIngester = (baseConfig: Partial<PluginsServerConfig> = {
                 throw new Error(`Failed to fetch team ${newTeam.id} from database`)
             }
 
-            const ingester = new IngestionConsumer(hub, {
-                ...hub,
-                kafkaMetricsProducer: hub.kafkaProducer,
-                hogTransformer: createHogTransformerService(hub, hub),
-            })
+            const ingester = new IngestionConsumer(hub, createIngestionConsumerDeps(hub))
             // NOTE: We don't actually use kafka so we skip instantiation for faster tests
             ingester['kafkaConsumer'] = {
                 connect: jest.fn(),
