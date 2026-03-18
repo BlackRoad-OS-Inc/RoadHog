@@ -19,6 +19,10 @@ import { CdpPrecalculatedFiltersConsumer } from './cdp/consumers/cdp-precalculat
 import { CyclotronV2JanitorService } from './cdp/services/cyclotron-v2'
 import { EncryptedFields } from './cdp/utils/encryption-utils'
 import { defaultConfig } from './config/config'
+import {
+    createIngestionRedisConnectionConfig,
+    createPosthogRedisConnectionConfig,
+} from './config/redis-pools'
 import { startEvaluationScheduler } from './evaluation-scheduler/evaluation-scheduler'
 import { KafkaProducerWrapper } from './kafka/producer'
 import { LogsIngestionConsumer } from './logs-ingestion/logs-ingestion-consumer'
@@ -338,22 +342,7 @@ export class PluginServer extends BaseServer {
 
         logger.info('🤔', 'Connecting to ingestion Redis...')
         this.redisPool = createRedisPoolFromConfig({
-            connection: this.config.INGESTION_REDIS_HOST
-                ? {
-                      url: this.config.INGESTION_REDIS_HOST,
-                      options: { port: this.config.INGESTION_REDIS_PORT },
-                      name: 'ingestion-redis',
-                  }
-                : this.config.POSTHOG_REDIS_HOST
-                  ? {
-                        url: this.config.POSTHOG_REDIS_HOST,
-                        options: {
-                            port: this.config.POSTHOG_REDIS_PORT,
-                            password: this.config.POSTHOG_REDIS_PASSWORD,
-                        },
-                        name: 'ingestion-redis',
-                    }
-                  : { url: this.config.REDIS_URL, name: 'ingestion-redis' },
+            connection: createIngestionRedisConnectionConfig(this.config),
             poolMinSize: this.config.REDIS_POOL_MIN_SIZE,
             poolMaxSize: this.config.REDIS_POOL_MAX_SIZE,
         })
@@ -399,16 +388,7 @@ export class PluginServer extends BaseServer {
     private createCdpLogsServices(teamManager: TeamManager): { quotaLimiting: QuotaLimiting } {
         logger.info('🤔', 'Connecting to PostHog Redis...')
         this.posthogRedisPool = createRedisPoolFromConfig({
-            connection: this.config.POSTHOG_REDIS_HOST
-                ? {
-                      url: this.config.POSTHOG_REDIS_HOST,
-                      options: {
-                          port: this.config.POSTHOG_REDIS_PORT,
-                          password: this.config.POSTHOG_REDIS_PASSWORD,
-                      },
-                      name: 'posthog-redis',
-                  }
-                : { url: this.config.REDIS_URL, name: 'posthog-redis' },
+            connection: createPosthogRedisConnectionConfig(this.config),
             poolMinSize: this.config.REDIS_POOL_MIN_SIZE,
             poolMaxSize: this.config.REDIS_POOL_MAX_SIZE,
         })

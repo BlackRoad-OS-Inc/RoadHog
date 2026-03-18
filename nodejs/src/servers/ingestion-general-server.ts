@@ -15,6 +15,10 @@ import {
     KAFKA_EVENTS_PLUGIN_INGESTION_HISTORICAL,
     KAFKA_EVENTS_PLUGIN_INGESTION_OVERFLOW,
 } from '../config/kafka-topics'
+import {
+    createCookielessRedisConnectionConfig,
+    createIngestionRedisConnectionConfig,
+} from '../config/redis-pools'
 import { IngestionConsumerConfig } from '../ingestion/config'
 import { CookielessManager } from '../ingestion/cookieless/cookieless-manager'
 import { IngestionConsumer, IngestionConsumerDeps } from '../ingestion/ingestion-consumer'
@@ -155,22 +159,7 @@ export class IngestionGeneralServer extends BaseServer {
 
         logger.info('🤔', 'Connecting to ingestion Redis...')
         this.redisPool = createRedisPoolFromConfig({
-            connection: this.config.INGESTION_REDIS_HOST
-                ? {
-                      url: this.config.INGESTION_REDIS_HOST,
-                      options: { port: this.config.INGESTION_REDIS_PORT },
-                      name: 'ingestion-redis',
-                  }
-                : this.config.POSTHOG_REDIS_HOST
-                  ? {
-                        url: this.config.POSTHOG_REDIS_HOST,
-                        options: {
-                            port: this.config.POSTHOG_REDIS_PORT,
-                            password: this.config.POSTHOG_REDIS_PASSWORD,
-                        },
-                        name: 'ingestion-redis',
-                    }
-                  : { url: this.config.REDIS_URL, name: 'ingestion-redis' },
+            connection: createIngestionRedisConnectionConfig(this.config),
             poolMinSize: this.config.REDIS_POOL_MIN_SIZE,
             poolMaxSize: this.config.REDIS_POOL_MAX_SIZE,
         })
@@ -196,13 +185,7 @@ export class IngestionGeneralServer extends BaseServer {
         // 3. Ingestion-specific services
         logger.info('🤔', 'Connecting to cookieless Redis...')
         this.cookielessRedisPool = createRedisPoolFromConfig({
-            connection: this.config.COOKIELESS_REDIS_HOST
-                ? {
-                      url: this.config.COOKIELESS_REDIS_HOST,
-                      options: { port: this.config.COOKIELESS_REDIS_PORT ?? 6379 },
-                      name: 'cookieless-redis',
-                  }
-                : { url: this.config.REDIS_URL, name: 'cookieless-redis' },
+            connection: createCookielessRedisConnectionConfig(this.config),
             poolMinSize: this.config.REDIS_POOL_MIN_SIZE,
             poolMaxSize: this.config.REDIS_POOL_MAX_SIZE,
         })
