@@ -23,8 +23,9 @@ def reverse_content_types(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("product_tours", "0005_producttour_draft_content"),
         ("posthog", "1056_migrate_experiments_models"),
+        ("surveys", "0001_initial"),
+        ("product_tours", "0006_alter_producttour_linked_surveys"),
     ]
 
     operations = [
