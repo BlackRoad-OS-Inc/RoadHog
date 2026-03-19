@@ -61,7 +61,7 @@ describe('BatchingPipeline', () => {
     }
 
     async function drainAll(
-        pipeline: BatchingPipeline<any, any, any, any, any, any>
+        pipeline: BatchingPipeline<any, any, any, any, any>
     ): Promise<{ allResults: PipelineResultWithContext<any, any>[]; allSideEffects: Promise<unknown>[] }> {
         const allResults: PipelineResultWithContext<any, any>[] = []
         const allSideEffects: Promise<unknown>[] = []
