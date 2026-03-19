@@ -182,7 +182,6 @@ class EmailVerifyDomainView(APIView):
         config.domain_verified = is_active
         config.dns_records = {
             "sending_dns_records": result.get("sending_dns_records", []),
-            "receiving_dns_records": result.get("receiving_dns_records", []),
         }
         config.save(update_fields=["domain_verified", "dns_records"])
 

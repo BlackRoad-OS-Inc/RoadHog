@@ -71,7 +71,6 @@ def add_domain(domain: str) -> dict[str, Any]:
         data = resp.json()
         return {
             "sending_dns_records": data.get("sending_dns_records", []),
-            "receiving_dns_records": data.get("receiving_dns_records", []),
         }
 
     if resp.status_code == 400:
@@ -97,24 +96,36 @@ def get_domain_dns_records(domain: str) -> dict[str, Any]:
     data = resp.json()
     return {
         "sending_dns_records": data.get("sending_dns_records", []),
-        "receiving_dns_records": data.get("receiving_dns_records", []),
     }
 
 
 def verify_domain(domain: str) -> dict[str, Any]:
-    """Trigger DNS verification for a domain and return current status."""
+    """Trigger DNS verification for a domain and return current status.
+
+    If the domain doesn't exist in Mailgun yet, registers it first.
+    """
+    api_key = _get_api_key()
     resp = requests.put(
         f"{MAILGUN_API_BASE}/domains/{domain}/verify",
-        auth=("api", _get_api_key()),
+        auth=("api", api_key),
         timeout=15,
     )
+
+    if resp.status_code == 404:
+        logger.info("mailgun_verify_domain_not_found_registering", domain=domain)
+        add_domain(domain)
+        resp = requests.put(
+            f"{MAILGUN_API_BASE}/domains/{domain}/verify",
+            auth=("api", api_key),
+            timeout=15,
+        )
+
     resp.raise_for_status()
     data = resp.json()
     domain_info = data.get("domain", {})
     return {
         "state": domain_info.get("state", "unverified"),
         "sending_dns_records": data.get("sending_dns_records", []),
-        "receiving_dns_records": data.get("receiving_dns_records", []),
     }
 
 

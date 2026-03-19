@@ -208,7 +208,6 @@ function EmailChannelSection(): JSX.Element {
         useActions(supportSettingsLogic)
 
     const sendingRecords = emailDnsRecords?.sending_dns_records as DnsRecord[] | undefined
-    const receivingRecords = emailDnsRecords?.receiving_dns_records as DnsRecord[] | undefined
 
     return (
         <div className="flex flex-col gap-y-2">
@@ -326,9 +325,6 @@ function EmailChannelSection(): JSX.Element {
 
                         {sendingRecords && sendingRecords.length > 0 && (
                             <DnsRecordsTable records={sendingRecords} title="Sending records (SPF/DKIM)" />
-                        )}
-                        {receivingRecords && receivingRecords.length > 0 && (
-                            <DnsRecordsTable records={receivingRecords} title="Receiving records (MX)" />
                         )}
 
                         {!emailDomainVerified && (
