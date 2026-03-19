@@ -41,11 +41,13 @@ export const manifest: ProductManifest = {
             defaultDocsPath: '/docs/llm-analytics/installation',
         },
         LLMAnalyticsPlayground: {
-            import: () => import('./frontend/LLMAnalyticsPlaygroundScene'),
+            import: () => import('./frontend/playground/LLMAnalyticsPlaygroundScene'),
             projectBased: true,
-            name: 'LLM playground',
-            layout: 'app-container',
+            name: 'Playground',
+            description: 'Test and experiment with LLM prompts in a sandbox environment.',
+            layout: 'app-full-scene-height',
             defaultDocsPath: '/docs/llm-analytics/installation',
+            iconType: 'llm_playground',
         },
         LLMAnalyticsDatasets: {
             import: () => import('./frontend/datasets/LLMAnalyticsDatasetsScene'),
@@ -130,17 +132,24 @@ export const manifest: ProductManifest = {
     routes: {
         '/llm-analytics/dashboard': ['LLMAnalytics', 'llmAnalyticsDashboard'],
         '/llm-analytics/generations': ['LLMAnalytics', 'llmAnalyticsGenerations'],
+        '/llm-analytics/reviews': ['LLMAnalytics', 'llmAnalyticsReviews'],
         '/llm-analytics/traces': ['LLMAnalytics', 'llmAnalyticsTraces'],
         '/llm-analytics/traces/:id': ['LLMAnalyticsTrace', 'llmAnalytics'],
         '/llm-analytics/users': ['LLMAnalytics', 'llmAnalyticsUsers'],
         '/llm-analytics/errors': ['LLMAnalytics', 'llmAnalyticsErrors'],
         '/llm-analytics/tools': ['LLMAnalytics', 'llmAnalyticsTools'],
+        '/llm-analytics/sentiment': ['LLMAnalytics', 'llmAnalyticsSentiment'],
         '/llm-analytics/sessions': ['LLMAnalytics', 'llmAnalyticsSessions'],
         '/llm-analytics/sessions/:id': ['LLMAnalyticsSession', 'llmAnalytics'],
-        '/llm-analytics/playground': ['LLMAnalytics', 'llmAnalyticsPlayground'],
+        '/llm-analytics/playground': ['LLMAnalyticsPlayground', 'llmAnalyticsPlayground'],
         '/llm-analytics/datasets': ['LLMAnalyticsDatasets', 'llmAnalyticsDatasets'],
         '/llm-analytics/datasets/:id': ['LLMAnalyticsDataset', 'llmAnalyticsDataset'],
         '/llm-analytics/evaluations': ['LLMAnalyticsEvaluations', 'llmAnalyticsEvaluations'],
+        '/llm-analytics/evaluations/offline/experiments': ['LLMAnalyticsEvaluations', 'llmAnalyticsOfflineEvaluations'],
+        '/llm-analytics/evaluations/offline/experiments/:experimentId': [
+            'LLMAnalyticsEvaluations',
+            'llmAnalyticsOfflineEvaluationExperiment',
+        ],
         '/llm-analytics/evaluations/templates': ['LLMAnalyticsEvaluationTemplates', 'llmAnalyticsEvaluationTemplates'],
         '/llm-analytics/evaluations/:id': ['LLMAnalyticsEvaluation', 'llmAnalyticsEvaluation'],
         '/llm-analytics/prompts': ['LLMAnalyticsPrompts', 'llmAnalyticsPrompts'],
@@ -160,6 +169,8 @@ export const manifest: ProductManifest = {
             combineUrl(`/llm-analytics/dashboard`, searchParams, hashParams).url,
         '/llm-observability/generations': (_params, searchParams, hashParams) =>
             combineUrl(`/llm-analytics/generations`, searchParams, hashParams).url,
+        '/llm-observability/reviews': (_params, searchParams, hashParams) =>
+            combineUrl(`/llm-analytics/reviews`, searchParams, hashParams).url,
         '/llm-observability/traces': (_params, searchParams, hashParams) =>
             combineUrl(`/llm-analytics/traces`, searchParams, hashParams).url,
         '/llm-observability/traces/:id': (params, searchParams, hashParams) =>
@@ -168,10 +179,13 @@ export const manifest: ProductManifest = {
             combineUrl(`/llm-analytics/users`, searchParams, hashParams).url,
         '/llm-observability/playground': (_params, searchParams, hashParams) =>
             combineUrl(`/llm-analytics/playground`, searchParams, hashParams).url,
+        '/llm-analytics/evaluations/offline': (_params, searchParams, hashParams) =>
+            combineUrl(urls.llmAnalyticsOfflineEvaluations(), searchParams, hashParams).url,
     },
     urls: {
         llmAnalyticsDashboard: (): string => '/llm-analytics/dashboard',
         llmAnalyticsGenerations: (): string => '/llm-analytics/generations',
+        llmAnalyticsReviews: (): string => '/llm-analytics/reviews',
         llmAnalyticsTraces: (): string => '/llm-analytics/traces',
         llmAnalyticsTrace: (
             id: string,
@@ -181,6 +195,7 @@ export const manifest: ProductManifest = {
                 exception_ts?: string
                 search?: string
                 tab?: string
+                msg?: string
             }
         ): string => {
             const queryParams = new URLSearchParams(params)
@@ -190,6 +205,7 @@ export const manifest: ProductManifest = {
         llmAnalyticsUsers: (): string => '/llm-analytics/users',
         llmAnalyticsErrors: (): string => '/llm-analytics/errors',
         llmAnalyticsTools: (): string => '/llm-analytics/tools',
+        llmAnalyticsSentiment: (): string => '/llm-analytics/sentiment',
         llmAnalyticsSessions: (): string => '/llm-analytics/sessions',
         llmAnalyticsSession: (
             id: string,
@@ -206,6 +222,9 @@ export const manifest: ProductManifest = {
         llmAnalyticsDataset: (id: string, params?: { item?: string }): string =>
             combineUrl(`/llm-analytics/datasets/${id}`, params).url,
         llmAnalyticsEvaluations: (): string => '/llm-analytics/evaluations',
+        llmAnalyticsOfflineEvaluations: (): string => '/llm-analytics/evaluations/offline/experiments',
+        llmAnalyticsOfflineEvaluationExperiment: (experimentId: string, encode: boolean = true): string =>
+            `/llm-analytics/evaluations/offline/experiments/${encode ? encodeURIComponent(experimentId) : experimentId}`,
         llmAnalyticsEvaluationTemplates: (): string => '/llm-analytics/evaluations/templates',
         llmAnalyticsEvaluation: (id: string): string => `/llm-analytics/evaluations/${id}`,
         llmAnalyticsPrompts: (): string => '/llm-analytics/prompts',
@@ -236,6 +255,16 @@ export const manifest: ProductManifest = {
             sceneKey: 'LLMAnalytics',
         },
         {
+            path: 'Playground',
+            intents: [ProductKey.LLM_ANALYTICS],
+            category: 'AI engineering',
+            type: 'llm_playground',
+            iconType: 'llm_playground' as FileSystemIconType,
+            iconColor: ['var(--color-product-llm-analytics-light)'] as FileSystemIconColor,
+            href: urls.llmAnalyticsPlayground(),
+            sceneKey: 'LLMAnalyticsPlayground',
+        },
+        {
             path: 'Clusters',
             intents: [ProductKey.LLM_CLUSTERS],
             category: 'AI engineering',
@@ -243,8 +272,6 @@ export const manifest: ProductManifest = {
             iconType: 'llm_clusters' as FileSystemIconType,
             iconColor: ['var(--color-product-llm-clusters-light)'] as FileSystemIconColor,
             href: urls.llmAnalyticsClusters(),
-            flag: FEATURE_FLAGS.LLM_ANALYTICS_CLUSTERS_TAB,
-            tags: ['alpha'],
             sceneKey: 'LLMAnalyticsClusters',
         },
         {
@@ -280,7 +307,7 @@ export const manifest: ProductManifest = {
             iconColor: ['var(--color-product-llm-prompts-light)'] as FileSystemIconColor,
             href: urls.llmAnalyticsPrompts(),
             flag: FEATURE_FLAGS.PROMPT_MANAGEMENT,
-            tags: ['alpha'],
+            tags: ['beta'],
             sceneKey: 'LLMAnalyticsPrompts',
         },
     ],

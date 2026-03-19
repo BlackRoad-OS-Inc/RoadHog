@@ -38,7 +38,7 @@ from posthog.models.activity_logging.activity_log import (
     log_activity,
 )
 from posthog.models.activity_logging.activity_page import activity_page_response
-from posthog.models.group_type_mapping import GROUP_TYPE_MAPPING_SERIALIZER_FIELDS, GroupTypeMapping
+from posthog.models.group_type_mapping import get_group_types_for_project
 from posthog.models.organization import Organization, OrganizationMembership
 from posthog.models.product_intent.product_intent import (
     ProductIntent,
@@ -264,12 +264,10 @@ class ProjectBackwardCompatSerializer(ProjectBackwardCompatBasicSerializer, User
         return self.user_permissions.team(team).effective_membership_level
 
     def get_has_group_types(self, project: Project) -> bool:
-        return GroupTypeMapping.objects.filter(project_id=project.id).exists()
+        return bool(get_group_types_for_project(project.id))
 
     def get_group_types(self, project: Project) -> list[dict[str, Any]]:
-        return list(
-            GroupTypeMapping.objects.filter(project_id=project.id).values(*GROUP_TYPE_MAPPING_SERIALIZER_FIELDS)
-        )
+        return get_group_types_for_project(project.id)
 
     def get_live_events_token(self, project: Project) -> Optional[str]:
         team = project.teams.get(pk=project.pk)
@@ -279,6 +277,20 @@ class ProjectBackwardCompatSerializer(ProjectBackwardCompatBasicSerializer, User
             PosthogJwtAudience.LIVESTREAM,
         )
 
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "product_type": {"type": "string"},
+                    "created_at": {"type": "string", "format": "date-time"},
+                    "onboarding_completed_at": {"type": "string", "format": "date-time", "nullable": True},
+                    "updated_at": {"type": "string", "format": "date-time"},
+                },
+            },
+        }
+    )
     def get_product_intents(self, obj):
         project = obj
         team = project.passthrough_team
@@ -668,7 +680,7 @@ class ProjectViewSet(TeamAndOrgViewSetMixin, AccessControlViewSetMixin, viewsets
                 activity="deleted",
                 detail=Detail(name=str(team.name)),
             )
-            report_user_action(user, f"team deleted", team=team)
+            report_user_action(user, "team deleted", team=team, request=self.request)
         log_activity(
             organization_id=cast(UUIDT, organization_id),
             team_id=project_id,
@@ -681,9 +693,10 @@ class ProjectViewSet(TeamAndOrgViewSetMixin, AccessControlViewSetMixin, viewsets
         )
         report_user_action(
             user,
-            f"project deleted",
+            "project deleted",
             {"project_name": project_name},
             team=teams[0],
+            request=self.request,
         )
 
     @action(
@@ -829,14 +842,13 @@ class ProjectViewSet(TeamAndOrgViewSetMixin, AccessControlViewSetMixin, viewsets
                 "product onboarding completed",
                 {
                     "product_key": product_type,
-                    "$current_url": current_url,
-                    "$session_id": session_id,
                     "intent_context": intent_context,
                     "intent_created_at": product_intent.created_at,
                     "intent_updated_at": product_intent.updated_at,
                     "realm": get_instance_realm(),
                 },
                 team=team,
+                request=request,
             )
 
         return response.Response(TeamSerializer(team, context=self.get_serializer_context()).data)
@@ -906,7 +918,7 @@ class ProjectViewSet(TeamAndOrgViewSetMixin, AccessControlViewSetMixin, viewsets
 
         report_user_action(
             user,
-            f"project moved to another organization",
+            "project moved to another organization",
             {
                 "project_id": project.id,
                 "project_name": project.name,
@@ -916,6 +928,7 @@ class ProjectViewSet(TeamAndOrgViewSetMixin, AccessControlViewSetMixin, viewsets
                 "new_organization_name": target_organization.name,
             },
             team=teams[0],
+            request=request,
         )
 
         return response.Response(

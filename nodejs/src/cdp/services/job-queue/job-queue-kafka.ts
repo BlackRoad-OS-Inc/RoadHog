@@ -8,22 +8,22 @@ import { compress, uncompress } from 'snappy'
 
 import { KafkaConsumer } from '../../../kafka/consumer'
 import { KafkaProducerWrapper } from '../../../kafka/producer'
-import { HealthCheckResult, HealthCheckResultError, PluginsServerConfig } from '../../../types'
+import { HealthCheckResult, HealthCheckResultError } from '../../../types'
 import { parseJSON } from '../../../utils/json-parse'
 import { logger } from '../../../utils/logger'
+import { CdpConfig } from '../../config'
 import { CyclotronJobInvocation, CyclotronJobInvocationResult, CyclotronJobQueueKind } from '../../types'
-import { cdpJobSizeKb } from './shared'
-import { WarpstreamFetchTester } from './warpstream-fetch-tester'
+import { cdpJobSizeCompressedKb, cdpJobSizeKb } from './shared'
 
 export class CyclotronJobQueueKafka {
     private kafkaConsumer?: KafkaConsumer
     private kafkaProducer?: KafkaProducerWrapper
-    private fetchTester?: WarpstreamFetchTester
+    private queue?: CyclotronJobQueueKind
+    private consumeBatch?: (invocations: CyclotronJobInvocation[]) => Promise<{ backgroundTask: Promise<any> }>
 
     constructor(
-        private config: PluginsServerConfig,
-        private queue: CyclotronJobQueueKind,
-        private consumeBatch: (invocations: CyclotronJobInvocation[]) => Promise<{ backgroundTask: Promise<any> }>
+        private kafkaClientRack: string | undefined,
+        private config: Pick<CdpConfig, 'CDP_CYCLOTRON_COMPRESS_KAFKA_DATA'>
     ) {}
 
     /**
@@ -31,10 +31,16 @@ export class CyclotronJobQueueKafka {
      */
     public async startAsProducer() {
         // NOTE: For producing we use different values dedicated for Cyclotron as this is typically using its own Kafka cluster
-        this.kafkaProducer = await KafkaProducerWrapper.create(this.config.KAFKA_CLIENT_RACK, 'CDP_PRODUCER')
+        this.kafkaProducer = await KafkaProducerWrapper.create(this.kafkaClientRack, 'CDP_PRODUCER')
     }
 
-    public async startAsConsumer() {
+    public async startAsConsumer(
+        queue: CyclotronJobQueueKind,
+        consumeBatch: (invocations: CyclotronJobInvocation[]) => Promise<{ backgroundTask: Promise<any> }>
+    ) {
+        this.queue = queue
+        this.consumeBatch = consumeBatch
+
         const groupId = `cdp-cyclotron-${this.queue}-consumer`
         const topic = `cdp_cyclotron_${this.queue}`
 
@@ -46,23 +52,6 @@ export class CyclotronJobQueueKafka {
             const { backgroundTask } = await this.consumeKafkaBatch(messages)
             return { backgroundTask }
         })
-
-        if (this.config.CDP_CYCLOTRON_TEST_SEEK_LATENCY) {
-            if (this.config.CDP_CYCLOTRON_TEST_SEEK_LATENCY) {
-                try {
-                    this.fetchTester = new WarpstreamFetchTester(this.config)
-                    this.fetchTester.start()
-                    logger.info('🔄', 'WarpStream fetch tester initialized')
-                } catch (error) {
-                    logger.warn('🔄', 'Failed to initialize WarpStream fetch tester', {
-                        error: String(error),
-                    })
-                    this.fetchTester = undefined
-                }
-            }
-
-            logger.info('🔄', 'WarpStream fetch tester initialized')
-        }
     }
 
     public async stopConsumer() {
@@ -91,22 +80,18 @@ export class CyclotronJobQueueKafka {
             invocations.map(async (x) => {
                 const serialized = serializeInvocation(x)
 
-                const value = this.config.CDP_CYCLOTRON_COMPRESS_KAFKA_DATA
-                    ? await compress(JSON.stringify(serialized))
-                    : JSON.stringify(serialized)
+                const jsonString = JSON.stringify(serialized)
+                cdpJobSizeKb.labels('kafka').observe(jsonString.length / 1024)
 
-                cdpJobSizeKb.observe(value.length / 1024)
+                const value = this.config.CDP_CYCLOTRON_COMPRESS_KAFKA_DATA ? await compress(jsonString) : jsonString
+
+                cdpJobSizeCompressedKb.labels('kafka').observe(value.length / 1024)
 
                 const headers: Record<string, string> = {
                     // NOTE: Later we should remove hogFunctionId as it is no longer used
                     hogFunctionId: x.functionId,
                     functionId: x.functionId,
                     teamId: x.teamId.toString(),
-                }
-
-                if (x.queueScheduledAt && x.state?.returnTopic) {
-                    headers.queueScheduledAt = x.queueScheduledAt.toString()
-                    headers.returnTopic = `cdp_cyclotron_${x.state.returnTopic}`
                 }
 
                 await producer
@@ -152,7 +137,7 @@ export class CyclotronJobQueueKafka {
 
     private async consumeKafkaBatch(messages: Message[]): Promise<{ backgroundTask: Promise<any> }> {
         if (messages.length === 0) {
-            return await this.consumeBatch([])
+            return await this.consumeBatch!([])
         }
 
         const invocations: CyclotronJobInvocation[] = []
@@ -173,15 +158,7 @@ export class CyclotronJobQueueKafka {
             invocations.push(invocation)
         }
 
-        if (this.fetchTester) {
-            try {
-                await this.fetchTester.maybeMeasureFetchLatency(messages)
-            } catch (error) {
-                logger.warn('fetch_tester_error', { error: String(error) })
-            }
-        }
-
-        return await this.consumeBatch(invocations)
+        return await this.consumeBatch!(invocations)
     }
 }
 

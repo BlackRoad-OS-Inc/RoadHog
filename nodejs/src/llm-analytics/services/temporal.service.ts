@@ -2,12 +2,13 @@ import { Client, Connection, TLSConfig, WorkflowHandle } from '@temporalio/clien
 import fs from 'fs/promises'
 import { Counter } from 'prom-client'
 
-import { PluginsServerConfig, RawKafkaEvent } from '../../types'
+import { CdpConfig } from '../../cdp/config'
+import { RawKafkaEvent } from '../../types'
 import { isDevEnv } from '../../utils/env-utils'
 import { logger } from '../../utils/logger'
 
 export type TemporalServiceConfig = Pick<
-    PluginsServerConfig,
+    CdpConfig,
     | 'TEMPORAL_CLIENT_ROOT_CA'
     | 'TEMPORAL_CLIENT_CERT'
     | 'TEMPORAL_CLIENT_KEY'
@@ -103,10 +104,15 @@ export class TemporalService {
         return client
     }
 
-    async startEvaluationRunWorkflow(evaluationId: string, event: RawKafkaEvent): Promise<WorkflowHandle> {
+    async startEvaluationRunWorkflow(
+        evaluationId: string,
+        event: RawKafkaEvent,
+        evaluationRuntime: string = 'llm_judge'
+    ): Promise<WorkflowHandle> {
         const client = await this.ensureConnected()
 
-        const workflowId = `${evaluationId}-${event.uuid}-ingestion`
+        const prefix = evaluationRuntime === 'hog' ? 'llma-hog-eval' : 'llma-llm-eval'
+        const workflowId = `${prefix}-${evaluationId}-${event.uuid}-ingestion`
 
         const handle = await client.workflow.start('run-evaluation', {
             args: [

@@ -2,7 +2,8 @@
 Management command to verify flag definitions cache consistency.
 
 Compares cached flag definitions data against database to detect discrepancies.
-Verifies both cache variants (with and without cohorts) used for SDK local evaluation.
+Verifies both cache variants (with-cohorts and without-cohorts). When --fix is
+used, each variant's cache is updated independently.
 
 Usage:
     # Verify all teams
@@ -13,10 +14,6 @@ Usage:
 
     # Sample random teams
     python manage.py verify_flag_definitions_cache --sample 100
-
-    # Verify only one variant
-    python manage.py verify_flag_definitions_cache --variant with-cohorts
-    python manage.py verify_flag_definitions_cache --variant without-cohorts
 
     # Verbose output (show full diffs)
     python manage.py verify_flag_definitions_cache --verbose
@@ -42,12 +39,6 @@ class Command(BaseHyperCacheCommand):
     def add_arguments(self, parser):
         self.add_common_team_arguments(parser)
         self.add_verify_arguments(parser)
-        parser.add_argument(
-            "--variant",
-            type=str,
-            choices=["with-cohorts", "without-cohorts"],
-            help="Verify only the specified variant (default: both)",
-        )
 
     @override
     def format_verbose_diff(self, diff: dict):
@@ -85,28 +76,18 @@ class Command(BaseHyperCacheCommand):
         sample_size = options.get("sample")
         verbose = options.get("verbose", False)
         fix = options.get("fix", False)
-        variant = options.get("variant")
 
         # Validate input arguments to prevent resource exhaustion
         if sample_size is not None:
             if not self.validate_sample_size(sample_size):
                 return
 
-        # Determine which configs to verify
-        configs_to_verify = []
-        if variant == "with-cohorts":
-            configs_to_verify = [(FLAG_DEFINITIONS_HYPERCACHE_MANAGEMENT_CONFIG, "with cohorts", True)]
-        elif variant == "without-cohorts":
-            configs_to_verify = [(FLAG_DEFINITIONS_NO_COHORTS_HYPERCACHE_MANAGEMENT_CONFIG, "without cohorts", False)]
-        else:
-            # Verify both variants
-            configs_to_verify = [
-                (FLAG_DEFINITIONS_HYPERCACHE_MANAGEMENT_CONFIG, "with cohorts", True),
-                (FLAG_DEFINITIONS_NO_COHORTS_HYPERCACHE_MANAGEMENT_CONFIG, "without cohorts", False),
-            ]
+        configs_to_verify = [
+            (FLAG_DEFINITIONS_HYPERCACHE_MANAGEMENT_CONFIG, True, "with cohorts"),
+            (FLAG_DEFINITIONS_NO_COHORTS_HYPERCACHE_MANAGEMENT_CONFIG, False, "without cohorts"),
+        ]
 
-        # Verify each variant
-        for config, variant_name, include_cohorts in configs_to_verify:
+        for config, include_cohorts, variant_name in configs_to_verify:
             self.stdout.write(f"\n{'=' * 70}")
             self.stdout.write(self.style.SUCCESS(f"Verifying flag definitions cache ({variant_name})"))
             self.stdout.write("=" * 70)

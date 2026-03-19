@@ -39,6 +39,8 @@ export const KAFKA_CLICKHOUSE_SESSION_REPLAY_EVENTS = `${prefix}clickhouse_sessi
 export const KAFKA_PERFORMANCE_EVENTS = `${prefix}clickhouse_performance_events${suffix}`
 // write heatmap events to ClickHouse
 export const KAFKA_CLICKHOUSE_HEATMAP_EVENTS = `${prefix}clickhouse_heatmap_events${suffix}`
+// write AI events to ClickHouse
+export const KAFKA_CLICKHOUSE_AI_EVENTS_JSON = `${prefix}clickhouse_ai_events_json${suffix}`
 
 // log entries for ingestion into ClickHouse
 export const KAFKA_LOG_ENTRIES = `${prefix}log_entries${suffix}`
@@ -54,6 +56,9 @@ export const KAFKA_COHORT_MEMBERSHIP_CHANGED_TRIGGER = `${prefix}cohort_membersh
 export const KAFKA_CDP_BATCH_HOGFLOW_REQUESTS = `${prefix}cdp_batch_hogflow_requests${suffix}`
 
 // Error tracking topics
+export const KAFKA_ERROR_TRACKING_INGESTION = `${prefix}ingestion-error_tracking-main${suffix}` // Partition count varies by env
+export const KAFKA_ERROR_TRACKING_INGESTION_DLQ = `${prefix}ingestion-error_tracking-main-dlq${suffix}`
+export const KAFKA_ERROR_TRACKING_INGESTION_OVERFLOW = `${prefix}ingestion-error_tracking-overflow${suffix}` // Partition count varies by env
 export const KAFKA_ERROR_TRACKING_ISSUE_FINGERPRINT = `${prefix}clickhouse_error_tracking_issue_fingerprint${suffix}`
 export const KAFKA_ERROR_TRACKING_ISSUE_FINGERPRINT_OVERRIDES = `${prefix}clickhouse_error_tracking_issue_fingerprint_overrides${suffix}`
 
@@ -65,6 +70,12 @@ export const KAFKA_LOGS_INGESTION = `${prefix}logs_ingestion${suffix}`
 export const KAFKA_LOGS_INGESTION_DLQ = `${prefix}logs_ingestion_dlq${suffix}`
 export const KAFKA_LOGS_INGESTION_OVERFLOW = `${prefix}logs_ingestion_overflow${suffix}`
 export const KAFKA_LOGS_CLICKHOUSE = `${prefix}clickhouse_logs${suffix}`
+
+// Traces ingestion topics
+export const KAFKA_TRACES_INGESTION = `${prefix}ingestion-traces${suffix}`
+export const KAFKA_TRACES_INGESTION_DLQ = `${prefix}ingestion-traces-dlq${suffix}`
+export const KAFKA_TRACES_INGESTION_OVERFLOW = `${prefix}ingestion-traces-overflow${suffix}`
+export const KAFKA_TRACES_CLICKHOUSE = `${prefix}clickhouse_traces${suffix}`
 
 // TopHog metrics
 export const KAFKA_CLICKHOUSE_TOPHOG = `${prefix}clickhouse_tophog${suffix}`

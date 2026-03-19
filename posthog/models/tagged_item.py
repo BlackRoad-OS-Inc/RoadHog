@@ -12,6 +12,7 @@ RELATED_OBJECTS = (
     "action",
     "feature_flag",
     "experiment_saved_metric",
+    "ticket",
 )
 
 
@@ -77,7 +78,14 @@ class TaggedItem(ModelActivityMixin, UUIDTModel):
         related_name="tagged_items",
     )
     experiment_saved_metric = models.ForeignKey(
-        "ExperimentSavedMetric",
+        "experiments.ExperimentSavedMetric",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="tagged_items",
+    )
+    ticket = models.ForeignKey(
+        "conversations.Ticket",
         on_delete=models.CASCADE,
         null=True,
         blank=True,

@@ -4,7 +4,7 @@ from django.db import models, transaction
 
 from posthog.models.utils import UUIDTModel
 
-from .constants import Channel, Priority, Status
+from .constants import Channel, ChannelDetail, Priority, Status
 
 if TYPE_CHECKING:
     from posthog.models import Person
@@ -40,6 +40,7 @@ class Ticket(UUIDTModel):
     team = models.ForeignKey("posthog.Team", on_delete=models.CASCADE)
     ticket_number = models.PositiveIntegerField()
     channel_source = models.CharField(max_length=20, choices=Channel.choices, default=Channel.WIDGET)
+    channel_detail = models.CharField(max_length=30, choices=ChannelDetail.choices, null=True, blank=True)
     widget_session_id = models.CharField(max_length=64, db_index=True)  # Random UUID for access control
     distinct_id = models.CharField(max_length=400)  # PostHog distinct_id for Person linking only
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
@@ -62,9 +63,16 @@ class Ticket(UUIDTModel):
     slack_thread_ts = models.CharField(max_length=64, null=True, blank=True)  # Slack thread timestamp (thread ID)
     slack_team_id = models.CharField(max_length=64, null=True, blank=True)  # Slack workspace/team ID
 
+    # Email channel fields (only set for channel_source="email")
+    email_subject = models.CharField(max_length=500, null=True, blank=True)
+    email_from = models.EmailField(null=True, blank=True)
+
     # Session context (captured when ticket is created)
     session_id = models.CharField(max_length=64, null=True, blank=True)  # PostHog session ID
     session_context = models.JSONField(default=dict, blank=True)  # session_replay_url, current_url, etc.
+
+    # SLA deadline — set via workflows, null means no SLA
+    sla_due_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -86,6 +94,8 @@ class Ticket(UUIDTModel):
             models.Index(fields=["team", "-updated_at"], name="posthog_con_team_updated_idx"),
             # Dashboard filtered + ordered queries
             models.Index(fields=["team", "status", "-updated_at"], name="posthog_con_status_upd_idx"),
+            # SLA sort/filter queries
+            models.Index(fields=["team", "sla_due_at"], name="posthog_con_team_sla_idx"),
         ]
         constraints = [
             models.UniqueConstraint(fields=["team", "ticket_number"], name="unique_ticket_number_per_team"),

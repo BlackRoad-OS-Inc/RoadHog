@@ -101,6 +101,10 @@ public:
 
     virtual std::any visitSettingsClause(HogQLParser::SettingsClauseContext *context) = 0;
 
+    virtual std::any visitValuesClause(HogQLParser::ValuesClauseContext *context) = 0;
+
+    virtual std::any visitValuesRow(HogQLParser::ValuesRowContext *context) = 0;
+
     virtual std::any visitJoinExprOp(HogQLParser::JoinExprOpContext *context) = 0;
 
     virtual std::any visitJoinExprTable(HogQLParser::JoinExprTableContext *context) = 0;
@@ -160,6 +164,12 @@ public:
     virtual std::any visitColumnTypeExprParam(HogQLParser::ColumnTypeExprParamContext *context) = 0;
 
     virtual std::any visitColumnExprList(HogQLParser::ColumnExprListContext *context) = 0;
+
+    virtual std::any visitSelectColumnExprList(HogQLParser::SelectColumnExprListContext *context) = 0;
+
+    virtual std::any visitColumnExprAliasBefore(HogQLParser::ColumnExprAliasBeforeContext *context) = 0;
+
+    virtual std::any visitColumnExprSelectValue(HogQLParser::ColumnExprSelectValueContext *context) = 0;
 
     virtual std::any visitColumnExprTernaryOp(HogQLParser::ColumnExprTernaryOpContext *context) = 0;
 
@@ -279,9 +289,13 @@ public:
 
     virtual std::any visitTableExprSubquery(HogQLParser::TableExprSubqueryContext *context) = 0;
 
+    virtual std::any visitTableExprValues(HogQLParser::TableExprValuesContext *context) = 0;
+
     virtual std::any visitTableExprAlias(HogQLParser::TableExprAliasContext *context) = 0;
 
     virtual std::any visitTableExprFunction(HogQLParser::TableExprFunctionContext *context) = 0;
+
+    virtual std::any visitTableAliasColumnNameList(HogQLParser::TableAliasColumnNameListContext *context) = 0;
 
     virtual std::any visitTableFunctionExpr(HogQLParser::TableFunctionExprContext *context) = 0;
 

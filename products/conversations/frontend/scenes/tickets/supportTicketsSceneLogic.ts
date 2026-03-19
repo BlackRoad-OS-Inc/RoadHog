@@ -1,4 +1,4 @@
-import { actions, afterMount, kea, listeners, path, reducers, selectors } from 'kea'
+import { actions, afterMount, kea, key, listeners, path, props, reducers, selectors } from 'kea'
 
 import { lemonToast } from '@posthog/lemon-ui'
 
@@ -16,14 +16,22 @@ import type { supportTicketsSceneLogicType } from './supportTicketsSceneLogicTyp
 
 export const SUPPORT_TICKETS_PAGE_SIZE = 20
 
+export interface SupportTicketsSceneLogicProps {
+    key?: string
+    distinctIds?: string[]
+}
+
 export const supportTicketsSceneLogic = kea<supportTicketsSceneLogicType>([
     path(['products', 'conversations', 'frontend', 'scenes', 'tickets', 'supportTicketsSceneLogic']),
+    props({} as SupportTicketsSceneLogicProps),
+    key((props: SupportTicketsSceneLogicProps) => props?.key || 'SupportTicketsScene'),
     actions({
         setStatusFilter: (statuses: TicketStatus[]) => ({ statuses }),
         setChannelFilter: (channel: TicketChannel | 'all') => ({ channel }),
         setSlaFilter: (sla: TicketSlaState | 'all') => ({ sla }),
         setPriorityFilter: (priorities: TicketPriority[]) => ({ priorities }),
         setAssigneeFilter: (assignee: AssigneeFilterValue) => ({ assignee }),
+        setTagsFilter: (tags: string[]) => ({ tags }),
         setDateRange: (dateFrom: string | null, dateTo: string | null) => ({ dateFrom, dateTo }),
         setCurrentPage: (page: number) => ({ page }),
         loadTickets: true,
@@ -91,6 +99,13 @@ export const supportTicketsSceneLogic = kea<supportTicketsSceneLogicType>([
                 setAssigneeFilter: (_, { assignee }) => assignee,
             },
         ],
+        tagsFilter: [
+            [] as string[],
+            { persist: true },
+            {
+                setTagsFilter: (_, { tags }) => tags,
+            },
+        ],
         dateFrom: [
             '-7d' as string | null,
             { persist: true },
@@ -109,10 +124,15 @@ export const supportTicketsSceneLogic = kea<supportTicketsSceneLogicType>([
     selectors({
         filteredTickets: [(s) => [s.tickets], (tickets: Ticket[]) => tickets],
     }),
-    listeners(({ actions, values }) => ({
+    listeners(({ actions, values, props }) => ({
         loadTickets: async (_, breakpoint) => {
             await breakpoint(300)
             const params: Record<string, any> = {}
+
+            if (props.distinctIds && props.distinctIds.length > 0) {
+                params.distinct_ids = props.distinctIds.join(',')
+            }
+
             if (values.statusFilter.length > 0) {
                 params.status = values.statusFilter.join(',')
             }
@@ -122,12 +142,18 @@ export const supportTicketsSceneLogic = kea<supportTicketsSceneLogicType>([
             if (values.channelFilter !== 'all') {
                 params.channel_source = values.channelFilter
             }
+            if (values.slaFilter !== 'all') {
+                params.sla = values.slaFilter
+            }
             if (values.assigneeFilter !== 'all') {
                 if (values.assigneeFilter === 'unassigned') {
                     params.assignee = 'unassigned'
                 } else if (values.assigneeFilter && typeof values.assigneeFilter === 'object') {
                     params.assignee = `${values.assigneeFilter.type}:${values.assigneeFilter.id}`
                 }
+            }
+            if (values.tagsFilter.length > 0) {
+                params.tags = JSON.stringify(values.tagsFilter)
             }
             if (values.dateFrom) {
                 params.date_from = values.dateFrom
@@ -159,7 +185,13 @@ export const supportTicketsSceneLogic = kea<supportTicketsSceneLogicType>([
         setChannelFilter: () => {
             actions.setCurrentPage(1)
         },
+        setSlaFilter: () => {
+            actions.setCurrentPage(1)
+        },
         setAssigneeFilter: () => {
+            actions.setCurrentPage(1)
+        },
+        setTagsFilter: () => {
             actions.setCurrentPage(1)
         },
         setDateRange: () => {

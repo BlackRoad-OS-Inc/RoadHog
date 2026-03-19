@@ -1,7 +1,7 @@
 use crate::api::errors::{simplify_serde_error, FlagError};
 use crate::database::get_connection_with_metrics;
 use crate::flags::flag_models::{
-    FeatureFlag, FeatureFlagList, FeatureFlagRow, HypercacheFlagsWrapper,
+    EvaluationMetadata, FeatureFlag, FeatureFlagList, FeatureFlagRow, HypercacheFlagsWrapper,
 };
 use crate::metrics::consts::TOMBSTONE_COUNTER;
 use common_database::PostgresReader;
@@ -11,56 +11,55 @@ use metrics::counter;
 
 impl FeatureFlagList {
     pub fn new(flags: Vec<FeatureFlag>) -> Self {
-        Self { flags }
+        Self {
+            flags,
+            ..Default::default()
+        }
     }
 
-    /// Parses a JSON Value from hypercache into a list of feature flags.
+    /// Parses a JSON Value from hypercache into flags and optional evaluation metadata.
     ///
     /// Handles:
     /// - Null values (returns empty vec)
     /// - Sentinel "__missing__" value (returns empty vec)
-    /// - Standard hypercache format `{"flags": [...]}`
+    /// - Standard hypercache format `{"flags": [...], "evaluation_metadata": {...}}`
     pub fn parse_hypercache_value(
         data: serde_json::Value,
         team_id: TeamId,
-    ) -> Result<Vec<FeatureFlag>, FlagError> {
+    ) -> Result<(Vec<FeatureFlag>, Option<EvaluationMetadata>), FlagError> {
         // Handle null (can happen when hypercache returns empty)
         if data.is_null() {
-            return Ok(vec![]);
+            return Ok((vec![], None));
         }
 
         // Check for the sentinel value indicating no flags for this team
         if data.as_str() == Some(HYPER_CACHE_EMPTY_VALUE) {
             tracing::debug!("Hypercache sentinel (no flags) for team {}", team_id);
-            return Ok(vec![]);
+            return Ok((vec![], None));
         }
 
-        // Parse the hypercache format: {"flags": [...]}
-        let wrapper: HypercacheFlagsWrapper =
-            serde_json::from_value(data.clone()).map_err(|e| {
-                let data_str = data.to_string();
-                let data_preview = &data_str[..data_str.len().min(200)];
-                tracing::error!(
-                    "Failed to parse hypercache data for team {}: {}. Data: {}",
-                    team_id,
-                    e,
-                    data_preview
-                );
-                counter!(
-                    TOMBSTONE_COUNTER,
-                    "failure_type" => "hypercache_parse_error",
-                    "team_id" => team_id.to_string(),
-                )
-                .increment(1);
-                FlagError::DataParsingErrorWithContext(format!(
-                    "Failed to parse feature flags for team {team_id}: {}",
-                    simplify_serde_error(&e.to_string())
-                ))
-            })?;
+        // Parse the hypercache format: {"flags": [...], "evaluation_metadata": {...}}
+        let wrapper: HypercacheFlagsWrapper = serde_json::from_value(data).map_err(|e| {
+            tracing::error!(
+                "Failed to parse hypercache data for team {}: {}",
+                team_id,
+                e
+            );
+            counter!(
+                TOMBSTONE_COUNTER,
+                "failure_type" => "hypercache_parse_error",
+                "team_id" => team_id.to_string(),
+            )
+            .increment(1);
+            FlagError::DataParsingErrorWithContext(format!(
+                "Failed to parse feature flags for team {team_id}: {}",
+                simplify_serde_error(&e.to_string())
+            ))
+        })?;
 
         tracing::debug!("Parsed {} flags for team {}", wrapper.flags.len(), team_id);
 
-        Ok(wrapper.flags)
+        Ok((wrapper.flags, wrapper.evaluation_metadata))
     }
 
     /// Returns feature flags from postgres given a team_id
@@ -91,19 +90,14 @@ impl FeatureFlagList {
                   f.version,
                   f.evaluation_runtime,
                   COALESCE(
-                      ARRAY_AGG(tag.name) FILTER (WHERE tag.name IS NOT NULL),
+                      ARRAY_AGG(ctx.name) FILTER (WHERE ctx.name IS NOT NULL),
                       '{}'::text[]
                   ) AS evaluation_tags,
                   bucketing_identifier
               FROM posthog_featureflag AS f
               JOIN posthog_team AS t ON (f.team_id = t.id)
-              -- Evaluation tags are distinct from organizational tags. This bridge table links
-              -- flags to tags that constrain runtime evaluation. We use LEFT JOIN to retain flags
-              -- with zero evaluation tags, so ARRAY_AGG(...) returns an empty array rather than
-              -- dropping the flag row entirely.
-              LEFT JOIN posthog_featureflagevaluationtag AS et ON (f.id = et.feature_flag_id)
-              -- Only fetch names for tags that are evaluation constraints (not all org tags)
-              LEFT JOIN posthog_tag AS tag ON (et.tag_id = tag.id)
+              LEFT JOIN posthog_featureflagevaluationcontext AS ec ON (f.id = ec.feature_flag_id)
+              LEFT JOIN posthog_evaluationcontext AS ctx ON (ec.evaluation_context_id = ctx.id)
             WHERE t.id = $1
               AND f.deleted = false
               -- Exclude encrypted remote config flags - they can only be accessed via
@@ -188,7 +182,6 @@ mod tests {
             setup_redis_client, TestContext,
         },
     };
-    use rand::Rng;
 
     #[tokio::test]
     async fn test_fetch_flags_from_redis() {
@@ -302,11 +295,8 @@ mod tests {
             .await
             .expect("Failed to insert team");
 
-        let random_id_1 = rand::thread_rng().gen_range(1_000_000..100_000_000);
-        let random_id_2 = rand::thread_rng().gen_range(1_000_000..100_000_000);
-
         let flag1 = FeatureFlagRow {
-            id: random_id_1,
+            id: 0,
             team_id: team.id,
             name: Some("Test Flag".to_string()),
             key: "test_flag".to_string(),
@@ -321,7 +311,7 @@ mod tests {
         };
 
         let flag2 = FeatureFlagRow {
-            id: random_id_2,
+            id: 0,
             team_id: team.id,
             name: Some("Test Flag 2".to_string()),
             key: "test_flag_2".to_string(),
@@ -414,14 +404,12 @@ mod tests {
             .expect("Failed to get connection");
 
         // Insert a regular feature flag via raw SQL (is_remote_configuration = false)
-        let regular_flag_id = rand::thread_rng().gen_range(1_000_000..100_000_000);
         sqlx::query(
             r#"INSERT INTO posthog_featureflag
-            (id, team_id, name, key, filters, deleted, active, ensure_experience_continuity,
+            (team_id, name, key, filters, deleted, active, ensure_experience_continuity,
              is_remote_configuration, has_encrypted_payloads, created_at)
-            VALUES ($1, $2, $3, $4, $5, false, true, false, false, false, '2024-06-17')"#,
+            VALUES ($1, $2, $3, $4, false, true, false, false, false, '2024-06-17')"#,
         )
-        .bind(regular_flag_id)
         .bind(team.id)
         .bind("Regular Flag")
         .bind("regular_flag")
@@ -431,14 +419,12 @@ mod tests {
         .expect("Failed to insert regular flag");
 
         // Insert an unencrypted remote config flag via raw SQL
-        let unencrypted_remote_config_id = rand::thread_rng().gen_range(1_000_000..100_000_000);
         sqlx::query(
             r#"INSERT INTO posthog_featureflag
-            (id, team_id, name, key, filters, deleted, active, ensure_experience_continuity,
+            (team_id, name, key, filters, deleted, active, ensure_experience_continuity,
              is_remote_configuration, has_encrypted_payloads, created_at)
-            VALUES ($1, $2, $3, $4, $5, false, true, false, true, false, '2024-06-17')"#,
+            VALUES ($1, $2, $3, $4, false, true, false, true, false, '2024-06-17')"#,
         )
-        .bind(unencrypted_remote_config_id)
         .bind(team.id)
         .bind("Unencrypted Remote Config Flag")
         .bind("unencrypted_remote_config_flag")
@@ -448,14 +434,12 @@ mod tests {
         .expect("Failed to insert unencrypted remote config flag");
 
         // Insert an encrypted remote config flag via raw SQL
-        let encrypted_remote_config_id = rand::thread_rng().gen_range(1_000_000..100_000_000);
         sqlx::query(
             r#"INSERT INTO posthog_featureflag
-            (id, team_id, name, key, filters, deleted, active, ensure_experience_continuity,
+            (team_id, name, key, filters, deleted, active, ensure_experience_continuity,
              is_remote_configuration, has_encrypted_payloads, created_at)
-            VALUES ($1, $2, $3, $4, $5, false, true, false, true, true, '2024-06-17')"#,
+            VALUES ($1, $2, $3, $4, false, true, false, true, true, '2024-06-17')"#,
         )
-        .bind(encrypted_remote_config_id)
         .bind(team.id)
         .bind("Encrypted Remote Config Flag")
         .bind("encrypted_remote_config_flag")
@@ -497,14 +481,12 @@ mod tests {
             .expect("Failed to get connection");
 
         // Insert flag with is_remote_configuration = NULL, has_encrypted_payloads = false
-        let null_remote_config_id = rand::thread_rng().gen_range(1_000_000..100_000_000);
         sqlx::query(
             r#"INSERT INTO posthog_featureflag
-            (id, team_id, name, key, filters, deleted, active, ensure_experience_continuity,
+            (team_id, name, key, filters, deleted, active, ensure_experience_continuity,
              is_remote_configuration, has_encrypted_payloads, created_at)
-            VALUES ($1, $2, $3, $4, $5, false, true, false, NULL, false, '2024-06-17')"#,
+            VALUES ($1, $2, $3, $4, false, true, false, NULL, false, '2024-06-17')"#,
         )
-        .bind(null_remote_config_id)
         .bind(team.id)
         .bind("Null Remote Config Flag")
         .bind("null_remote_config")
@@ -514,14 +496,12 @@ mod tests {
         .expect("Failed to insert null remote config flag");
 
         // Insert flag with is_remote_configuration = true, has_encrypted_payloads = NULL
-        let null_encrypted_id = rand::thread_rng().gen_range(1_000_000..100_000_000);
         sqlx::query(
             r#"INSERT INTO posthog_featureflag
-            (id, team_id, name, key, filters, deleted, active, ensure_experience_continuity,
+            (team_id, name, key, filters, deleted, active, ensure_experience_continuity,
              is_remote_configuration, has_encrypted_payloads, created_at)
-            VALUES ($1, $2, $3, $4, $5, false, true, false, true, NULL, '2024-06-17')"#,
+            VALUES ($1, $2, $3, $4, false, true, false, true, NULL, '2024-06-17')"#,
         )
-        .bind(null_encrypted_id)
         .bind(team.id)
         .bind("Null Encrypted Flag")
         .bind("null_encrypted")
@@ -531,14 +511,12 @@ mod tests {
         .expect("Failed to insert null encrypted flag");
 
         // Insert legacy flag with both fields NULL
-        let legacy_flag_id = rand::thread_rng().gen_range(1_000_000..100_000_000);
         sqlx::query(
             r#"INSERT INTO posthog_featureflag
-            (id, team_id, name, key, filters, deleted, active, ensure_experience_continuity,
+            (team_id, name, key, filters, deleted, active, ensure_experience_continuity,
              is_remote_configuration, has_encrypted_payloads, created_at)
-            VALUES ($1, $2, $3, $4, $5, false, true, false, NULL, NULL, '2024-06-17')"#,
+            VALUES ($1, $2, $3, $4, false, true, false, NULL, NULL, '2024-06-17')"#,
         )
-        .bind(legacy_flag_id)
         .bind(team.id)
         .bind("Legacy Flag")
         .bind("legacy_flag")
@@ -549,14 +527,12 @@ mod tests {
 
         // Insert flag with is_remote_configuration = NULL, has_encrypted_payloads = true
         // This should still be included because is_remote_configuration is not TRUE
-        let null_remote_encrypted_true_id = rand::thread_rng().gen_range(1_000_000..100_000_000);
         sqlx::query(
             r#"INSERT INTO posthog_featureflag
-            (id, team_id, name, key, filters, deleted, active, ensure_experience_continuity,
+            (team_id, name, key, filters, deleted, active, ensure_experience_continuity,
              is_remote_configuration, has_encrypted_payloads, created_at)
-            VALUES ($1, $2, $3, $4, $5, false, true, false, NULL, true, '2024-06-17')"#,
+            VALUES ($1, $2, $3, $4, false, true, false, NULL, true, '2024-06-17')"#,
         )
-        .bind(null_remote_encrypted_true_id)
         .bind(team.id)
         .bind("Null Remote Encrypted True Flag")
         .bind("null_remote_encrypted_true")
@@ -668,7 +644,8 @@ mod tests {
 
         let result = FeatureFlagList::parse_hypercache_value(data, 123);
         assert!(result.is_ok());
-        let flags = result.unwrap();
+        let (flags, metadata) = result.unwrap();
+        assert!(metadata.is_none());
         assert_eq!(flags.len(), 2);
         assert_eq!(flags[0].key, "test_flag");
         assert!(flags[0].active);
@@ -677,11 +654,186 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_hypercache_value_with_evaluation_context_valid_flags() {
+        let data = json!({
+            "evaluation_metadata": {
+                "dependency_stages": [
+                    [766, 768, 769],
+                    [765]
+                ],
+                "flags_with_missing_deps": [768],
+                "transitive_deps": {
+                    "765": [766],
+                    "766": [],
+                    "768": [],
+                    "769": []
+                }
+            },
+            "flags": [
+                {
+                    "active": true,
+                    "bucketing_identifier": null,
+                    "deleted": false,
+                    "ensure_experience_continuity": false,
+                    "evaluation_contexts": [],
+                    "evaluation_runtime": "all",
+                    "evaluation_tags": [],
+                    "filters": {
+                        "groups": [
+                            {
+                                "properties": [
+                                    {
+                                        "key": "766",
+                                        "label": "client-only-flag",
+                                        "operator": "flag_evaluates_to",
+                                        "type": "flag",
+                                        "value": true
+                                    }
+                                ],
+                                "rollout_percentage": 100,
+                                "variant": null
+                            }
+                        ],
+                        "multivariate": null,
+                        "payloads": {}
+                    },
+                    "has_encrypted_payloads": false,
+                    "id": 765,
+                    "key": "all-flag-with-flag-dependency",
+                    "name": "",
+                    "team_id": 15,
+                    "version": 3
+                },
+                {
+                    "active": true,
+                    "bucketing_identifier": null,
+                    "deleted": false,
+                    "ensure_experience_continuity": false,
+                    "evaluation_contexts": [],
+                    "evaluation_runtime": "client",
+                    "evaluation_tags": [],
+                    "filters": {
+                        "groups": [
+                            {
+                                "properties": [],
+                                "rollout_percentage": 100,
+                                "variant": null
+                            }
+                        ],
+                        "multivariate": null,
+                        "payloads": {}
+                    },
+                    "has_encrypted_payloads": false,
+                    "id": 766,
+                    "key": "client-only-flag",
+                    "name": "",
+                    "team_id": 15,
+                    "version": 2
+                },
+                {
+                    "active": true,
+                    "bucketing_identifier": null,
+                    "deleted": false,
+                    "ensure_experience_continuity": false,
+                    "evaluation_contexts": [],
+                    "evaluation_runtime": "all",
+                    "evaluation_tags": [],
+                    "filters": {
+                        "groups": [
+                            {
+                                "properties": [
+                                    {
+                                        "key": "9999",
+                                        "label": "boolean-flag",
+                                        "operator": "flag_evaluates_to",
+                                        "type": "flag",
+                                        "value": true
+                                    }
+                                ],
+                                "rollout_percentage": 100,
+                                "variant": null
+                            }
+                        ],
+                        "multivariate": null,
+                        "payloads": {}
+                    },
+                    "has_encrypted_payloads": false,
+                    "id": 768,
+                    "key": "flag-with-truly-missing-dependency",
+                    "name": "",
+                    "team_id": 15,
+                    "version": 2
+                },
+                {
+                    "active": true,
+                    "bucketing_identifier": null,
+                    "deleted": false,
+                    "ensure_experience_continuity": false,
+                    "evaluation_contexts": [],
+                    "evaluation_runtime": "all",
+                    "evaluation_tags": [],
+                    "filters": {
+                        "groups": [
+                            {
+                                "properties": [
+                                    {
+                                        "cohort_name": "[Test] Dependent Cohort",
+                                        "key": "id",
+                                        "operator": "in",
+                                        "type": "cohort",
+                                        "value": 5
+                                    }
+                                ],
+                                "rollout_percentage": 100,
+                                "variant": null
+                            }
+                        ],
+                        "multivariate": null,
+                        "payloads": {}
+                    },
+                    "has_encrypted_payloads": false,
+                    "id": 769,
+                    "key": "cohort-dependency-flag",
+                    "name": "",
+                    "team_id": 15,
+                    "version": 1
+                }
+            ]
+        });
+
+        let result = FeatureFlagList::parse_hypercache_value(data, 123);
+        assert!(result.is_ok());
+        let (flags, evaluation_metadata) = result.unwrap();
+        let meta = evaluation_metadata.unwrap();
+        assert_eq!(meta.dependency_stages.len(), 2);
+        assert_eq!(meta.dependency_stages[0], vec![766, 768, 769]);
+        assert_eq!(meta.dependency_stages[1], vec![765]);
+        assert_eq!(meta.flags_with_missing_deps, vec![768]);
+        assert_eq!(meta.transitive_deps.len(), 4);
+        assert_eq!(meta.transitive_deps[&765].len(), 1);
+        assert!(meta.transitive_deps[&765].contains(&766));
+        assert!(meta.transitive_deps[&766].is_empty());
+        assert!(meta.transitive_deps[&768].is_empty());
+        assert!(meta.transitive_deps[&769].is_empty());
+        assert_eq!(flags.len(), 4);
+        assert_eq!(flags[0].key, "all-flag-with-flag-dependency");
+        assert!(flags[0].active);
+        assert_eq!(flags[1].key, "client-only-flag");
+        assert!(flags[1].active);
+        assert_eq!(flags[2].key, "flag-with-truly-missing-dependency");
+        assert!(flags[2].active);
+        assert_eq!(flags[3].key, "cohort-dependency-flag");
+        assert!(flags[3].active);
+    }
+
+    #[test]
     fn test_parse_hypercache_value_null_returns_empty() {
         let data = serde_json::Value::Null;
         let result = FeatureFlagList::parse_hypercache_value(data, 123);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_empty());
+        let (flags, metadata) = result.unwrap();
+        assert!(flags.is_empty());
+        assert!(metadata.is_none());
     }
 
     #[test]
@@ -689,7 +841,9 @@ mod tests {
         let data = json!("__missing__");
         let result = FeatureFlagList::parse_hypercache_value(data, 123);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_empty());
+        let (flags, metadata) = result.unwrap();
+        assert!(flags.is_empty());
+        assert!(metadata.is_none());
     }
 
     #[test]
@@ -697,7 +851,9 @@ mod tests {
         let data = json!({"flags": []});
         let result = FeatureFlagList::parse_hypercache_value(data, 123);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_empty());
+        let (flags, metadata) = result.unwrap();
+        assert!(flags.is_empty());
+        assert!(metadata.is_none());
     }
 
     #[test]
@@ -771,7 +927,8 @@ mod tests {
 
         let result = FeatureFlagList::parse_hypercache_value(data, 123);
         assert!(result.is_ok());
-        let flags = result.unwrap();
+        let (flags, metadata) = result.unwrap();
+        assert!(metadata.is_none());
         assert_eq!(flags.len(), 1);
         let flag = &flags[0];
         assert_eq!(flag.id, 42);

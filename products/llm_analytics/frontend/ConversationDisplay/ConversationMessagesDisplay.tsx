@@ -12,8 +12,8 @@ import { LemonMarkdown } from 'lib/lemon-ui/LemonMarkdown'
 import { isObject } from 'lib/utils'
 
 import { MessageSentimentBar } from '../components/SentimentTag'
+import { llmGenerationSentimentLazyLoaderLogic } from '../llmGenerationSentimentLazyLoaderLogic'
 import { LLMInputOutput } from '../LLMInputOutput'
-import { llmSentimentLazyLoaderLogic } from '../llmSentimentLazyLoaderLogic'
 import { SearchHighlight } from '../SearchHighlight'
 import { containsSearchQuery } from '../searchUtils'
 import { CompatMessage, MultiModalContentItem, VercelSDKImageMessage } from '../types'
@@ -35,21 +35,33 @@ import { HighlightedXMLViewer } from './HighlightedXMLViewer'
 import { MessageActionsMenu } from './MessageActionsMenu'
 import { XMLViewer } from './XMLViewer'
 
-type ConversationDisplayOption = 'expand_all' | 'collapse_except_output_and_last_input' | 'text_view'
+export type ConversationDisplayOption =
+    | 'expand_all'
+    | 'expand_user_only'
+    | 'collapse_except_output_and_last_input'
+    | 'text_view'
 type MessageType = 'input' | 'output'
 
 function getInitialMessageShowStates(
-    inputCount: number,
-    outputCount: number,
+    inputMessages: CompatMessage[],
+    outputMessages: CompatMessage[],
     displayOption: ConversationDisplayOption = 'collapse_except_output_and_last_input'
 ): { input: boolean[]; output: boolean[] } {
-    const inputStates = new Array(inputCount).fill(false).map((_, i) => {
+    const inputStates = inputMessages.map((message, i) => {
         if (displayOption === 'expand_all') {
             return true
         }
-        return i === inputCount - 1
+        if (displayOption === 'expand_user_only') {
+            return message.role === 'user'
+        }
+        return i === inputMessages.length - 1
     })
-    const outputStates = new Array(outputCount).fill(true)
+    const outputStates = outputMessages.map((message) => {
+        if (displayOption === 'expand_user_only') {
+            return message.role === 'user'
+        }
+        return true
+    })
     return { input: inputStates, output: outputStates }
 }
 
@@ -65,6 +77,7 @@ export function ConversationMessagesDisplay({
     displayOption,
     traceId,
     generationEventId,
+    highlightMessageIndex,
 }: {
     inputNormalized: CompatMessage[]
     outputNormalized: CompatMessage[]
@@ -78,19 +91,22 @@ export function ConversationMessagesDisplay({
     displayOption?: ConversationDisplayOption
     traceId?: string | null
     generationEventId?: string
+    /** Original $ai_input index to auto-expand and highlight (e.g. from sentiment tab deep link) */
+    highlightMessageIndex?: number | null
 }): JSX.Element {
     const [messageShowStates, setMessageShowStates] = React.useState(() =>
-        getInitialMessageShowStates(inputNormalized.length, outputNormalized.length, displayOption)
+        getInitialMessageShowStates(inputNormalized, outputNormalized, displayOption)
     )
     const [isRenderingMarkdown, setIsRenderingMarkdown] = React.useState(true)
     const [isRenderingXml, setIsRenderingXml] = React.useState(false)
     const previousSearchQueryRef = React.useRef('')
+    const inputRolesSignature = inputNormalized.map((message) => message.role).join('|')
+    const outputRolesSignature = outputNormalized.map((message) => message.role).join('|')
     const inputMessageShowStates = messageShowStates.input
     const outputMessageShowStates = messageShowStates.output
-    const { getGenerationSentiment } = useValues(llmSentimentLazyLoaderLogic)
+    const { getGenerationSentiment } = useValues(llmGenerationSentimentLazyLoaderLogic)
 
-    const generationSentiment =
-        traceId && generationEventId ? getGenerationSentiment(traceId, generationEventId) : undefined
+    const generationSentiment = generationEventId ? getGenerationSentiment(generationEventId) : undefined
 
     // Sentiment is only available for user messages that have a known original
     // index in $ai_input (sourceIndex). System/assistant messages and messages
@@ -127,10 +143,16 @@ export function ConversationMessagesDisplay({
 
     // Initialize message states when message counts or display option changes.
     React.useEffect(() => {
-        setMessageShowStates(
-            getInitialMessageShowStates(inputNormalized.length, outputNormalized.length, displayOption)
-        )
-    }, [inputNormalized.length, outputNormalized.length, displayOption])
+        setMessageShowStates(getInitialMessageShowStates(inputNormalized, outputNormalized, displayOption))
+    }, [
+        inputNormalized.length,
+        outputNormalized.length,
+        inputRolesSignature,
+        outputRolesSignature,
+        displayOption,
+        outputNormalized,
+        inputNormalized,
+    ])
 
     // Expand only messages matching the current search query.
     React.useEffect(() => {
@@ -146,12 +168,30 @@ export function ConversationMessagesDisplay({
             })
             setMessageShowStates({ input: inputMatches, output: outputMatches })
         } else if (previousSearchQueryRef.current) {
-            setMessageShowStates(
-                getInitialMessageShowStates(inputNormalized.length, outputNormalized.length, displayOption)
-            )
+            setMessageShowStates(getInitialMessageShowStates(inputNormalized, outputNormalized, displayOption))
         }
         previousSearchQueryRef.current = trimmedSearchQuery
     }, [searchQuery, inputNormalized, outputNormalized, inputNormalized.length, outputNormalized.length, displayOption])
+
+    // Auto-expand the highlighted message (e.g. from sentiment tab deep link)
+    const highlightedMessageRef = React.useRef<HTMLDivElement | null>(null)
+    React.useEffect(() => {
+        if (highlightMessageIndex == null || !inputSourceIndices) {
+            return
+        }
+        const normalizedIndex = inputSourceIndices.indexOf(highlightMessageIndex)
+        if (normalizedIndex >= 0) {
+            setMessageShowStates((state) => {
+                const nextInput = [...state.input]
+                nextInput[normalizedIndex] = true
+                return { ...state, input: nextInput }
+            })
+            // Scroll into view after render
+            requestAnimationFrame(() => {
+                highlightedMessageRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+            })
+        }
+    }, [highlightMessageIndex, inputSourceIndices])
 
     const allInputsExpanded = inputMessageShowStates.every(Boolean)
     const allInputsCollapsed = inputMessageShowStates.every((state: boolean) => !state)
@@ -206,20 +246,26 @@ export function ConversationMessagesDisplay({
     const inputDisplay =
         inputNormalized.length > 0 ? (
             inputNormalized.map((message, i) => {
+                const isHighlighted = highlightMessageIndex != null && inputSourceIndices?.[i] === highlightMessageIndex
                 return (
                     <React.Fragment key={i}>
-                        <LLMMessageDisplay
-                            message={message}
-                            show={inputMessageShowStates[i] || false}
-                            onToggle={() => toggleMessage('input', i)}
-                            searchQuery={searchQuery}
-                            traceId={traceId}
-                            isRenderingMarkdown={isRenderingMarkdown}
-                            isRenderingXml={isRenderingXml}
-                            onToggleMarkdownRendering={() => setIsRenderingMarkdown((state) => !state)}
-                            onToggleXmlRendering={() => setIsRenderingXml((state) => !state)}
-                            messageSentiment={getMessageSentiment(message.role, inputSourceIndices?.[i])}
-                        />
+                        <div
+                            ref={isHighlighted ? highlightedMessageRef : undefined}
+                            className={isHighlighted ? 'ring-2 ring-primary/30 rounded' : undefined}
+                        >
+                            <LLMMessageDisplay
+                                message={message}
+                                show={inputMessageShowStates[i] || false}
+                                onToggle={() => toggleMessage('input', i)}
+                                searchQuery={searchQuery}
+                                traceId={traceId}
+                                isRenderingMarkdown={isRenderingMarkdown}
+                                isRenderingXml={isRenderingXml}
+                                onToggleMarkdownRendering={() => setIsRenderingMarkdown((state) => !state)}
+                                onToggleXmlRendering={() => setIsRenderingXml((state) => !state)}
+                                messageSentiment={getMessageSentiment(message.role, inputSourceIndices?.[i])}
+                            />
+                        </div>
                         {i < inputNormalized.length - 1 && (
                             <div className="border-l ml-2 h-2" /> /* Spacer connecting messages visually */
                         )}
@@ -726,8 +772,8 @@ export const LLMMessageDisplay = React.memo(
                         {renderMessageContent(content, searchQuery)}
                     </div>
                 )}
-                {show && !minimal && Object.keys(additionalKwargsEntries).length > 0 && (
-                    <div className="p-2 text-xs border-t">
+                {show && (!minimal || !content) && Object.keys(additionalKwargsEntries).length > 0 && (
+                    <div className={clsx(!minimal ? 'p-2 text-xs border-t' : 'p-1 text-xs')}>
                         <HighlightedJSONViewer
                             src={additionalKwargsEntries}
                             name={null}

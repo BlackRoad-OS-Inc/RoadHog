@@ -22,6 +22,7 @@ import { cn } from 'lib/utils/css-classes'
 import { cohortEditLogic } from 'scenes/cohorts/cohortEditLogic'
 import { CohortCriteriaGroups } from 'scenes/cohorts/CohortFilters/CohortCriteriaGroups'
 import { COHORT_TYPE_OPTIONS } from 'scenes/cohorts/CohortFilters/constants'
+import { interProjectCopyLogic } from 'scenes/resource-transfer/interProjectCopyLogic'
 import { urls } from 'scenes/urls'
 
 import { sidePanelStateLogic } from '~/layout/navigation-3000/sidepanel/sidePanelStateLogic'
@@ -79,6 +80,7 @@ export function CohortEdit({ id, attachTo, tabId }: CohortEditProps): JSX.Elemen
         addPersonToCreateStaticCohort,
         removePersonFromCreateStaticCohort,
         setCreationPersonQuery,
+        submitCohort,
     } = useActions(logic)
     const modalLogic = addPersonToCohortModalLogic(logicProps)
     const { showAddPersonToCohortModal } = useActions(modalLogic)
@@ -95,6 +97,7 @@ export function CohortEdit({ id, attachTo, tabId }: CohortEditProps): JSX.Elemen
     } = useValues(logic)
     const { featureFlags } = useValues(featureFlagLogic)
     const { openSidePanel } = useActions(sidePanelStateLogic)
+    const { canCopyToProject } = useValues(interProjectCopyLogic)
 
     const isNewCohort = cohort.id === 'new' || cohort.id === undefined
     const dataNodeLogicKey = createCohortDataNodeLogicKey(cohort.id)
@@ -107,7 +110,6 @@ export function CohortEdit({ id, attachTo, tabId }: CohortEditProps): JSX.Elemen
         type: 'cohort',
         ref: cohortId,
         enabled: Boolean(cohortId && !cohortLoading && !cohortMissing && !cohort.deleted),
-        deps: [cohortId, cohortLoading, cohortMissing, cohort.deleted],
     })
 
     if (cohortMissing) {
@@ -175,6 +177,17 @@ export function CohortEdit({ id, attachTo, tabId }: CohortEditProps): JSX.Elemen
                         >
                             <IconCopy /> Duplicate as static cohort
                         </ButtonPrimitive>
+
+                        {!isNewCohort && canCopyToProject && (
+                            <ButtonPrimitive
+                                menuItem
+                                onClick={() => router.actions.push(urls.resourceTransfer('Cohort', cohort.id))}
+                                data-attr="cohort-copy-to-project"
+                                tooltip="Copy this cohort to another project"
+                            >
+                                <IconCopy /> Copy to another project
+                            </ButtonPrimitive>
+                        )}
 
                         {!cohort.is_static && featureFlags[FEATURE_FLAGS.COHORT_CALCULATION_HISTORY] && (
                             <ButtonPrimitive
@@ -329,14 +342,22 @@ export function CohortEdit({ id, attachTo, tabId }: CohortEditProps): JSX.Elemen
                                                 <LemonBanner
                                                     type="error"
                                                     action={{
-                                                        onClick: () =>
-                                                            openSidePanel(SidePanelTab.Support, 'bug:cohorts::true'),
-                                                        children: 'Contact support',
+                                                        onClick: () => submitCohort(),
+                                                        children: 'Retry',
                                                     }}
                                                 >
                                                     <strong>Calculation failed:</strong>{' '}
                                                     {cohort.last_error_message ||
-                                                        'Unable to calculate this cohort. Please check your matching criteria and try again.'}
+                                                        'Unable to calculate this cohort. Please check your matching criteria and try again.'}{' '}
+                                                    If it fails again,{' '}
+                                                    <Link
+                                                        onClick={() =>
+                                                            openSidePanel(SidePanelTab.Support, 'bug:cohorts::true')
+                                                        }
+                                                    >
+                                                        contact support
+                                                    </Link>
+                                                    .
                                                 </LemonBanner>
                                             ) : null}
                                         </div>

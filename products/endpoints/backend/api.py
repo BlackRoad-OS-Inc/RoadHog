@@ -2,6 +2,7 @@ import re
 import uuid
 import builtins
 import dataclasses
+from collections.abc import Iterator
 from datetime import timedelta
 from typing import Optional, Union, cast
 
@@ -36,8 +37,10 @@ from posthog.schema import (
 
 from posthog.hogql import ast
 from posthog.hogql.constants import LimitContext
-from posthog.hogql.errors import ExposedHogQLError, ResolutionError
+from posthog.hogql.context import HogQLContext
+from posthog.hogql.errors import ExposedHogQLError, QueryError, ResolutionError
 from posthog.hogql.parser import parse_select
+from posthog.hogql.printer.base import HogQLPrinter
 
 from posthog.api.documentation import extend_schema
 from posthog.api.mixins import PydanticModelMixin
@@ -50,7 +53,7 @@ from posthog.clickhouse.client.connection import Workload
 from posthog.clickhouse.client.limit import ConcurrencyLimitExceeded
 from posthog.clickhouse.query_tagging import Product, get_query_tag_value, tag_queries
 from posthog.errors import ExposedCHQueryError
-from posthog.event_usage import report_user_action
+from posthog.event_usage import get_request_analytics_properties, report_user_action
 from posthog.exceptions_capture import capture_exception
 from posthog.hogql_queries.hogql_query_runner import HogQLQueryRunner
 from posthog.hogql_queries.query_runner import BLOCKING_EXECUTION_MODES
@@ -89,10 +92,20 @@ from common.hogvm.python.utils import HogVMException
 
 MIN_CACHE_AGE_SECONDS = 300
 MAX_CACHE_AGE_SECONDS = 86400
+ENDPOINT_BREAKDOWN_LIMIT = 10_000
+
 
 ENDPOINT_NAME_REGEX = r"^[a-zA-Z][a-zA-Z0-9_-]{0,127}$"
 
 logger = structlog.get_logger(__name__)
+
+
+def _add_where_condition(select_query: ast.SelectQuery, condition: ast.Expr) -> None:
+    """Append a condition to select_query.where with AND."""
+    if select_query.where:
+        select_query.where = ast.And(exprs=[select_query.where, condition])
+    else:
+        select_query.where = condition
 
 
 def _get_single_breakdown_property(breakdown_filter: dict) -> str | None:
@@ -112,27 +125,41 @@ def _get_single_breakdown_property(breakdown_filter: dict) -> str | None:
     return None
 
 
-def _get_single_breakdown_info(breakdown_filter: dict) -> tuple[str, str] | None:
-    """Extract the breakdown property name and type from either legacy or new format.
-
-    Returns (property_name, property_type) or None if not found.
-
-    Legacy: {"breakdown": "$browser", "breakdown_type": "event"}
-    New:    {"breakdowns": [{"property": "$browser", "type": "event"}]}
-    """
+def _iter_breakdowns(breakdown_filter: dict) -> Iterator[tuple[str, str]]:
+    """Yield (property_name, property_type) from legacy or new breakdown format."""
     breakdown = breakdown_filter.get("breakdown")
     if breakdown:
-        breakdown_type = breakdown_filter.get("breakdown_type", "event")
-        return (breakdown, breakdown_type)
-
-    breakdowns = breakdown_filter.get("breakdowns") or []
-    if len(breakdowns) == 1:
-        prop = breakdowns[0].get("property")
-        prop_type = breakdowns[0].get("type", "event")
+        yield (breakdown, breakdown_filter.get("breakdown_type", "event"))
+        return
+    for b in breakdown_filter.get("breakdowns") or []:
+        prop = b.get("property")
         if prop:
-            return (prop, prop_type)
+            yield (prop, b.get("type", "event"))
 
-    return None
+
+def _get_breakdown_properties(breakdown_filter: dict) -> list[str]:
+    """Extract all breakdown property names from either legacy or new format."""
+    return [name for name, _ in _iter_breakdowns(breakdown_filter)]
+
+
+def _get_breakdown_column_indices(breakdown_filter: dict) -> dict[str, int]:
+    """Map breakdown property names to their 1-based index in the breakdown_value array.
+
+    Single breakdown: {"$browser": 0}  (0 means use the whole array, not an index)
+    Multiple breakdowns: {"$browser": 1, "$os": 2}
+    """
+    props = _get_breakdown_properties(breakdown_filter)
+    if len(props) <= 1:
+        return {props[0]: 0} if props else {}
+    return {prop: i + 1 for i, prop in enumerate(props)}
+
+
+def _get_breakdown_infos(breakdown_filter: dict) -> list[tuple[str, str]]:
+    """Extract all breakdown property name and type pairs.
+
+    Returns list of (property_name, property_type) tuples.
+    """
+    return list(_iter_breakdowns(breakdown_filter))
 
 
 def _endpoint_refresh_mode_to_refresh_type(
@@ -186,6 +213,15 @@ class EndpointPagination:
         result["offset"] = self.offset
 
 
+class _PlaceholderPreservingPrinter(HogQLPrinter):
+    """HogQL printer that preserves {placeholder} syntax instead of raising on unresolved placeholders."""
+
+    def visit_placeholder(self, node: ast.Placeholder) -> str:
+        if node.field is None:
+            raise QueryError("You can not use placeholders here")
+        return f"{{{node.field}}}"
+
+
 @extend_schema(tags=[ProductKey.ENDPOINTS])
 class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.ModelViewSet):
     # NOTE: Do we need to override the scopes for the "create"
@@ -229,14 +265,14 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             try:
                 return int(body_version)
             except (ValueError, TypeError):
-                raise ValidationError(f"Invalid version parameter: {body_version}")
+                raise ValidationError({"version": f"Must be an integer, got: {body_version}"})
 
         query_version = request.query_params.get("version")
         if query_version is not None:
             try:
                 return int(query_version)
             except (ValueError, TypeError):
-                raise ValidationError(f"Invalid version parameter: {query_version}")
+                raise ValidationError({"version": f"Must be an integer, got: {query_version}"})
 
         return None
 
@@ -487,17 +523,19 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
     def validate_request(self, data: EndpointRequest, strict: bool = True) -> None:
         query = data.query
         if not query and strict:
-            raise ValidationError("Must specify query")
+            raise ValidationError({"query": "This field is required."})
 
         name = data.name
         if not name:
             if name is not None or strict:
-                raise ValidationError("Endpoint must have a name.")
+                raise ValidationError({"name": "This field is required."})
             return
         if not isinstance(name, str) or not re.fullmatch(ENDPOINT_NAME_REGEX, name):
             raise ValidationError(
-                "Endpoint name must start with a letter, contain only alphanumeric characters, hyphens, or underscores, "
-                "and be between 1 and 128 characters long."
+                {
+                    "name": f"Invalid name '{name}'. Must start with a letter, contain only alphanumeric characters, "
+                    "hyphens, or underscores, and be between 1 and 128 characters long."
+                }
             )
 
         if query and isinstance(query, HogQLQuery) and query.query:
@@ -530,7 +568,10 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                 derived_from_insight=data.derived_from_insight,
             )
 
-            columns = EndpointVersion.extract_columns(query_dict, team_id=self.team.pk)
+            try:
+                columns: list[dict] | None = EndpointVersion.extract_columns(query_dict, team_id=self.team.pk)
+            except Exception:
+                columns = None
             EndpointVersion.objects.create(
                 endpoint=endpoint,
                 version=1,
@@ -561,6 +602,7 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                     "query_kind": query_dict.get("kind") if isinstance(query_dict, dict) else None,
                 },
                 team=self.team,
+                request=request,
             )
 
             current_version = endpoint.get_version()
@@ -645,7 +687,7 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             try:
                 target_version_override = endpoint.get_version(version_number)
             except EndpointVersion.DoesNotExist:
-                raise ValidationError(f"Version {version_number} not found")
+                raise ValidationError({"version": f"Version {version_number} not found for this endpoint."})
             if data.query is not None:
                 raise ValidationError(
                     {
@@ -852,7 +894,8 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                 origin=DataWarehouseSavedQuery.Origin.ENDPOINT,
             )
 
-        hogql_query = convert_insight_query_to_hogql(version.query, self.team)
+        mat_query = _prepare_insight_query_for_endpoint(version.query)
+        hogql_query = convert_insight_query_to_hogql(mat_query, self.team)
 
         variable_infos: list = []
         if version.query.get("variables"):
@@ -860,6 +903,8 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
 
             if can_materialize and variable_infos:
                 hogql_query = transform_query_for_materialization(hogql_query, variable_infos, self.team)
+
+        hogql_query = _replace_breakdown_sentinels_in_query(hogql_query)
 
         saved_query.query = hogql_query
         saved_query.external_tables = saved_query.s3_tables
@@ -872,7 +917,26 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
 
         saved_query.schedule_materialization()
 
-        # Update version with materialization info
+        from products.data_modeling.backend.services.saved_query_dag_sync import sync_saved_query_to_dag
+
+        try:
+            sync_saved_query_to_dag(saved_query)
+        except Exception as e:
+            logger.exception(
+                "Failed to sync endpoint node to DAG",
+                endpoint_name=endpoint.name,
+                saved_query_id=version.saved_query.id if version and version.saved_query else None,
+            )
+            capture_exception(
+                e,
+                {
+                    "product": Product.ENDPOINTS,
+                    "team_id": self.team_id,
+                    "endpoint_name": endpoint.name,
+                    "saved_query_id": version.saved_query.id if version and version.saved_query else None,
+                },
+            )
+
         version.saved_query = saved_query
         version.save(update_fields=["saved_query"])
 
@@ -883,6 +947,26 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
         """
         version = version or endpoint.get_version()
         if version:
+            if version.saved_query:
+                from products.data_modeling.backend.services.saved_query_dag_sync import delete_node_from_dag
+
+                try:
+                    delete_node_from_dag(version.saved_query)
+                except Exception as e:
+                    logger.exception(
+                        "Failed to remove endpoint node from DAG",
+                        endpoint_name=endpoint.name,
+                        saved_query_id=version.saved_query.id if version and version.saved_query else None,
+                    )
+                    capture_exception(
+                        e,
+                        {
+                            "product": Product.ENDPOINTS,
+                            "team_id": self.team_id,
+                            "endpoint_name": endpoint.name,
+                            "saved_query_id": version.saved_query.id if version and version.saved_query else None,
+                        },
+                    )
             version.disable_materialization()
         clear_endpoint_materialization_cache(self.team_id, endpoint.name)
 
@@ -891,6 +975,29 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
         endpoint = get_object_or_404(Endpoint, team=self.team, name=name, deleted=False)
         endpoint_id = str(endpoint.id)
         endpoint_name = endpoint.name
+
+        # Remove DAG nodes before soft_delete (which soft-deletes saved queries)
+        from products.data_modeling.backend.services.saved_query_dag_sync import delete_node_from_dag
+
+        for version in endpoint.versions.filter(saved_query__isnull=False):
+            try:
+                if version.saved_query:
+                    delete_node_from_dag(version.saved_query)
+            except Exception as e:
+                logger.exception(
+                    "Failed to remove endpoint node from DAG on destroy",
+                    endpoint_name=endpoint.name,
+                    saved_query_id=version.saved_query.id if version.saved_query else None,
+                )
+                capture_exception(
+                    e,
+                    {
+                        "product": Product.ENDPOINTS,
+                        "team_id": self.team_id,
+                        "endpoint_name": endpoint.name,
+                        "saved_query_id": version.saved_query.id if version and version.saved_query else None,
+                    },
+                )
 
         endpoint.soft_delete()
         clear_endpoint_materialization_cache(self.team_id, endpoint.name)
@@ -956,14 +1063,14 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                 if not request_var_codes.issubset(materialized_codes):
                     return False
             else:
-                # Materialized insight: only breakdown property allowed
+                # Materialized insight: only breakdown properties allowed
                 breakdown_filter = query.get("breakdownFilter") or {}
-                breakdown = _get_single_breakdown_property(breakdown_filter)
-                if not breakdown:
+                allowed_props = set(_get_breakdown_properties(breakdown_filter))
+                if not allowed_props:
                     return False
 
                 request_var_codes = set(data.variables.keys())
-                if not request_var_codes.issubset({breakdown}):
+                if not request_var_codes.issubset(allowed_props):
                     return False
 
         return True
@@ -1022,12 +1129,10 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
         # Insight queries
         allowed: set[str] = set()
 
-        # Only allow breakdown property for query types that support it
+        # Only allow breakdown properties for query types that support it
         if query_kind in self.BREAKDOWN_SUPPORTED_QUERY_TYPES:
             breakdown_filter = query.get("breakdownFilter") or {}
-            breakdown = _get_single_breakdown_property(breakdown_filter)
-            if breakdown:
-                allowed.add(breakdown)
+            allowed.update(_get_breakdown_properties(breakdown_filter))
 
         if not is_materialized:
             # Non-materialized also allows date_from/date_to via filters_override
@@ -1047,11 +1152,10 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             materialized_vars = self._get_materialized_variables(version)
             return {v.code_name for v in materialized_vars}
 
-        # Insight queries: breakdown property is required if present
+        # Insight queries: all breakdown properties are required
         if query_kind in self.BREAKDOWN_SUPPORTED_QUERY_TYPES:
             breakdown_filter = query.get("breakdownFilter") or {}
-            prop = _get_single_breakdown_property(breakdown_filter)
-            return {prop} if prop else set()
+            return set(_get_breakdown_properties(breakdown_filter))
 
         return set()
 
@@ -1072,48 +1176,40 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             op=op,
             right=right_expr,
         )
-        if select_query.where:
-            select_query.where = ast.And(exprs=[select_query.where, condition])
-        else:
-            select_query.where = condition
+        _add_where_condition(select_query, condition)
 
-    def _build_breakdown_filter_condition(self, query_kind: str | None, value: str) -> ast.Expr | None:
+    def _build_breakdown_filter_condition(
+        self, query_kind: str | None, value: str, array_index: int = 0
+    ) -> ast.Expr | None:
         """Build the appropriate WHERE condition for breakdown filtering based on query type.
 
-        Different insight types store breakdowns in different columns:
-        - TrendsQuery, RetentionQuery: `breakdown_value` Array column
-        - FunnelsQuery: `final_prop` Array column
-        - LifecycleQuery, StickinessQuery, PathsQuery: No breakdown support
-
-        Both breakdown_value and final_prop are Array(Nullable(String)) columns,
-        so we use has() for array containment check.
+        array_index controls how to access the breakdown column:
+        - 0: single breakdown — use has() on the full array
+        - 1+: multiple breakdowns — use equality on breakdown_value[N]
         """
-        if query_kind == "FunnelsQuery":
-            return ast.Call(
-                name="has",
-                args=[ast.Field(chain=["final_prop"]), ast.Constant(value=value)],
-            )
-        elif query_kind in ("TrendsQuery", "RetentionQuery"):
-            return ast.Call(
-                name="has",
-                args=[ast.Field(chain=["breakdown_value"]), ast.Constant(value=value)],
-            )
-        elif query_kind in ("LifecycleQuery", "StickinessQuery", "PathsQuery"):
+        if query_kind in ("LifecycleQuery", "StickinessQuery", "PathsQuery"):
             logger.warning(
                 "Query type does not support breakdown filtering",
                 query_kind=query_kind,
             )
             return None
-        else:
-            logger.warning(
-                "Unknown query kind for breakdown filtering",
-                query_kind=query_kind,
-                falling_back_to="breakdown_value",
+
+        column_name = "final_prop" if query_kind == "FunnelsQuery" else "breakdown_value"
+
+        if array_index > 0:
+            return ast.CompareOperation(
+                left=ast.ArrayAccess(
+                    array=ast.Field(chain=[column_name]),
+                    property=ast.Constant(value=array_index),
+                ),
+                op=ast.CompareOperationOp.Eq,
+                right=ast.Constant(value=value),
             )
-            return ast.Call(
-                name="has",
-                args=[ast.Field(chain=["breakdown_value"]), ast.Constant(value=value)],
-            )
+
+        return ast.Call(
+            name="has",
+            args=[ast.Field(chain=[column_name]), ast.Constant(value=value)],
+        )
 
     def _execute_query_and_respond(
         self,
@@ -1138,7 +1234,7 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
         tag_queries(product=Product.ENDPOINTS)
 
         if execution_mode not in BLOCKING_EXECUTION_MODES:
-            raise ValidationError("Only sync modes are supported (refresh param)")
+            raise ValidationError({"refresh": f"Only sync modes are supported, got: {execution_mode}"})
 
         result = process_query_model(
             self.team,
@@ -1149,6 +1245,7 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             user=cast(User, request.user),
             is_query_service=(get_query_tag_value("access_method") == "personal_api_key"),
             cache_age_seconds=cache_age_seconds,
+            analytics_props=get_request_analytics_properties(request),
         )
 
         if isinstance(result, BaseModel):
@@ -1173,6 +1270,10 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
 
         if pagination and "results" in result:
             pagination.process_results(result)
+        elif "results" in result:
+            result["hasMore"] = False
+
+        _clean_breakdown_sentinels(result)
 
         if "results" in result:
             results_value = result.pop("results")
@@ -1254,11 +1355,9 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                             value = prop.value[0] if isinstance(prop.value, list) else prop.value
                             condition = self._build_breakdown_filter_condition(query_kind, str(value))
                             if condition:
-                                if select_query.where:
-                                    select_query.where = ast.And(exprs=[select_query.where, condition])
-                                else:
-                                    select_query.where = condition
-                            break  # Only use first property filter for materialized
+                                _add_where_condition(select_query, condition)
+                            # filters_override is deprecated — only the first property is used
+                            break
             elif data.variables:
                 if query_kind == "HogQLQuery":
                     # HogQL: filter by all materialized variable columns
@@ -1274,18 +1373,17 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                                 value_wrapper_fns=mat_var.value_wrapper_fns,
                             )
                 else:
-                    # Insight: filter by breakdown property name
+                    # Insight: filter by breakdown property names
                     breakdown_filter = query.get("breakdownFilter") or {}
-                    breakdown_prop = _get_single_breakdown_property(breakdown_filter)  # e.g., "$browser"
+                    index_mapping = _get_breakdown_column_indices(breakdown_filter)
 
-                    if breakdown_prop and breakdown_prop in data.variables:
-                        value = data.variables[breakdown_prop]
-                        condition = self._build_breakdown_filter_condition(query_kind, value)
-                        if condition:
-                            if select_query.where:
-                                select_query.where = ast.And(exprs=[select_query.where, condition])
-                            else:
-                                select_query.where = condition
+                    for breakdown_prop, array_index in index_mapping.items():
+                        if breakdown_prop in data.variables:
+                            condition = self._build_breakdown_filter_condition(
+                                query_kind, data.variables[breakdown_prop], array_index=array_index
+                            )
+                            if condition:
+                                _add_where_condition(select_query, condition)
 
             materialized_hogql_query = HogQLQuery(
                 query=select_query.to_hogql(),
@@ -1373,11 +1471,16 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
         return value, None
 
     def _apply_pagination_to_query(self, query: dict, limit: int, offset: int) -> tuple[dict, EndpointPagination]:
-        """Apply pagination to a HogQL query. Returns (modified_query, pagination)."""
+        """Apply pagination to a HogQL query. Returns (modified_query, pagination).
+
+        Parses the HogQL AST, applies LIMIT/OFFSET, and reprints using a
+        placeholder-preserving printer so unresolved {variables.*} survive.
+        """
         query_kind = query.get("kind")
 
         if query_kind == "HogQLQuery":
-            parsed = parse_select(query.get("query", ""))
+            query_sql = query.get("query", "")
+            parsed = parse_select(query_sql)
             if not isinstance(parsed, ast.SelectQuery):
                 raise ValidationError(
                     "Pagination is not supported for UNION queries. Wrap the UNION in a subquery: SELECT * FROM (... UNION ALL ...) LIMIT n"
@@ -1385,13 +1488,15 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
 
             ceiling = parsed.limit.value if isinstance(parsed.limit, ast.Constant) else None
             pagination = EndpointPagination(limit=limit, offset=offset, ceiling=ceiling)
+
             pagination.apply_to(parsed)
 
+            ctx = HogQLContext(enable_select_queries=True, limit_top_select=False)
             query = query.copy()
-            query["query"] = parsed.to_hogql()
+            query["query"] = _PlaceholderPreservingPrinter(context=ctx, dialect="hogql").visit(parsed)
             return query, pagination
 
-        raise ValidationError(f"Limit/offset parameters are only supported for HogQLQuery, not {query_kind}")
+        raise ValidationError({"limit": f"Limit/offset parameters are only supported for HogQLQuery, not {query_kind}"})
 
     def _parse_variables(
         self, query: dict[str, dict], variables: dict[str, str]
@@ -1408,7 +1513,7 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                     variable_id = query_variable_id
 
             if variable_id is None:
-                raise ValidationError(f"Variable '{request_variable_code_name}' not found in query")
+                raise ValidationError({"variables": f"Variable '{request_variable_code_name}' not found in query"})
 
             variables_override.append(
                 HogQLVariable(
@@ -1420,38 +1525,122 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             )
         return variables_override
 
-    def _variables_to_filters(self, variables: dict[str, str], breakdown_info: tuple[str, str] | None = None):
+    def _variables_to_filters(
+        self,
+        variables: dict[str, str],
+        breakdown_infos: builtins.list[tuple[str, str]] | None = None,
+    ):
         """Convert insight magic variables to DashboardFilter.
 
         Args:
             variables: Dict of variable name -> value from the request
-            breakdown_info: Tuple of (property_name, property_type) from breakdown filter
+            breakdown_infos: List of (property_name, property_type) for breakdown filtering
         """
         from posthog.schema import DashboardFilter, PropertyOperator
 
         date_from = variables.get("date_from")
         date_to = variables.get("date_to")
 
-        # Build properties filter for breakdown
-        properties: list[dict] | None = None
-        if breakdown_info:
-            breakdown_prop, breakdown_type = breakdown_info
-            if breakdown_prop in variables:
-                breakdown_value = variables[breakdown_prop]
-                # Build filter dict - Pydantic will validate and convert to correct type
-                properties = [
-                    {
-                        "key": breakdown_prop,
-                        "value": breakdown_value,
-                        "type": breakdown_type if breakdown_type else "event",
-                        "operator": PropertyOperator.EXACT,
-                    }
-                ]
+        properties: list[dict] = []
+        for prop_name, prop_type in breakdown_infos or []:
+            if prop_name in variables:
+                value = variables[prop_name]
+                # Empty string means "null/unset" — match events where the property is missing.
+                # This keeps inline execution consistent with the materialized path,
+                # where null breakdown values are stored as '' in S3.
+                if value == "":
+                    properties.append(
+                        {
+                            "key": prop_name,
+                            "type": prop_type if prop_type else "event",
+                            "operator": PropertyOperator.IS_NOT_SET,
+                        }
+                    )
+                else:
+                    properties.append(
+                        {
+                            "key": prop_name,
+                            "value": value,
+                            "type": prop_type if prop_type else "event",
+                            "operator": PropertyOperator.EXACT,
+                        }
+                    )
 
         if not date_from and not date_to and not properties:
             return None
 
         return DashboardFilter(date_from=date_from, date_to=date_to, properties=properties)
+
+    def _should_use_ducklake(self, endpoint: Endpoint, version: EndpointVersion | None) -> bool:
+        if version is None:
+            return False
+        if version.query.get("kind") != "HogQLQuery":
+            return False
+
+        import posthoganalytics
+
+        user_email = getattr(self.request.user, "email", "") if self.request else ""
+        ff_result = posthoganalytics.feature_enabled(
+            "endpoints-ducklake-execution",
+            user_email,
+            person_properties={"email": str(user_email)},
+            only_evaluate_locally=True,
+            send_feature_flag_events=False,
+        )
+        logger.info(
+            "Ducklake FF evaluation",
+            endpoint_name=endpoint.name,
+            ff_result=ff_result,
+        )
+        if not ff_result:
+            return False
+
+        from posthog.ducklake.common import get_duckgres_server_for_team
+
+        server = get_duckgres_server_for_team(self.team_id)
+        if server is None:
+            logger.info("Ducklake skip: no duckgres server", endpoint_name=endpoint.name, team_id=self.team_id)
+        return server is not None
+
+    def _execute_ducklake_endpoint(
+        self,
+        endpoint: Endpoint,
+        query: dict,
+        debug: bool = False,
+    ) -> Response:
+        from posthog.schema import HogQLQuery
+
+        from posthog.ducklake.client import execute_ducklake_query
+
+        try:
+            result = execute_ducklake_query(self.team_id, query=HogQLQuery(query=query["query"]))
+            response_data: dict = {
+                "results": result.results,
+                "columns": result.columns,
+                "types": result.types,
+                "hasMore": False,
+                "backend": "ducklake",
+            }
+            if debug:
+                response_data["query"] = query.get("query")
+                response_data["hogql"] = result.hogql
+                response_data["ducklake_sql"] = result.sql
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception(
+                "DuckLake endpoint execution failed",
+                endpoint_name=endpoint.name,
+            )
+            capture_exception(
+                e,
+                {
+                    "product": Product.ENDPOINTS,
+                    "team_id": self.team_id,
+                    "ducklake": True,
+                    "endpoint_name": endpoint.name,
+                },
+            )
+            raise
 
     def _execute_inline_endpoint(
         self,
@@ -1466,6 +1655,8 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
     ) -> Response:
         """Execute query directly against ClickHouse."""
         try:
+            query = _prepare_insight_query_for_endpoint(query)
+
             pagination: EndpointPagination | None = None
             if limit is not None:
                 query, pagination = self._apply_pagination_to_query(query, limit, offset or 0)
@@ -1488,8 +1679,8 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                     variables_override = self._parse_variables(query, data.variables)
                 else:
                     breakdown_filter = query.get("breakdownFilter") or {}
-                    breakdown_info = _get_single_breakdown_info(breakdown_filter)
-                    filters_override = self._variables_to_filters(data.variables, breakdown_info)
+                    breakdown_infos = _get_breakdown_infos(breakdown_filter)
+                    filters_override = self._variables_to_filters(data.variables, breakdown_infos=breakdown_infos)
 
             query_request_data = {
                 "client_query_id": data.client_query_id,
@@ -1553,6 +1744,7 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                 "refresh_mode": data.refresh.value if data.refresh else None,
             },
             team=self.team,
+            request=request,
         )
 
         version_number, err = self._parse_int_param(data.version, request.query_params.get("version"), "version")
@@ -1612,9 +1804,37 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                         status=status.HTTP_404_NOT_FOUND,
                     )
                 query_to_use = version_obj.query.copy()
-                result = self._execute_inline_endpoint(
-                    endpoint, data, request, query_to_use, version=version_obj, debug=debug, limit=limit, offset=offset
-                )
+
+                use_ducklake = self._should_use_ducklake(endpoint, version_obj)
+                if use_ducklake:
+                    try:
+                        result = self._execute_ducklake_endpoint(endpoint, query_to_use, debug=debug)
+                    except Exception:
+                        logger.warning(
+                            "DuckLake execution failed, falling back to inline",
+                            endpoint_name=endpoint.name,
+                        )
+                        result = self._execute_inline_endpoint(
+                            endpoint,
+                            data,
+                            request,
+                            query_to_use,
+                            version=version_obj,
+                            debug=debug,
+                            limit=limit,
+                            offset=offset,
+                        )
+                else:
+                    result = self._execute_inline_endpoint(
+                        endpoint,
+                        data,
+                        request,
+                        query_to_use,
+                        version=version_obj,
+                        debug=debug,
+                        limit=limit,
+                        offset=offset,
+                    )
         except (ExposedHogQLError, ExposedCHQueryError) as e:
             logger.exception(
                 "Endpoint execution failed",
@@ -1666,19 +1886,21 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
 
         # Reject query_override (always)
         if hasattr(data, "query_override") and data.query_override is not None:
-            raise ValidationError("query_override is not allowed. Use variables instead.")
+            raise ValidationError({"query_override": "Not allowed. Use variables instead."})
 
         # Allow filters_override for insight endpoints (deprecated but backwards compatible)
         # Reject for HogQL endpoints
         if data.filters_override is not None:
             if query_kind == "HogQLQuery":
-                raise ValidationError("filters_override is not allowed for HogQL endpoints. Use variables instead.")
+                raise ValidationError({"filters_override": "Not allowed for HogQL endpoints. Use variables instead."})
 
         # Validate refresh mode
         if data.refresh == EndpointRefreshMode.DIRECT and not is_materialized:
             raise ValidationError(
-                "'direct' refresh mode is only valid for materialized endpoints. "
-                "Use 'cache' or 'force' instead, or enable materialization on this endpoint."
+                {
+                    "refresh": "'direct' refresh mode is only valid for materialized endpoints. "
+                    "Use 'cache' or 'force' instead, or enable materialization on this endpoint."
+                }
             )
 
         # Validate variables
@@ -1686,7 +1908,7 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             allowed_vars = self._get_allowed_variables(query, is_materialized, version)
             unknown_vars = set(data.variables.keys()) - allowed_vars
             if unknown_vars:
-                raise ValidationError(f"Unknown variable(s): {', '.join(sorted(unknown_vars))}")
+                raise ValidationError({"variables": f"Unknown variable(s): {', '.join(sorted(unknown_vars))}"})
 
         # SECURITY: For materialized endpoints with required variables, ALL must be provided.
         # Without this check, omitting variables would return ALL data instead of filtered data.
@@ -1697,7 +1919,9 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
                 provided = set(data.variables.keys()) if data.variables else set()
                 missing = sorted(required_vars - provided)
                 if missing:
-                    raise ValidationError(f"Required variable(s) {', '.join(repr(v) for v in missing)} not provided")
+                    raise ValidationError(
+                        {"variables": f"Required variable(s) {', '.join(repr(v) for v in missing)} not provided"}
+                    )
 
     @extend_schema(
         description="Get the last execution times in the past 6 months for multiple endpoints.",
@@ -1721,7 +1945,7 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             validated_names = []
             for name in names:
                 if not isinstance(name, str) or not re.fullmatch(ENDPOINT_NAME_REGEX, name):
-                    raise ValidationError(f"Invalid endpoint name: {name}")
+                    raise ValidationError({"names": f"Invalid endpoint name: {name}"})
                 validated_names.append(f"'{name}'")
             names_list = ",".join(validated_names)
 
@@ -1823,3 +2047,148 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
 
         spec = generate_openapi_spec(endpoint, self.team.id, request, version)
         return Response(spec, content_type="application/json")
+
+
+def _prepare_insight_query_for_endpoint(query: dict) -> dict:
+    """Prepare an insight query for endpoint execution.
+
+    We override the breakdown_limit to a high value so all values are returned
+    (the insight UI default of 25 would silently drop data). We keep
+    breakdown_hide_other_aggregation=False (default) so that if the limit IS
+    exceeded, the "Other" bucket appears in results and we can detect + alert.
+    """
+    breakdown_filter = query.get("breakdownFilter")
+    if not breakdown_filter:
+        return query
+
+    return {
+        **query,
+        "breakdownFilter": {
+            **breakdown_filter,
+            "breakdown_hide_other_aggregation": False,
+            "breakdown_limit": ENDPOINT_BREAKDOWN_LIMIT,
+        },
+    }
+
+
+def _replace_breakdown_sentinels_in_query(hogql_query: dict) -> dict:
+    """Replace breakdown sentinel string literals in HogQL query text.
+
+    Runs before the query is stored for materialization, so S3 data
+    never contains the internal sentinel strings. The "other" sentinel
+    is still embedded in the HogQL by the query builder (in if() and ORDER BY
+    expressions) even when breakdown_hide_other_aggregation is set, because
+    that flag only affects post-processing in the query runner.
+    """
+    from posthog.hogql_queries.insights.trends.breakdown import (
+        BREAKDOWN_NULL_STRING_LABEL,
+        BREAKDOWN_OTHER_STRING_LABEL,
+    )
+
+    query_text = hogql_query.get("query")
+    if not query_text or not isinstance(query_text, str):
+        return hogql_query
+
+    replacements = {
+        f"'{BREAKDOWN_NULL_STRING_LABEL}'": "''",
+        f"'{BREAKDOWN_OTHER_STRING_LABEL}'": "'Other'",
+    }
+    for old, new in replacements.items():
+        query_text = query_text.replace(old, new)
+
+    return {**hogql_query, "query": query_text}
+
+
+def _clean_breakdown_sentinels(result: dict) -> None:
+    """Replace breakdown sentinel strings in API response results in-place.
+
+    Handles both list-of-lists (materialized/HogQL) and list-of-dicts (inline insight).
+    If the "Other" sentinel is found, it means the breakdown_limit was exceeded —
+    we clean it to "Other" but also capture_exception for visibility.
+    """
+    from posthog.hogql_queries.insights.trends.breakdown import BREAKDOWN_OTHER_STRING_LABEL
+
+    rows = result.get("results")
+    if not rows:
+        return
+
+    found_other = False
+    columns = result.get("columns")
+    if columns:
+        # HogQL/materialized path: results are list[tuple] or list[list]
+        indices = [i for i, col in enumerate(columns) if col == "breakdown_value"]
+        if not indices:
+            return
+        for row_idx, row in enumerate(rows):
+            needs_clean = any(isinstance(row[i], (str, list)) or row[i] is None for i in indices)
+            if not needs_clean:
+                continue
+            if not found_other:
+                found_other = any(_value_contains_other(row[i], BREAKDOWN_OTHER_STRING_LABEL) for i in indices)
+            row_list = list(row)
+            for i in indices:
+                row_list[i] = _clean_sentinel_value(row_list[i])
+            rows[row_idx] = type(row)(row_list)
+    elif isinstance(rows[0], dict):
+        # Inline insight path: results are list[dict]
+        for row in rows:
+            if "breakdown_value" in row:
+                if not found_other:
+                    found_other = _value_contains_other(row["breakdown_value"], BREAKDOWN_OTHER_STRING_LABEL)
+                row["breakdown_value"] = _clean_sentinel_value(row["breakdown_value"])
+            if "label" in row:
+                if not found_other and isinstance(row["label"], str):
+                    found_other = BREAKDOWN_OTHER_STRING_LABEL in row["label"]
+                row["label"] = _clean_sentinel_label(row["label"])
+
+    if found_other:
+        capture_exception(
+            Exception(
+                f"Endpoint breakdown limit ({ENDPOINT_BREAKDOWN_LIMIT}) exceeded — 'Other' bucket appeared in results"
+            )
+        )
+
+
+def _value_contains_other(value: object, other_label: str) -> bool:
+    """Check if a breakdown value contains the 'Other' sentinel."""
+    if isinstance(value, str):
+        return value == other_label
+    if isinstance(value, list):
+        return any(item == other_label for item in value if isinstance(item, str))
+    return False
+
+
+def _clean_sentinel_value(value: object) -> object:
+    """Clean breakdown sentinel strings (null and other) in a value or list of values."""
+    from posthog.hogql_queries.insights.trends.breakdown import (
+        BREAKDOWN_NULL_STRING_LABEL,
+        BREAKDOWN_OTHER_STRING_LABEL,
+    )
+
+    if isinstance(value, str):
+        if value == BREAKDOWN_NULL_STRING_LABEL or value == "":
+            return None
+        if value == BREAKDOWN_OTHER_STRING_LABEL:
+            return "Other"
+    elif isinstance(value, list):
+        return [_clean_sentinel_value(item) for item in value]
+    return value
+
+
+def _clean_sentinel_label(label: object) -> object:
+    """Clean a label string containing ::-joined breakdown parts."""
+    from posthog.hogql_queries.insights.trends.breakdown import (
+        BREAKDOWN_NULL_STRING_LABEL,
+        BREAKDOWN_OTHER_STRING_LABEL,
+    )
+
+    if not isinstance(label, str):
+        return label
+    if BREAKDOWN_NULL_STRING_LABEL not in label and BREAKDOWN_OTHER_STRING_LABEL not in label:
+        return label
+    parts = label.split("::")
+    cleaned = [
+        "null" if p == BREAKDOWN_NULL_STRING_LABEL else "Other" if p == BREAKDOWN_OTHER_STRING_LABEL else p
+        for p in parts
+    ]
+    return "::".join(cleaned)

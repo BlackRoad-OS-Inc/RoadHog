@@ -1,3 +1,6 @@
+/** Tight date window around trace creation for sentiment ClickHouse queries. */
+export const SENTIMENT_DATE_WINDOW_DAYS = 2
+
 export type SentimentLabel = 'positive' | 'neutral' | 'negative'
 
 interface MessageScore {
@@ -45,6 +48,39 @@ export function computeExtremes(messages?: Record<string | number, MessageScore>
     return { maxPositive, maxNegative }
 }
 
+/**
+ * Extract plain text from message content, mirroring the backend's _extract_content_text.
+ * Handles string content, Anthropic-style content block arrays, and nested structures.
+ */
+export function extractContentText(content: unknown): string {
+    if (!content) {
+        return ''
+    }
+    if (typeof content === 'string') {
+        return content
+    }
+    if (Array.isArray(content)) {
+        return content
+            .map((block) => {
+                if (typeof block === 'string') {
+                    return block
+                }
+                if (block && typeof block === 'object') {
+                    if ('type' in block && block.type === 'text' && 'text' in block) {
+                        return (block as { text: string }).text
+                    }
+                    if ('content' in block) {
+                        return extractContentText((block as { content: unknown }).content)
+                    }
+                }
+                return ''
+            })
+            .filter(Boolean)
+            .join(' ')
+    }
+    return String(content)
+}
+
 export function buildSentimentBarTooltip(
     sentimentLabel: string,
     widthPercent: number,
@@ -59,19 +95,4 @@ export function buildSentimentBarTooltip(
         parts.push(`max negative: ${Math.round(maxNegative * 100)}%`)
     }
     return parts.length > 1 ? `${parts[0]} (${parts.slice(1).join(', ')})` : parts[0]
-}
-
-export function flattenGenerationMessages(
-    generations?: Record<string, { messages?: Record<string | number, MessageScore> }>
-): Record<string, MessageScore> | undefined {
-    if (!generations) {
-        return undefined
-    }
-    const flat: Record<string, MessageScore> = {}
-    for (const [genId, gen] of Object.entries(generations)) {
-        for (const [msgId, msg] of Object.entries(gen.messages ?? {})) {
-            flat[`${genId}:${msgId}`] = msg
-        }
-    }
-    return Object.keys(flat).length > 0 ? flat : undefined
 }

@@ -114,17 +114,17 @@ function getMaterializationDisabledReasons(
 }
 
 export function QueryInfo({ tabId }: QueryInfoProps): JSX.Element {
-    const { sourceTableItems } = useValues(infoTabLogic({ tabId }))
     const { editingView, upstream, upstreamViewMode } = useValues(sqlEditorLogic)
+    const infoLogic = infoTabLogic({ tabId, viewId: editingView?.id })
+    const { sourceTableItems } = useValues(infoLogic)
     const { runDataWarehouseSavedQuery, saveAsView, setUpstreamViewMode } = useActions(sqlEditorLogic)
     const { featureFlags } = useValues(featureFlagLogic)
 
     const isLineageDependencyViewEnabled = featureFlags[FEATURE_FLAGS.LINEAGE_DEPENDENCY_VIEW]
 
-    const { dataModelingJobs, dataModelingJobsLoading, hasMoreJobsToLoad, startingMaterialization } = useValues(
-        infoTabLogic({ tabId })
-    )
-    const { loadOlderDataModelingJobs, setStartingMaterialization } = useActions(infoTabLogic({ tabId }))
+    const { dataModelingJobs, dataModelingJobsLoading, hasMoreJobsToLoad, startingMaterialization } =
+        useValues(infoLogic)
+    const { loadOlderDataModelingJobs, setStartingMaterialization } = useActions(infoLogic)
 
     const { dataWarehouseSavedQueryMapById, updatingDataWarehouseSavedQuery, initialDataWarehouseSavedQueryLoading } =
         useValues(dataWarehouseViewsLogic)
@@ -157,7 +157,7 @@ export function QueryInfo({ tabId }: QueryInfoProps): JSX.Element {
                         <h3 className="mb-0">Materialization</h3>
                         <LemonTag type="warning">BETA</LemonTag>
                         {savedQuery?.latest_error && savedQuery.status === 'Failed' && (
-                            <Tooltip title={savedQuery.latest_error}>
+                            <Tooltip title={savedQuery.latest_error} interactive>
                                 <LemonTag type="danger">Error</LemonTag>
                             </Tooltip>
                         )}
@@ -329,7 +329,7 @@ export function QueryInfo({ tabId }: QueryInfoProps): JSX.Element {
                                         }
 
                                         return error && status !== 'Completed' ? (
-                                            <Tooltip title={error}>
+                                            <Tooltip title={error} interactive>
                                                 <LemonTag type={type}>{status}</LemonTag>
                                             </Tooltip>
                                         ) : (

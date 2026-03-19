@@ -87,17 +87,17 @@ describe('experimentsTabLogic', () => {
         })
         initKeaTests()
 
+        theToolbarConfigLogic = toolbarConfigLogic.build({ apiURL: 'http://localhost', accessToken: 'test-token' })
+        theToolbarConfigLogic.mount()
+
+        theToolbarLogic = toolbarLogic()
+        theToolbarLogic.mount()
+
         theExperimentsLogic = experimentsLogic()
         theExperimentsLogic.mount()
 
         theExperimentsTabLogic = experimentsTabLogic()
         theExperimentsTabLogic.mount()
-
-        theToolbarLogic = toolbarLogic()
-        theToolbarLogic.mount()
-
-        theToolbarConfigLogic = toolbarConfigLogic.build({ apiURL: 'http://localhost' })
-        theToolbarConfigLogic.mount()
     })
 
     describe('core assumptions', () => {
@@ -164,7 +164,7 @@ describe('experimentsTabLogic', () => {
                                 transforms: [],
                                 rollout_percentage: 50,
                             },
-                            'variant #1': {
+                            'test-0': {
                                 transforms: [{}],
                                 rollout_percentage: 50,
                                 is_new: true,
@@ -180,7 +180,7 @@ describe('experimentsTabLogic', () => {
         it('can remove an existing variant', async () => {
             await expectLogic(theExperimentsTabLogic, () => {
                 theExperimentsTabLogic.actions.selectExperiment(1)
-                theExperimentsTabLogic.actions.removeVariant('variant #1')
+                theExperimentsTabLogic.actions.removeVariant('test-0')
             })
                 .toMatchValues({
                     experimentForm: {

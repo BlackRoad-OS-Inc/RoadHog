@@ -2,6 +2,7 @@ import { api } from 'lib/api.mock'
 
 import { expectLogic } from 'kea-test-utils'
 
+import { lemonToast } from 'lib/lemon-ui/LemonToast/LemonToast'
 import { userLogic } from 'scenes/userLogic'
 
 import experimentJson from '~/mocks/fixtures/api/experiments/_experiment_launched_with_funnel_and_trends.json'
@@ -13,6 +14,13 @@ import { initKeaTests } from '~/test/init'
 import { Experiment } from '~/types'
 
 import { ExperimentSavedMetric, ExperimentWarning, experimentLogic } from './experimentLogic'
+
+jest.mock('lib/lemon-ui/LemonToast/LemonToast', () => ({
+    lemonToast: {
+        success: jest.fn(),
+        error: jest.fn(),
+    },
+}))
 
 const RUNNING_EXP_ID = 45
 const RUNNING_FUNNEL_EXP_ID = 46
@@ -707,6 +715,94 @@ describe('experimentLogic', () => {
         })
     })
 
+    describe('launchExperiment', () => {
+        it('calls launch endpoint and updates experiment state on success', async () => {
+            const draftExperiment = {
+                ...experiment,
+                start_date: null,
+                status: 'draft',
+            } as unknown as Experiment
+
+            const launchedExperiment = {
+                ...experiment,
+                start_date: '2026-03-17T10:00:00Z',
+                status: 'running',
+            }
+
+            useMocks({
+                post: {
+                    '/api/projects/:team/experiments/:id/launch': launchedExperiment,
+                },
+            })
+
+            logic.actions.setExperiment(draftExperiment)
+
+            expect(logic.values.experiment.start_date).toBeNull()
+            expect(logic.values.experiment.status).toBe('draft')
+
+            await expectLogic(logic, () => {
+                logic.actions.launchExperiment()
+            })
+                .toDispatchActions(['launchExperiment', 'setExperiment'])
+                .toFinishAllListeners()
+
+            expect(logic.values.experiment.start_date).toBe('2026-03-17T10:00:00Z')
+            expect(logic.values.experiment.status).toBe('running')
+        })
+
+        it('shows error toast on validation error', async () => {
+            // Mock api.create directly for error tests because MSW error responses
+            // go through the full ApiError pipeline, making it fragile to test the
+            // exact error shape. What we care about is: if the call rejects with a
+            // detail, the toast shows it.
+            const createSpy = jest.spyOn(api, 'create').mockRejectedValue({
+                detail: 'Experiment has already been launched.',
+            })
+            const errorMock = lemonToast.error as jest.Mock
+            errorMock.mockClear()
+
+            logic.actions.setExperiment(experiment)
+
+            await expectLogic(logic, () => {
+                logic.actions.launchExperiment()
+            }).toFinishAllListeners()
+
+            expect(errorMock).toHaveBeenCalledWith('Experiment has already been launched.')
+            createSpy.mockRestore()
+        })
+
+        it('shows generic error toast when detail is missing', async () => {
+            const createSpy = jest.spyOn(api, 'create').mockRejectedValue(new Error('Network error'))
+            const errorMock = lemonToast.error as jest.Mock
+            errorMock.mockClear()
+
+            logic.actions.setExperiment(experiment)
+
+            await expectLogic(logic, () => {
+                logic.actions.launchExperiment()
+            }).toFinishAllListeners()
+
+            expect(errorMock).toHaveBeenCalledWith('Failed to launch experiment')
+            createSpy.mockRestore()
+        })
+
+        it('does not update experiment state on error', async () => {
+            const createSpy = jest.spyOn(api, 'create').mockRejectedValue({
+                detail: 'Experiment has already been launched.',
+            })
+
+            const draftExperiment = { ...experiment, start_date: undefined, status: 'draft' } as unknown as Experiment
+            logic.actions.setExperiment(draftExperiment)
+
+            await expectLogic(logic, () => {
+                logic.actions.launchExperiment()
+            }).toFinishAllListeners()
+
+            expect(logic.values.experiment.start_date).toBeUndefined()
+            createSpy.mockRestore()
+        })
+    })
+
     describe('experimentWarning', () => {
         const multivariantFilters = {
             groups: [{ properties: [], rollout_percentage: 100 }],
@@ -734,6 +830,16 @@ describe('experimentLogic', () => {
                 variants: [
                     { key: 'control', rollout_percentage: 50 },
                     { key: 'test', rollout_percentage: 50 },
+                ],
+            },
+        }
+
+        const zeroRolloutShippedVariantFilters = {
+            groups: [{ properties: [], rollout_percentage: 0 }],
+            multivariate: {
+                variants: [
+                    { key: 'control', rollout_percentage: 0 },
+                    { key: 'test', rollout_percentage: 100 },
                 ],
             },
         }
@@ -782,6 +888,20 @@ describe('experimentLogic', () => {
                 expected: { key: 'running_but_no_rollout' },
             },
             {
+                desc: 'running experiment with zero rollout takes priority over single variant shipped',
+                overrides: {
+                    start_date: '2020-01-01',
+                    end_date: undefined,
+                    feature_flag: {
+                        id: 1,
+                        key: 'flag',
+                        active: true,
+                        filters: zeroRolloutShippedVariantFilters,
+                    } as any,
+                },
+                expected: { key: 'running_but_no_rollout' },
+            },
+            {
                 desc: 'ended experiment with flag still distributing multiple variants',
                 overrides: {
                     start_date: '2020-01-01',
@@ -789,6 +909,15 @@ describe('experimentLogic', () => {
                     feature_flag: { id: 1, key: 'flag', active: true, filters: multivariantFilters } as any,
                 },
                 expected: { key: 'ended_but_multiple_variants_rolled_out' },
+            },
+            {
+                desc: 'ended experiment with flag active but zero group rollout',
+                overrides: {
+                    start_date: '2020-01-01',
+                    end_date: '2020-02-01',
+                    feature_flag: { id: 1, key: 'flag', active: true, filters: zeroRolloutFilters } as any,
+                },
+                expected: null,
             },
             {
                 desc: 'ended experiment with flag disabled',
@@ -826,6 +955,15 @@ describe('experimentLogic', () => {
                     feature_flag: { id: 1, key: 'flag', active: true, filters: multivariantFilters } as any,
                 },
                 expected: { key: 'not_started_but_multiple_variants_rolled_out' },
+            },
+            {
+                desc: 'draft experiment with flag active but zero group rollout',
+                overrides: {
+                    start_date: undefined,
+                    end_date: undefined,
+                    feature_flag: { id: 1, key: 'flag', active: true, filters: zeroRolloutFilters } as any,
+                },
+                expected: null,
             },
             {
                 desc: 'draft experiment with flag disabled',

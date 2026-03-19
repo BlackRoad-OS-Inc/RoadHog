@@ -23,6 +23,33 @@ _cleanup_tmpfiles() {
 }
 trap _cleanup_tmpfiles EXIT
 
+_strip_ansi() {
+  sed $'s/\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\r'
+}
+
+_save_failure_log() {
+  local label="$1"
+  local tmpfile="$2"
+  local logdir="$FLOX_ENV_CACHE/activation-error-logs"
+  local slug="${label// /-}"
+  local logfile="$logdir/${slug}-$(date +%Y%m%d-%H%M%S).log"
+
+  local log_saved=0
+  # Best-effort: failures here must not abort the script under `set -euo pipefail`.
+  if mkdir -p "$logdir" 2>/dev/null; then
+    {
+      echo "── ${label} (failed) ──"
+      _strip_ansi < "$tmpfile"
+      echo ""
+    } 2>/dev/null > "$logfile" && log_saved=1 || true
+  fi
+
+  printf '    %b%s%b\n' "${C_DIM}" "$(tail -n 15 "$tmpfile" 2>/dev/null | _strip_ansi || true)" "${C_RESET}"
+  if [[ "$log_saved" -eq 1 ]]; then
+    printf '    %bFull log: %s%b\n' "${C_DIM}" "$logfile" "${C_RESET}"
+  fi
+}
+
 # ── Step runner ─────────────────────────────────────────────────────
 # Runs a command with a spinner and live output preview.
 # Usage: run_step "Label" command [args...]
@@ -48,6 +75,7 @@ run_step() {
       echo -e "\r  ${C_GREEN}✓${C_RESET} ${label}"
     else
       echo -e "\r  ${C_RED}✗${C_RESET} ${label}  (failed)"
+      _save_failure_log "$label" "$tmpfile"
       return 1
     fi
     return 0
@@ -106,8 +134,8 @@ run_step() {
     if [[ "$had_output" == true ]]; then printf "\033[2K"; fi
   else
     printf "\r\033[2K  ${C_RED}✗${C_RESET} %-42s %3ds\n" "$label" "$elapsed"
-    # Show last few lines of output on failure
-    echo -e "    ${C_DIM}$(tail -n 3 "$tmpfile" 2>/dev/null)${C_RESET}"
+    # Save failure log and show last few lines of output on failure
+    _save_failure_log "$label" "$tmpfile"
     return $exit_code
   fi
 }
@@ -134,6 +162,35 @@ if [[ -t 0 ]] && ! command -v direnv >/dev/null 2>&1 && [[ ! -f "$FLOX_ENV_CACHE
   fi
   touch "$FLOX_ENV_CACHE/.hush-direnv"
   echo
+fi
+
+# ── Xcode license check (macOS only) ─────────────────────────────────
+# Only check when full Xcode.app is installed (not just Command Line Tools),
+# since xcodebuild -license check returns non-zero for CLT-only setups too.
+if [[ "$(uname -s)" == "Darwin" ]] && command -v xcodebuild >/dev/null 2>&1 \
+   && [[ "$(xcode-select -p 2>/dev/null)" == /Applications/Xcode*.app/* ]]; then
+  if ! xcodebuild -license check >/dev/null 2>&1; then
+    if [[ -t 0 ]] && [[ ! -f "$FLOX_ENV_CACHE/.hush-xcode-license" ]]; then
+      warn_step "Xcode license not accepted. Native builds may fail."
+      read -p "$(echo -e "   Accept Xcode license now? (Y/n) ")" -n 1 -r
+      echo
+      if [[ $REPLY =~ ^[Yy]$ || -z $REPLY ]]; then
+        echo -e "   ${C_DIM}Running: sudo xcodebuild -license accept${C_RESET}"
+        if sudo xcodebuild -license accept; then
+          done_step "Xcode license accepted"
+        else
+          echo -e "   ${C_RED}✗${C_RESET} Failed to accept Xcode license"
+          echo -e "   ${C_DIM}Run 'sudo xcodebuild -license' manually to resolve.${C_RESET}"
+        fi
+      else
+        touch "$FLOX_ENV_CACHE/.hush-xcode-license"
+        echo -e "   ${C_DIM}Skipped. Run 'sudo xcodebuild -license' if builds fail.${C_RESET}"
+      fi
+      echo
+    elif [[ ! -t 0 ]]; then
+      echo -e "  ${C_YELLOW}⚠${C_RESET} Xcode license not accepted  ${C_DIM}(run 'sudo xcodebuild -license')${C_RESET}"
+    fi
+  fi
 fi
 
 # ── Header ──────────────────────────────────────────────────────────
@@ -194,6 +251,22 @@ if [[ -f "$DOTENV_FILE" ]]; then
   done_step "Environment vars"
 else
   warn_step "Environment vars  ${C_DIM}(.env not found)${C_RESET}"
+fi
+
+# ── Step 5: Rust toolchain check ───────────────────────────────────
+_flox_rustc_ver=$(rustc --version 2>/dev/null | awk '{print $2}')
+_rustup_rustc="$HOME/.cargo/bin/rustc"
+if [[ -x "$_rustup_rustc" ]] && [[ -n "$_flox_rustc_ver" ]]; then
+  _rustup_rustc_ver=$("$_rustup_rustc" --version 2>/dev/null | awk '{print $2}')
+  if [[ -n "$_rustup_rustc_ver" ]] && [[ "$_flox_rustc_ver" != "$_rustup_rustc_ver" ]]; then
+    warn_step "Rust toolchain mismatch: flox has rustc ${_flox_rustc_ver}, rustup has ${_rustup_rustc_ver}"
+    echo -e "    ${C_DIM}Building outside flox will use a different compiler and invalidate the entire cargo cache.${C_RESET}"
+    echo -e "    ${C_DIM}Fix: ${C_BOLD}rustup toolchain remove stable${C_RESET}${C_DIM} or always build inside flox.${C_RESET}"
+  else
+    done_step "Rust toolchain (rustc ${_flox_rustc_ver})"
+  fi
+elif [[ -n "$_flox_rustc_ver" ]]; then
+  done_step "Rust toolchain (rustc ${_flox_rustc_ver})"
 fi
 
 # ── Summary ─────────────────────────────────────────────────────────

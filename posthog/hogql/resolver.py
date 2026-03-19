@@ -170,6 +170,31 @@ class Resolver(CloningVisitor):
 
         return result
 
+    def visit_values_query(self, node: ast.ValuesQuery):
+        resolved_rows: list[list[ast.Expr]] = []
+        for row in node.rows:
+            resolved_rows.append([self.visit(expr) for expr in row])
+
+        if resolved_rows:
+            expected_len = len(resolved_rows[0])
+            for i, row in enumerate(resolved_rows):
+                if len(row) != expected_len:
+                    raise QueryError(f"VALUES row {i + 1} has {len(row)} columns, expected {expected_len}")
+
+        columns: dict[str, ast.Type] = {}
+        if resolved_rows:
+            for j, expr in enumerate(resolved_rows[0]):
+                col_name = f"col{j}"
+                columns[col_name] = expr.type or ast.UnknownType()
+
+        result = ast.ValuesQuery(
+            start=node.start,
+            end=node.end,
+            rows=resolved_rows,
+        )
+        result.type = ast.SelectQueryType(columns=columns)
+        return result
+
     def visit_cte(self, node: ast.CTE):
         self.cte_counter += 1
 
@@ -187,6 +212,8 @@ class Resolver(CloningVisitor):
                 cte_type=node.cte_type,
                 recursive=True,
                 type=ast.CTETableType(name=node.name, select_query_type=base_select.type),
+                materialized=node.materialized,
+                using_key=node.using_key,
             )
             self.ctes[node.name] = placeholder
 
@@ -224,16 +251,39 @@ class Resolver(CloningVisitor):
                         new_name: initial.select[i].type or ast.UnknownType() for i, new_name in enumerate(node.columns)
                     }
 
+        if node.using_key is not None:
+            if node.columns:
+                valid_columns = set(node.columns)
+            elif isinstance(cte_expr, ast.SelectQuery) and cte_expr.type:
+                valid_columns = set(cte_expr.type.columns.keys())
+            elif isinstance(cte_expr, ast.SelectSetQuery) and cte_expr.type:
+                first_type = cte_expr.type.types[0]
+                while isinstance(first_type, ast.SelectSetQueryType):
+                    first_type = first_type.types[0]
+                valid_columns = set(first_type.columns.keys())
+            else:
+                valid_columns = set()
+
+            if valid_columns:
+                invalid = [k for k in node.using_key if k not in valid_columns]
+                if invalid:
+                    raise QueryError(
+                        f"USING KEY column(s) {', '.join(repr(k) for k in invalid)} not found in CTE '{node.name}'. "
+                        f"Available columns: {', '.join(sorted(valid_columns))}"
+                    )
+
         # Create a new CTE node instead of modifying the input
         # This ensures we can resolve CTEs even if they appear multiple times
         new_node = ast.CTE(
             start=node.start,
             end=node.end,
-            type=ast.CTETableType(name=node.name, select_query_type=cte_expr.type),
+            type=ast.CTETableType(name=node.name, select_query_type=cast(ast.SelectQueryType, cte_expr.type)),
             name=node.name,
             expr=cte_expr,
             cte_type=node.cte_type,
             recursive=node.recursive,
+            materialized=node.materialized,
+            using_key=node.using_key,
             columns=node.columns,
         )
 
@@ -442,7 +492,7 @@ class Resolver(CloningVisitor):
 
                 # :TRICKY: Make sure to clone and visit _all_ JoinExpr fields/nodes.
                 node.type = node_type
-                node.table = cast(ast.Field, clone_expr(node.table))
+                node.table = clone_expr(cast(ast.Field, node.table))
                 node.table.type = cte_table_type
                 node.next_join = self.visit(node.next_join)
                 node.alias = table_alias
@@ -552,6 +602,38 @@ class Resolver(CloningVisitor):
                 node.constraint = self.visit_join_constraint(node.constraint)
 
             node.table = cast(ast.SelectQuery, super().visit(node.table))
+
+            # Remap column names if alias_columns is provided (e.g. AS v(id, name))
+            if node.alias_columns and node.table.type:
+                # Find the SelectQuery to count columns from the select list
+                inner_select: ast.SelectQuery | ast.SelectSetQuery = node.table
+                if isinstance(inner_select, ast.SelectSetQuery):
+                    inner = inner_select.initial_select_query
+                    while isinstance(inner, ast.SelectSetQuery):
+                        inner = inner.initial_select_query
+                    inner_select = inner
+
+                num_cols = len(cast(ast.SelectQuery, inner_select).select)
+                if len(node.alias_columns) != num_cols:
+                    raise QueryError(
+                        f"Subquery has {num_cols} column(s) but {len(node.alias_columns)} column name(s) were provided"
+                    )
+
+                # Remap the SelectQueryType columns dict
+                select_query_type = cast(ast.SelectQueryType, node.table.type)
+                if isinstance(node.table.type, ast.SelectSetQueryType):
+                    first_type = node.table.type.types[0]
+                    while isinstance(first_type, ast.SelectSetQueryType):
+                        first_type = first_type.types[0]
+                    select_query_type = cast(ast.SelectQueryType, first_type)
+
+                # Build new columns from the select list's types, keyed by the alias column names
+                select_list = cast(ast.SelectQuery, inner_select).select
+                select_query_type.columns = {
+                    new_name: (expr.type if expr.type is not None else ast.UnknownType())
+                    for new_name, expr in zip(node.alias_columns, select_list)
+                }
+
             if isinstance(node.table, ast.SelectQuery) and node.table.view_name is not None and node.alias is not None:
                 if node.alias in scope.tables:
                     raise QueryError(
@@ -577,6 +659,50 @@ class Resolver(CloningVisitor):
                 scope.anonymous_tables.append(cast(ast.SelectQueryType | ast.SelectSetQueryType, node.type))
 
             # :TRICKY: Make sure to clone and visit _all_ JoinExpr fields/nodes.
+            node.next_join = self.visit(node.next_join)
+            if node.constraint and node.constraint.constraint_type == "ON":
+                node.constraint = self.visit_join_constraint(node.constraint)
+            node.sample = self.visit(node.sample)
+
+            return node
+
+        elif isinstance(node.table, ast.ValuesQuery):
+            node = cast(ast.JoinExpr, clone_expr(node))
+            node.table = cast(ast.ValuesQuery, self.visit(node.table))
+
+            # Auto-generate alias and alias_columns when omitted so the
+            # printed SQL contains column names that match the resolved
+            # SelectQueryType (sugar syntax like DuckDB's col0, col1, ...).
+            if not node.alias_columns and node.table.type:
+                node.alias_columns = list(node.table.type.columns.keys())
+                if node.alias is None:
+                    node.alias = "values"
+
+            # Remap column names if alias_columns is provided
+            if node.alias_columns and node.table.type:
+                num_cols = len(node.table.type.columns)
+                if len(node.alias_columns) != num_cols:
+                    raise QueryError(
+                        f"VALUES has {num_cols} column(s) but {len(node.alias_columns)} column name(s) were provided"
+                    )
+                original_columns = node.table.type.columns
+                node.table.type.columns = {
+                    new_name: list(original_columns.values())[i] for i, new_name in enumerate(node.alias_columns)
+                }
+
+            if node.alias is not None:
+                if node.alias in scope.tables:
+                    raise QueryError(
+                        f'Already have joined a table called "{node.alias}". Can\'t join another one with the same name.'
+                    )
+                node.type = ast.SelectQueryAliasType(
+                    alias=node.alias, select_query_type=cast(ast.SelectQueryType, node.table.type)
+                )
+                scope.tables[node.alias] = node.type
+            else:
+                node.type = cast(ast.TableOrSelectType, node.table.type)
+                scope.anonymous_tables.append(cast(ast.SelectQueryType, node.type))
+
             node.next_join = self.visit(node.next_join)
             if node.constraint and node.constraint.constraint_type == "ON":
                 node.constraint = self.visit_join_constraint(node.constraint)
