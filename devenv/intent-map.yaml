@@ -68,10 +68,59 @@ capabilities:
         requires: [temporal_workflows]
         docker_profiles: []
 
+    # Dagster code location groups - control which dagster locations are loaded
+    # Base locations (shared, analytics_platform, growth, ingestion) are in dagster_pipelines
     dagster_pipelines:
         description: 'Dagster data pipeline orchestration'
         requires: [core_infra]
         docker_profiles: []
+        dagster_locations:
+            - posthog.dags.locations.shared
+            - posthog.dags.locations.analytics_platform
+            - posthog.dags.locations.growth
+            - posthog.dags.locations.ingestion
+
+    dagster_web_analytics:
+        description: 'Dagster web analytics pre-aggregation and maintenance jobs'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations:
+            - posthog.dags.locations.web_analytics
+
+    dagster_llm_analytics:
+        description: 'Dagster LLM analytics metrics jobs'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations:
+            - posthog.dags.locations.llm_analytics
+
+    dagster_error_tracking:
+        description: 'Dagster error tracking cleanup jobs'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations:
+            - posthog.dags.locations.error_tracking
+
+    dagster_ai:
+        description: 'Dagster PostHog AI evaluation jobs'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations:
+            - posthog.dags.locations.posthog_ai
+
+    dagster_logs:
+        description: 'Dagster logs backup jobs'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations:
+            - posthog.dags.locations.logs
+
+    dagster_data_warehouse:
+        description: 'Dagster data warehouse backfill and sync jobs'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations:
+            - posthog.dags.locations.data_stack
 
     llm_gateway:
         description: 'LLM gateway for AI features'
@@ -196,6 +245,7 @@ intents:
                 property_definitions,
                 nodejs_cdp,
                 nodejs_error_tracking,
+                dagster_error_tracking,
             ]
 
     session_replay:
@@ -239,11 +289,12 @@ intents:
                 property_definitions,
                 temporal_workflows,
                 llm_analytics_sentiment,
+                dagster_llm_analytics,
             ]
 
     web_analytics:
         description: 'Web analytics, traffic analysis, and heatmaps'
-        capabilities: [event_ingestion, replay_storage, property_definitions, livestream]
+        capabilities: [event_ingestion, replay_storage, property_definitions, livestream, dagster_web_analytics]
 
     surveys:
         description: 'User surveys and feedback collection'
@@ -251,7 +302,8 @@ intents:
 
     data_warehouse:
         description: 'Data warehouse queries and saved queries'
-        capabilities: [event_ingestion, property_definitions, celery_workers, temporal_workflows]
+        capabilities:
+            [event_ingestion, property_definitions, celery_workers, temporal_workflows, dagster_data_warehouse]
 
     cohorts:
         description: 'User cohort management'
@@ -264,11 +316,12 @@ intents:
 
     ai_features:
         description: 'AI features'
-        capabilities: [event_ingestion, llm_gateway, embedding_service, property_definitions, temporal_workflows]
+        capabilities:
+            [event_ingestion, llm_gateway, embedding_service, property_definitions, temporal_workflows, dagster_ai]
 
     logs:
         description: 'Log aggregation and viewing'
-        capabilities: [event_ingestion, property_definitions, nodejs_logs, nodejs_traces]
+        capabilities: [event_ingestion, property_definitions, nodejs_logs, nodejs_traces, dagster_logs]
 
     workflows:
         description: 'Workflow automation and orchestration'
