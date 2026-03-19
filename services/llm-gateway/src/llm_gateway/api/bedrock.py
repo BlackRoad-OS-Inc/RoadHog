@@ -24,7 +24,6 @@ COUNT_TOKENS_ENDPOINT_NAME = "bedrock_count_tokens"
 
 
 def ensure_bedrock_configured(settings: Any) -> None:
-    logger.info(f"inside ensure_bedrock_configured: {settings.bedrock_region_name}")
     if settings.bedrock_region_name:
         return
 
@@ -108,8 +107,8 @@ async def _handle_count_tokens(
         raise
     except Exception as e:
         status_code = "502"
-        logger.info({"model": body.model, "max_tokens": data.get("max_tokens", 4096)})
-        logger.exception(f"Error proxying bedrock count_tokens request: {e}")
+        logger.info(model=body.model, max_tokens=data.get("max_tokens", 4096))
+        logger.exception("Error proxying bedrock count_tokens request", exc_info=e)
         raise HTTPException(
             status_code=502,
             detail={"error": {"message": "Failed to count tokens via Bedrock", "type": "proxy_error"}},
