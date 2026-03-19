@@ -6,26 +6,54 @@ to remote development environments.
 
 from __future__ import annotations
 
+import shlex
+import subprocess
+from pathlib import Path
+
 import click
 from hogli.core.cli import cli
+from hogli.devenv import DevenvConfig, generate_saved_devenv_config
 
 from . import codespace as cs
 
 DEFAULT_MACHINE = "premiumLinux"
+REMOTE_WORKSPACE_ROOT = "/workspaces/posthog"
 
 
-def _get_intents_from_config() -> str:
-    """Read intent configuration from local dev setup. Falls back to product_analytics."""
+def _get_devenv_config() -> DevenvConfig:
+    """Read local devenv configuration. Falls back to product_analytics."""
     try:
         from hogli.devenv.generator import get_generated_mprocs_path, load_devenv_config
 
         output_path = get_generated_mprocs_path()
         config = load_devenv_config(output_path)
         if config and config.intents:
-            return ",".join(config.intents)
+            return config
     except Exception:
         pass
-    return "product_analytics"
+    return DevenvConfig(intents=["product_analytics"])
+
+
+def _bootstrap_codespace(name: str, config: DevenvConfig) -> None:
+    """Persist the desired config inside a newly created codespace and bootstrap it."""
+    click.echo("Bootstrapping codespace from current hogli config...")
+    bootstrap_args = ["uv", "run", "bin/hogli", "box:bootstrap"]
+
+    for intent in config.intents:
+        bootstrap_args.extend(["--intent", intent])
+    for unit in config.include_units:
+        bootstrap_args.extend(["--include-unit", unit])
+    for unit in config.exclude_units:
+        bootstrap_args.extend(["--exclude-unit", unit])
+    for unit in config.skip_autostart:
+        bootstrap_args.extend(["--skip-autostart", unit])
+    for unit in config.enable_autostart:
+        bootstrap_args.extend(["--enable-autostart", unit])
+    if config.log_to_files:
+        bootstrap_args.append("--log")
+
+    remote_command = f"cd {shlex.quote(REMOTE_WORKSPACE_ROOT)} && {shlex.join(bootstrap_args)}"
+    cs.run_remote_command(name, remote_command)
 
 
 def _resolve_codespace_name(branch: str | None, name: str | None) -> str:
@@ -66,10 +94,13 @@ def box_start(
     """
     cs.ensure_gh_authenticated()
     branch = branch or cs.get_current_branch()
-    intents = intents or _get_intents_from_config()
+    config = _get_devenv_config()
+    if intents:
+        parsed_intents = [intent.strip() for intent in intents.split(",") if intent.strip()]
+        config = config.model_copy(update={"intents": parsed_intents or config.intents})
 
     click.echo(f"Branch: {branch}")
-    click.echo(f"Intents: {intents}")
+    click.echo(f"Intents: {', '.join(config.intents)}")
 
     # Check for existing codespace
     if not force_new:
@@ -94,10 +125,6 @@ def box_start(
                 cs.ssh_into(name)
             return
 
-    # Set intent secret for the new codespace
-    click.echo("Setting intent configuration...")
-    cs.set_user_secret("POSTHOG_DEVBOX_INTENTS", intents)
-
     # Create new codespace
     click.echo(f"Creating codespace (machine: {machine})...")
     name = cs.create_codespace(
@@ -113,6 +140,12 @@ def box_start(
         click.echo("Error: codespace creation timed out", err=True)
         raise SystemExit(1)
 
+    try:
+        _bootstrap_codespace(name, config)
+    except Exception as exc:
+        click.echo(f"Error bootstrapping codespace: {exc}", err=True)
+        raise SystemExit(1)
+
     click.echo("Codespace ready!")
     if code:
         click.echo("Opening in VS Code...")
@@ -120,6 +153,68 @@ def box_start(
     else:
         click.echo("Connecting via SSH...")
         cs.ssh_into(name)
+
+
+@cli.command(name="box:bootstrap", help="Bootstrap a new devbox from an explicit hogli config", hidden=True)
+@click.option("--intent", "intents", multiple=True, help="Intent to persist in the remote dev config")
+@click.option("--include-unit", "include_units", multiple=True, help="Additional unit to include")
+@click.option("--exclude-unit", "exclude_units", multiple=True, help="Unit to exclude")
+@click.option("--skip-autostart", "skip_autostart", multiple=True, help="Unit to leave stopped")
+@click.option("--enable-autostart", "enable_autostart", multiple=True, help="Manual-start unit to auto-start")
+@click.option("--log", "log_to_files", is_flag=True, help="Enable process log files")
+def box_bootstrap(
+    intents: tuple[str, ...],
+    include_units: tuple[str, ...],
+    exclude_units: tuple[str, ...],
+    skip_autostart: tuple[str, ...],
+    enable_autostart: tuple[str, ...],
+    log_to_files: bool,
+) -> None:
+    """Persist an exact dev environment config in the current workspace and bootstrap it."""
+    config = DevenvConfig(
+        intents=list(intents) or ["product_analytics"],
+        include_units=list(include_units),
+        exclude_units=list(exclude_units),
+        skip_autostart=list(skip_autostart),
+        enable_autostart=list(enable_autostart),
+        log_to_files=log_to_files,
+    )
+
+    generated_path = Path(REMOTE_WORKSPACE_ROOT) / ".posthog" / ".generated" / "mprocs.yaml"
+    output_path, _ = generate_saved_devenv_config(config, generated_path)
+    click.echo(f"Generated dev config: {output_path}")
+
+    def _run(description: str, cmd: list[str], *, check: bool = True) -> None:
+        click.echo(f"{description}...")
+        result = subprocess.run(cmd, check=False)
+        if check and result.returncode != 0:
+            click.echo(f"Error: {description.lower()} failed (exit {result.returncode})", err=True)
+            raise SystemExit(result.returncode)
+
+    _run("Starting Docker infrastructure", ["uv", "run", "bin/hogli", "docker:services:up"])
+    _run(
+        "Waiting for PostgreSQL",
+        ["timeout", "120", "bash", "-lc", "until pg_isready -h localhost -U posthog 2>/dev/null; do sleep 2; done"],
+    )
+    _run(
+        "Waiting for ClickHouse",
+        ["timeout", "120", "bash", "-lc", "until curl -sf http://localhost:8123/ping 2>/dev/null; do sleep 2; done"],
+    )
+    # Fast path: restore pre-migrated PG schema from CI before running migrations
+    _run("Downloading pre-migrated schema from CI", ["uv", "run", "bin/hogli", "db:download-schema"], check=False)
+    schema_file = Path(REMOTE_WORKSPACE_ROOT) / ".postgres-backups" / "schema-latest.sql.gz"
+    if schema_file.exists():
+        _run(
+            "Restoring pre-migrated schema",
+            ["bash", "-c", f"gunzip -c {schema_file} | psql -q -U posthog -h localhost posthog"],
+            check=False,
+        )
+
+    _run("Running Django migrations", ["uv", "run", "python", "manage.py", "migrate", "--noinput"])
+    _run("Running ClickHouse migrations", ["uv", "run", "python", "manage.py", "migrate_clickhouse"])
+    _run("Creating dev API key", ["uv", "run", "python", "manage.py", "setup_local_api_key"])
+
+    click.echo("Devbox bootstrap complete. Run 'hogli start' to launch app processes.")
 
 
 @cli.command(name="box:stop", help="Stop a running devbox (preserves state)")
