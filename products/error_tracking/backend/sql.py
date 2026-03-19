@@ -117,6 +117,10 @@ def TRUNCATE_ERROR_TRACKING_ISSUE_FINGERPRINT_OVERRIDES_TABLE_SQL():
     return f"TRUNCATE TABLE IF EXISTS {ERROR_TRACKING_ISSUE_FINGERPRINT_OVERRIDES_TABLE} ON CLUSTER '{settings.CLICKHOUSE_CLUSTER}'"
 
 
+def TRUNCATE_ERROR_TRACKING_ISSUE_FINGERPRINT_DENORMALIZED_TABLE_SQL():
+    return f"TRUNCATE TABLE IF EXISTS {ERROR_TRACKING_ISSUE_FINGERPRINT_DENORMALIZED_TABLE} ON CLUSTER '{settings.CLICKHOUSE_CLUSTER}'"
+
+
 INSERT_ERROR_TRACKING_ISSUE_FINGERPRINT_OVERRIDES = """
 INSERT INTO error_tracking_issue_fingerprint_overrides (fingerprint, issue_id, team_id, is_deleted, version, _timestamp, _offset, _partition) SELECT %(fingerprint)s, %(issue_id)s, %(team_id)s, %(is_deleted)s, %(version)s, now(), 0, 0 VALUES
 """
@@ -146,6 +150,7 @@ CREATE TABLE IF NOT EXISTS {table_name} {on_cluster_clause}
     issue_status VARCHAR,
     assigned_user_id Nullable(Int64),
     assigned_role_id Nullable(UUID),
+    first_seen DateTime64(3, 'UTC'),
     is_deleted Int8,
     version Int64
     {extra_fields}
@@ -200,6 +205,7 @@ issue_description,
 issue_status,
 assigned_user_id,
 assigned_role_id,
+first_seen,
 is_deleted,
 version,
 _timestamp,
@@ -229,7 +235,7 @@ WRITABLE_ERROR_TRACKING_ISSUE_FINGERPRINT_DENORMALIZED_TABLE_SQL = (
 
 
 INSERT_ERROR_TRACKING_ISSUE_FINGERPRINT_DENORMALIZED = """
-INSERT INTO error_tracking_issue_fingerprint_denormalized (fingerprint, issue_id, team_id, issue_name, issue_description, issue_status, assigned_user_id, assigned_role_id, is_deleted, version, _timestamp, _offset, _partition) SELECT %(fingerprint)s, %(issue_id)s, %(team_id)s, %(issue_name)s, %(issue_description)s, %(issue_status)s, %(assigned_user_id)s, %(assigned_role_id)s, %(is_deleted)s, %(version)s, now(), 0, 0 VALUES
+INSERT INTO error_tracking_issue_fingerprint_denormalized (fingerprint, issue_id, team_id, issue_name, issue_description, issue_status, assigned_user_id, assigned_role_id, first_seen, is_deleted, version, _timestamp, _offset, _partition) SELECT %(fingerprint)s, %(issue_id)s, %(team_id)s, %(issue_name)s, %(issue_description)s, %(issue_status)s, %(assigned_user_id)s, %(assigned_role_id)s, %(first_seen)s, %(is_deleted)s, %(version)s, now(), 0, 0 VALUES
 """
 
 
