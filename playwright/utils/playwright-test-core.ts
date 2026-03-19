@@ -39,6 +39,17 @@ export const test = base.extend<{ page: Page }>({
             await new Navigation(page).openMenuItem(name)
         }
 
+        // Capture browser errors for CI debugging
+        page.on('pageerror', (error) => {
+            console.error(`[PAGE ERROR] ${error.message}`)
+            console.error(error.stack)
+        })
+        page.on('console', (msg) => {
+            if (msg.type() === 'error') {
+                console.error(`[CONSOLE ERROR] ${msg.text()}`)
+            }
+        })
+
         // Pass the extended page to the test
         // eslint-disable-next-line react-hooks/rules-of-hooks
         await use(page)

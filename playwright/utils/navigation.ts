@@ -30,9 +30,7 @@ export class Navigation {
 
         // Prefer navbar selector if it exists, fall back to menu-item
         const element = (await navbarSelector.count()) > 0 ? navbarSelector : menuSelector
-        // Wait for the element to be visible before clicking (handles initial page load)
-        await element.first().waitFor({ state: 'visible', timeout: 30000 })
-        await element.first().click()
+        await element.click()
         // Wait for navigation to complete and page to be ready
         await this.page.waitForLoadState('domcontentloaded')
         // Additional wait with timeout for network to settle (catches lazy-loaded components)
