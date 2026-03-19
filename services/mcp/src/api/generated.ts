@@ -12785,6 +12785,7 @@ export namespace Schemas {
     * `Numeric` - Numeric
     * `Boolean` - Boolean
     * `Object` - Object
+    * `Any` - Any
      */
     export type SchemaPropertyGroupPropertyPropertyTypeEnum = typeof SchemaPropertyGroupPropertyPropertyTypeEnum[keyof typeof SchemaPropertyGroupPropertyPropertyTypeEnum];
 
@@ -12795,6 +12796,7 @@ export namespace Schemas {
       Numeric: 'Numeric',
       Boolean: 'Boolean',
       Object: 'Object',
+      Any: 'Any',
     } as const;
 
     export interface SchemaPropertyGroupProperty {
@@ -12804,6 +12806,7 @@ export namespace Schemas {
       property_type: SchemaPropertyGroupPropertyPropertyTypeEnum;
       is_required?: boolean;
       is_optional_in_types?: boolean;
+      validation_rules?: unknown | null;
       description?: string;
       readonly created_at: string;
       readonly updated_at: string;
