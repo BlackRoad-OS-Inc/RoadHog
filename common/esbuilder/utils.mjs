@@ -212,6 +212,7 @@ export const commonConfig = {
     define: {
         global: 'globalThis',
         'process.env.NODE_ENV': isDev ? '"development"' : '"production"',
+        'process.env': '{}',
     },
     loader: {
         '.ttf': 'file',

@@ -115,6 +115,7 @@ export default defineConfig(({ mode }) => {
         define: {
             global: 'globalThis',
             'process.env.NODE_ENV': isDev ? '"development"' : '"production"',
+            'process.env': '{}',
         },
         css: {
             devSourcemap: true,
