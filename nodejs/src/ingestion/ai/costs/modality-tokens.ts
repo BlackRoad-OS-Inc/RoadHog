@@ -6,9 +6,16 @@ export interface EventWithProperties extends PluginEvent {
     properties: Properties
 }
 
+type OutputTarget = 'output' | 'input'
+
 /**
  * Extract modality-specific token counts from raw provider usage metadata.
- * Currently supports Gemini's candidatesTokensDetails for image token breakdown.
+ *
+ * Supports:
+ * - Gemini's candidatesTokensDetails / promptTokensDetails for output/input image token breakdown
+ * - OpenAI's completion_tokens_details / prompt_tokens_details for output/input image token breakdown
+ * - Various Vercel AI SDK wrapper formats for both providers
+ *
  * Removes $ai_usage from properties after extraction.
  */
 export const extractModalityTokens = (event: EventWithProperties): EventWithProperties => {
@@ -22,11 +29,14 @@ export const extractModalityTokens = (event: EventWithProperties): EventWithProp
     try {
         let extractedTokens = false
 
-        // Helper function to extract tokens from either array or object format
-        const extractTokensFromDetails = (tokenDetails: unknown): void => {
+        // Helper function to extract tokens from Gemini array or object format
+        const extractTokensFromDetails = (tokenDetails: unknown, target: OutputTarget = 'output'): void => {
             if (!tokenDetails) {
                 return
             }
+
+            const imageKey = target === 'output' ? '$ai_image_output_tokens' : '$ai_image_input_tokens'
+            const textKey = target === 'output' ? '$ai_text_output_tokens' : '$ai_text_input_tokens'
 
             // Array format: [{ modality: "TEXT", tokenCount: 10 }, { modality: "IMAGE", tokenCount: 1290 }]
             // Gemini returns uppercase modality values (TEXT, IMAGE, AUDIO)
@@ -40,11 +50,11 @@ export const extractModalityTokens = (event: EventWithProperties): EventWithProp
                             const modalityLower = modality.toLowerCase()
 
                             if (modalityLower === 'image' && tokenCount > 0) {
-                                event.properties['$ai_image_output_tokens'] = tokenCount
+                                event.properties[imageKey] = tokenCount
                                 extractedTokens = true
                             }
                             if (modalityLower === 'text') {
-                                event.properties['$ai_text_output_tokens'] = tokenCount
+                                event.properties[textKey] = tokenCount
                                 extractedTokens = true
                             }
                         }
@@ -57,25 +67,60 @@ export const extractModalityTokens = (event: EventWithProperties): EventWithProp
                 const details = tokenDetails as Record<string, unknown>
 
                 if (typeof details['imageTokens'] === 'number' && details['imageTokens'] > 0) {
-                    event.properties['$ai_image_output_tokens'] = details['imageTokens']
+                    event.properties[imageKey] = details['imageTokens']
                     extractedTokens = true
                 }
 
                 if (typeof details['textTokens'] === 'number') {
-                    event.properties['$ai_text_output_tokens'] = details['textTokens']
+                    event.properties[textKey] = details['textTokens']
                     extractedTokens = true
                 }
             }
         }
 
-        // Handle Gemini's candidatesTokensDetails (or outputTokenDetails in some versions)
-        // Gemini returns: [{ modality: "TEXT", tokenCount: 10 }, { modality: "IMAGE", tokenCount: 1290 }]
-        // Also supports object format as defensive fallback: { textTokens: 10, imageTokens: 1290 }
-        const tokenDetails =
-            (usage as Record<string, unknown>)['candidatesTokensDetails'] ??
-            (usage as Record<string, unknown>)['outputTokenDetails']
+        // Helper to extract image tokens from OpenAI's *_tokens_details format
+        // OpenAI returns: { text_tokens: 200, image_tokens: 1300 }
+        const extractOpenAITokenDetails = (tokenDetails: unknown, target: OutputTarget): void => {
+            if (!tokenDetails || typeof tokenDetails !== 'object') {
+                return
+            }
 
-        extractTokensFromDetails(tokenDetails)
+            const details = tokenDetails as Record<string, unknown>
+            const imageKey = target === 'output' ? '$ai_image_output_tokens' : '$ai_image_input_tokens'
+            const textKey = target === 'output' ? '$ai_text_output_tokens' : '$ai_text_input_tokens'
+
+            if (typeof details['image_tokens'] === 'number' && details['image_tokens'] > 0) {
+                event.properties[imageKey] = details['image_tokens']
+                extractedTokens = true
+            }
+
+            if (typeof details['text_tokens'] === 'number') {
+                event.properties[textKey] = details['text_tokens']
+                extractedTokens = true
+            }
+        }
+
+        // Helper to extract Gemini output and input token details from a usage-like object
+        const extractGeminiTokenDetails = (usageObj: Record<string, unknown>): void => {
+            // Output tokens
+            const outputDetails = usageObj['candidatesTokensDetails'] ?? usageObj['outputTokenDetails']
+            extractTokensFromDetails(outputDetails, 'output')
+
+            // Input tokens
+            const inputDetails = usageObj['promptTokensDetails'] ?? usageObj['inputTokenDetails']
+            extractTokensFromDetails(inputDetails, 'input')
+        }
+
+        // --- Direct Gemini usage metadata ---
+        extractGeminiTokenDetails(usage as Record<string, unknown>)
+
+        // --- OpenAI direct usage metadata ---
+        // OpenAI reports: { completion_tokens_details: { image_tokens: N }, prompt_tokens_details: { image_tokens: N } }
+        const completionDetails = (usage as Record<string, unknown>)['completion_tokens_details']
+        extractOpenAITokenDetails(completionDetails, 'output')
+
+        const promptDetails = (usage as Record<string, unknown>)['prompt_tokens_details']
+        extractOpenAITokenDetails(promptDetails, 'input')
 
         // Check for Vercel AI SDK with rawResponse at top level: { rawResponse: { usageMetadata: {...} } }
         // This is the current path when using Vercel AI SDK with Google provider
@@ -83,11 +128,7 @@ export const extractModalityTokens = (event: EventWithProperties): EventWithProp
         if (topLevelRawResponse && typeof topLevelRawResponse === 'object') {
             const topLevelUsageMetadata = (topLevelRawResponse as Record<string, unknown>)['usageMetadata']
             if (topLevelUsageMetadata && typeof topLevelUsageMetadata === 'object') {
-                const topLevelTokenDetails =
-                    (topLevelUsageMetadata as Record<string, unknown>)['candidatesTokensDetails'] ??
-                    (topLevelUsageMetadata as Record<string, unknown>)['outputTokenDetails']
-
-                extractTokensFromDetails(topLevelTokenDetails)
+                extractGeminiTokenDetails(topLevelUsageMetadata as Record<string, unknown>)
             }
         }
 
@@ -96,11 +137,17 @@ export const extractModalityTokens = (event: EventWithProperties): EventWithProp
         if (providerMetadata && typeof providerMetadata === 'object') {
             const googleMetadata = (providerMetadata as Record<string, unknown>)['google']
             if (googleMetadata && typeof googleMetadata === 'object') {
-                const googleTokenDetails =
-                    (googleMetadata as Record<string, unknown>)['candidatesTokensDetails'] ??
-                    (googleMetadata as Record<string, unknown>)['outputTokenDetails']
+                extractGeminiTokenDetails(googleMetadata as Record<string, unknown>)
+            }
 
-                extractTokensFromDetails(googleTokenDetails)
+            // Check for Vercel AI SDK with OpenAI provider metadata
+            const openaiMetadata = (providerMetadata as Record<string, unknown>)['openai']
+            if (openaiMetadata && typeof openaiMetadata === 'object') {
+                const openaiCompletionDetails = (openaiMetadata as Record<string, unknown>)['completion_tokens_details']
+                extractOpenAITokenDetails(openaiCompletionDetails, 'output')
+
+                const openaiPromptDetails = (openaiMetadata as Record<string, unknown>)['prompt_tokens_details']
+                extractOpenAITokenDetails(openaiPromptDetails, 'input')
             }
         }
 
@@ -112,11 +159,21 @@ export const extractModalityTokens = (event: EventWithProperties): EventWithProp
             if (rawProviderMetadata && typeof rawProviderMetadata === 'object') {
                 const rawGoogleMetadata = (rawProviderMetadata as Record<string, unknown>)['google']
                 if (rawGoogleMetadata && typeof rawGoogleMetadata === 'object') {
-                    const rawGoogleTokenDetails =
-                        (rawGoogleMetadata as Record<string, unknown>)['candidatesTokensDetails'] ??
-                        (rawGoogleMetadata as Record<string, unknown>)['outputTokenDetails']
+                    extractGeminiTokenDetails(rawGoogleMetadata as Record<string, unknown>)
+                }
 
-                    extractTokensFromDetails(rawGoogleTokenDetails)
+                // Check for OpenAI provider metadata in rawUsage
+                const rawOpenaiMetadata = (rawProviderMetadata as Record<string, unknown>)['openai']
+                if (rawOpenaiMetadata && typeof rawOpenaiMetadata === 'object') {
+                    const rawOpenaiCompletionDetails = (rawOpenaiMetadata as Record<string, unknown>)[
+                        'completion_tokens_details'
+                    ]
+                    extractOpenAITokenDetails(rawOpenaiCompletionDetails, 'output')
+
+                    const rawOpenaiPromptDetails = (rawOpenaiMetadata as Record<string, unknown>)[
+                        'prompt_tokens_details'
+                    ]
+                    extractOpenAITokenDetails(rawOpenaiPromptDetails, 'input')
                 }
             }
 
@@ -126,11 +183,7 @@ export const extractModalityTokens = (event: EventWithProperties): EventWithProp
             if (rawUsageUsage && typeof rawUsageUsage === 'object') {
                 const rawUsageRaw = (rawUsageUsage as Record<string, unknown>)['raw']
                 if (rawUsageRaw && typeof rawUsageRaw === 'object') {
-                    const vercelRawTokenDetails =
-                        (rawUsageRaw as Record<string, unknown>)['candidatesTokensDetails'] ??
-                        (rawUsageRaw as Record<string, unknown>)['outputTokenDetails']
-
-                    extractTokensFromDetails(vercelRawTokenDetails)
+                    extractGeminiTokenDetails(rawUsageRaw as Record<string, unknown>)
                 }
             }
 
@@ -140,11 +193,7 @@ export const extractModalityTokens = (event: EventWithProperties): EventWithProp
             if (rawResponse && typeof rawResponse === 'object') {
                 const usageMetadata = (rawResponse as Record<string, unknown>)['usageMetadata']
                 if (usageMetadata && typeof usageMetadata === 'object') {
-                    const rawResponseTokenDetails =
-                        (usageMetadata as Record<string, unknown>)['candidatesTokensDetails'] ??
-                        (usageMetadata as Record<string, unknown>)['outputTokenDetails']
-
-                    extractTokensFromDetails(rawResponseTokenDetails)
+                    extractGeminiTokenDetails(usageMetadata as Record<string, unknown>)
                 }
             }
         }

@@ -728,6 +728,91 @@ describe('calculateInputCost()', () => {
         })
     })
 
+    describe('image input token pricing', () => {
+        const GEMINI_IMAGE_MODEL: ResolvedModelCost = {
+            model: 'gemini-2.5-flash',
+            provider: 'google',
+            cost: {
+                prompt_token: 0.0000003,
+                completion_token: 0.0000025,
+                image: 0.0000006, // 2x prompt_token for this test
+            },
+        }
+
+        it('adjusts cost when image input tokens have different pricing', () => {
+            const event = createGeminiTestEvent(1000, undefined, {
+                $ai_image_input_tokens: 200,
+            })
+            const result = calculateInputCost(event, GEMINI_IMAGE_MODEL)
+
+            // Without image adjustment: 1000 * 0.0000003 = 0.0003
+            // Image adjustment: 200 * (0.0000006 - 0.0000003) = 200 * 0.0000003 = 0.00006
+            // Total: 0.0003 + 0.00006 = 0.00036
+            expectCostToBeCloseTo(result, 0.00036, 8)
+        })
+
+        it('no adjustment when image price equals prompt_token price', () => {
+            const modelWithSamePrice: ResolvedModelCost = {
+                model: 'gemini-2.5-flash',
+                provider: 'google',
+                cost: {
+                    prompt_token: 0.0000003,
+                    completion_token: 0.0000025,
+                    image: 0.0000003, // same as prompt_token
+                },
+            }
+
+            const event = createGeminiTestEvent(1000, undefined, {
+                $ai_image_input_tokens: 200,
+            })
+            const result = calculateInputCost(event, modelWithSamePrice)
+
+            // No adjustment since image == prompt_token
+            // Total: 1000 * 0.0000003 = 0.0003
+            expectCostToBeCloseTo(result, 0.0003, 8)
+        })
+
+        it('no adjustment when no image pricing defined', () => {
+            const event = createGeminiTestEvent(1000, undefined, {
+                $ai_image_input_tokens: 200,
+            })
+            const result = calculateInputCost(event, GEMINI_MODEL)
+
+            // No image pricing on GEMINI_MODEL, so no adjustment
+            // Total: 1000 * 0.00000125 = 0.00125
+            expectCostToBeCloseTo(result, 0.00125)
+        })
+
+        it('no adjustment when no image input tokens', () => {
+            const event = createGeminiTestEvent(1000)
+            const result = calculateInputCost(event, GEMINI_IMAGE_MODEL)
+
+            // No image input tokens, so no adjustment
+            // Total: 1000 * 0.0000003 = 0.0003
+            expectCostToBeCloseTo(result, 0.0003, 8)
+        })
+
+        it('adjusts cost with cache tokens present', () => {
+            const event = createGeminiTestEvent(1000, 400, {
+                $ai_image_input_tokens: 200,
+            })
+            const modelWithCache: ResolvedModelCost = {
+                ...GEMINI_IMAGE_MODEL,
+                cost: {
+                    ...GEMINI_IMAGE_MODEL.cost,
+                    cache_read_token: 0.00000015,
+                },
+            }
+            const result = calculateInputCost(event, modelWithCache)
+
+            // Regular: (1000 - 400) * 0.0000003 = 0.00018
+            // Cache read: 400 * 0.00000015 = 0.00006
+            // Image adjustment: 200 * (0.0000006 - 0.0000003) = 0.00006
+            // Total: 0.00018 + 0.00006 + 0.00006 = 0.0003
+            expectCostToBeCloseTo(result, 0.0003, 8)
+        })
+    })
+
     describe('explicit $ai_cache_reporting_exclusive flag', () => {
         it('uses exclusive accounting when flag is true on OpenAI event', () => {
             const event = createOpenAITestEvent(1000, 400, {

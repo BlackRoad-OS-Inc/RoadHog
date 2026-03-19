@@ -73,6 +73,19 @@ export const calculateInputCost = (event: PluginEvent, cost: ResolvedModelCost):
     const cacheReadTokens = event.properties['$ai_cache_read_input_tokens'] || 0
     const inputTokens = event.properties['$ai_input_tokens'] || 0
 
+    // Calculate image input cost adjustment if image input tokens and image pricing are present.
+    // Image tokens are already included in $ai_input_tokens and priced at prompt_token rate.
+    // This adjustment adds the difference: imageTokens * (image_price - prompt_token_price).
+    const imageInputTokens = event.properties['$ai_image_input_tokens']
+    const hasImageInputTokens = typeof imageInputTokens === 'number' && imageInputTokens > 0
+    const hasImageInputPricing = cost.cost.image !== undefined && cost.cost.image > 0
+    let imageInputCostAdjustment = '0'
+
+    if (hasImageInputTokens && hasImageInputPricing) {
+        const priceDiff = bigDecimal.subtract(cost.cost.image!, cost.cost.prompt_token)
+        imageInputCostAdjustment = bigDecimal.multiply(priceDiff, imageInputTokens)
+    }
+
     if (matchProvider(event, 'anthropic')) {
         const cacheWriteTokens = event.properties['$ai_cache_creation_input_tokens'] || 0
 
@@ -92,7 +105,8 @@ export const calculateInputCost = (event: PluginEvent, cost: ResolvedModelCost):
             : bigDecimal.subtract(bigDecimal.subtract(inputTokens, cacheReadTokens), cacheWriteTokens)
         const uncachedCost = bigDecimal.multiply(cost.cost.prompt_token, uncachedTokens)
 
-        return bigDecimal.add(totalCacheCost, uncachedCost)
+        const baseCost = bigDecimal.add(totalCacheCost, uncachedCost)
+        return bigDecimal.add(baseCost, imageInputCostAdjustment)
     }
 
     const regularTokens = exclusive ? inputTokens : bigDecimal.subtract(inputTokens, cacheReadTokens)
@@ -119,5 +133,6 @@ export const calculateInputCost = (event: PluginEvent, cost: ResolvedModelCost):
 
     const regularCost = bigDecimal.multiply(cost.cost.prompt_token, regularTokens)
 
-    return bigDecimal.add(cacheReadCost, regularCost)
+    const baseCost = bigDecimal.add(cacheReadCost, regularCost)
+    return bigDecimal.add(baseCost, imageInputCostAdjustment)
 }

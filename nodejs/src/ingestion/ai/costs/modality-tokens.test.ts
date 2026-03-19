@@ -441,4 +441,248 @@ describe('extractModalityTokens()', () => {
             expect(result.properties['$ai_usage']).toBeUndefined()
         })
     })
+
+    describe('OpenAI image token extraction', () => {
+        it('extracts image output tokens from completion_tokens_details', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    completion_tokens_details: {
+                        text_tokens: 200,
+                        image_tokens: 1300,
+                    },
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_output_tokens']).toBe(1300)
+            expect(result.properties['$ai_text_output_tokens']).toBe(200)
+            expect(result.properties['$ai_usage']).toBeUndefined()
+        })
+
+        it('extracts image input tokens from prompt_tokens_details', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    prompt_tokens_details: {
+                        text_tokens: 50,
+                        image_tokens: 500,
+                    },
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_input_tokens']).toBe(500)
+            expect(result.properties['$ai_text_input_tokens']).toBe(50)
+            expect(result.properties['$ai_usage']).toBeUndefined()
+        })
+
+        it('extracts both input and output image tokens from OpenAI usage', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    prompt_tokens_details: {
+                        text_tokens: 50,
+                        image_tokens: 500,
+                    },
+                    completion_tokens_details: {
+                        text_tokens: 200,
+                        image_tokens: 1300,
+                    },
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_input_tokens']).toBe(500)
+            expect(result.properties['$ai_text_input_tokens']).toBe(50)
+            expect(result.properties['$ai_image_output_tokens']).toBe(1300)
+            expect(result.properties['$ai_text_output_tokens']).toBe(200)
+        })
+
+        it('does not set image tokens when zero in OpenAI format', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    completion_tokens_details: {
+                        text_tokens: 200,
+                        image_tokens: 0,
+                    },
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_output_tokens']).toBeUndefined()
+            expect(result.properties['$ai_text_output_tokens']).toBe(200)
+        })
+
+        it('handles non-numeric image_tokens gracefully', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    completion_tokens_details: {
+                        text_tokens: 200,
+                        image_tokens: 'not a number',
+                    },
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_output_tokens']).toBeUndefined()
+            expect(result.properties['$ai_text_output_tokens']).toBe(200)
+        })
+
+        it('extracts OpenAI tokens from Vercel AI SDK providerMetadata.openai', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    providerMetadata: {
+                        openai: {
+                            completion_tokens_details: {
+                                text_tokens: 200,
+                                image_tokens: 1300,
+                            },
+                            prompt_tokens_details: {
+                                text_tokens: 50,
+                                image_tokens: 500,
+                            },
+                        },
+                    },
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_output_tokens']).toBe(1300)
+            expect(result.properties['$ai_text_output_tokens']).toBe(200)
+            expect(result.properties['$ai_image_input_tokens']).toBe(500)
+            expect(result.properties['$ai_text_input_tokens']).toBe(50)
+        })
+
+        it('extracts OpenAI tokens from rawUsage.providerMetadata.openai', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    rawUsage: {
+                        providerMetadata: {
+                            openai: {
+                                completion_tokens_details: {
+                                    text_tokens: 200,
+                                    image_tokens: 1300,
+                                },
+                            },
+                        },
+                    },
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_output_tokens']).toBe(1300)
+            expect(result.properties['$ai_text_output_tokens']).toBe(200)
+        })
+    })
+
+    describe('Gemini input token extraction', () => {
+        it('extracts image input tokens from promptTokensDetails array format', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    promptTokensDetails: [
+                        { modality: 'TEXT', tokenCount: 100 },
+                        { modality: 'IMAGE', tokenCount: 500 },
+                    ],
+                    candidatesTokensDetails: [
+                        { modality: 'TEXT', tokenCount: 10 },
+                        { modality: 'IMAGE', tokenCount: 1290 },
+                    ],
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_input_tokens']).toBe(500)
+            expect(result.properties['$ai_text_input_tokens']).toBe(100)
+            expect(result.properties['$ai_image_output_tokens']).toBe(1290)
+            expect(result.properties['$ai_text_output_tokens']).toBe(10)
+        })
+
+        it('extracts image input tokens from inputTokenDetails array format', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    inputTokenDetails: [
+                        { modality: 'TEXT', tokenCount: 100 },
+                        { modality: 'IMAGE', tokenCount: 500 },
+                    ],
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_input_tokens']).toBe(500)
+            expect(result.properties['$ai_text_input_tokens']).toBe(100)
+        })
+
+        it('extracts image input tokens from Vercel AI SDK providerMetadata.google', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    providerMetadata: {
+                        google: {
+                            promptTokensDetails: [
+                                { modality: 'TEXT', tokenCount: 100 },
+                                { modality: 'IMAGE', tokenCount: 500 },
+                            ],
+                            candidatesTokensDetails: [
+                                { modality: 'TEXT', tokenCount: 10 },
+                                { modality: 'IMAGE', tokenCount: 1290 },
+                            ],
+                        },
+                    },
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_input_tokens']).toBe(500)
+            expect(result.properties['$ai_text_input_tokens']).toBe(100)
+            expect(result.properties['$ai_image_output_tokens']).toBe(1290)
+            expect(result.properties['$ai_text_output_tokens']).toBe(10)
+        })
+
+        it('extracts input tokens from rawUsage.rawResponse.usageMetadata', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    rawUsage: {
+                        rawResponse: {
+                            usageMetadata: {
+                                promptTokensDetails: [
+                                    { modality: 'TEXT', tokenCount: 100 },
+                                    { modality: 'IMAGE', tokenCount: 500 },
+                                ],
+                                candidatesTokensDetails: [{ modality: 'IMAGE', tokenCount: 1290 }],
+                            },
+                        },
+                    },
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_input_tokens']).toBe(500)
+            expect(result.properties['$ai_text_input_tokens']).toBe(100)
+            expect(result.properties['$ai_image_output_tokens']).toBe(1290)
+        })
+
+        it('does not set image input tokens when zero', () => {
+            const event = createAIEvent({
+                $ai_usage: {
+                    promptTokensDetails: [
+                        { modality: 'TEXT', tokenCount: 100 },
+                        { modality: 'IMAGE', tokenCount: 0 },
+                    ],
+                },
+            })
+
+            const result = extractModalityTokens(event)
+
+            expect(result.properties['$ai_image_input_tokens']).toBeUndefined()
+            expect(result.properties['$ai_text_input_tokens']).toBe(100)
+        })
+    })
 })
