@@ -245,7 +245,7 @@ def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
     existing_schedules = HogFlowSchedule.objects.filter(hog_flow=hog_flow, team_id=team_id)
 
     if not schedule_config and not scheduled_at_str:
-        # No schedule at all — mark existing schedules as completed and cancel pending runs
+        # No schedule: mark existing schedules as completed and cancel pending runs
         for sched in existing_schedules:
             sched.status = HogFlowSchedule.Status.COMPLETED
             sched.save(update_fields=["status", "updated_at"])
@@ -516,12 +516,6 @@ class HogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, vie
         serializer.save()
         log_activity_from_viewset(self, serializer.instance, name=serializer.instance.name, detail_type="standard")
 
-        # Sync recurring schedule if present in trigger config
-        try:
-            _sync_schedule_for_hog_flow(serializer.instance, self.team_id)
-        except Exception as e:
-            logger.warning("Failed to sync schedule on create", error=str(e))
-
         try:
             # Count edges and actions
             edges_count = len(serializer.instance.edges) if serializer.instance.edges else 0
@@ -556,24 +550,6 @@ class HogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, vie
         serializer.save()
 
         log_activity_from_viewset(self, serializer.instance, name=serializer.instance.name, previous=before_update)
-
-        # Sync recurring schedule — handle activation, deactivation, and config changes
-        try:
-            with transaction.atomic():
-                if serializer.instance.status != HogFlow.State.ACTIVE:
-                    # Pause all schedules when workflow is not active
-                    for sched in HogFlowSchedule.objects.filter(
-                        hog_flow=serializer.instance, team_id=self.team_id
-                    ).exclude(status=HogFlowSchedule.Status.COMPLETED):
-                        sched.status = HogFlowSchedule.Status.PAUSED
-                        sched.save(update_fields=["status", "updated_at"])
-                        HogFlowScheduledRun.objects.filter(
-                            schedule=sched, status=HogFlowScheduledRun.Status.PENDING
-                        ).update(status=HogFlowScheduledRun.Status.CANCELLED)
-                else:
-                    _sync_schedule_for_hog_flow(serializer.instance, self.team_id)
-        except Exception as e:
-            logger.warning("Failed to sync schedule on update", error=str(e))
 
         # PostHog capture for hog_flow activated (draft -> active)
         if (

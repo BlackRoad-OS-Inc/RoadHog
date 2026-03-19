@@ -88,6 +88,19 @@ class HogFlow(UUIDTModel):
 def hog_flow_saved(sender, instance: HogFlow, created, **kwargs):
     reload_hog_flows_on_workers(team_id=instance.team_id, hog_flow_ids=[str(instance.id)])
 
+    try:
+        from posthog.api.hog_flow import _sync_schedule_for_hog_flow
+
+        _sync_schedule_for_hog_flow(instance, instance.team_id)
+    except Exception:
+        import structlog
+
+        structlog.get_logger().warning(
+            "Failed to sync schedule for HogFlow",
+            hog_flow_id=str(instance.id),
+            exc_info=True,
+        )
+
 
 @receiver(post_save, sender=Action)
 def action_saved_for_hog_flows(sender, instance: Action, created, **kwargs):
