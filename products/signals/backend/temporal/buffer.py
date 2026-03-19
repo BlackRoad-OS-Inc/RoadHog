@@ -22,7 +22,8 @@ from products.signals.backend.temporal.types import BufferSignalsInput, EmitSign
 
 logger = structlog.get_logger(__name__)
 
-BUFFER_MAX_SIZE = 10
+# TODO: Check if the size of the buffer doesn't oveload memory for the Temporal workflow handling the batch
+BUFFER_MAX_SIZE = 20
 BUFFER_FLUSH_TIMEOUT_SECONDS = 60
 
 OBJECT_STORAGE_SIGNALS_PREFIX = "signals/signal_batches"
