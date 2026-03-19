@@ -7027,6 +7027,33 @@ export namespace Schemas {
       Number2: 2,
     } as const;
 
+    export interface CopyFlagsRequest {
+      /** Key of the feature flag to copy */
+      feature_flag_key: string;
+      /** Source project ID to copy the flag from */
+      from_project: number;
+      /** List of target project IDs to copy the flag to */
+      target_project_ids: number[];
+      /** Whether to also copy scheduled changes for this flag */
+      copy_schedule?: boolean;
+    }
+
+    export type CopyFlagsResponseSuccessItem = {[key: string]: unknown};
+
+    export interface CopyFlagsResult {
+      /** Project ID (present on failure) */
+      project_id?: number;
+      /** Error message (present on failure) */
+      error_message?: string;
+    }
+
+    export interface CopyFlagsResponse {
+      /** List of successfully copied flags */
+      success: CopyFlagsResponseSuccessItem[];
+      /** List of failed copy attempts */
+      failed: CopyFlagsResult[];
+    }
+
     export interface CoreEvent {
       readonly id: string;
       /**
@@ -11619,6 +11646,15 @@ export namespace Schemas {
       Frequentist: 'frequentist',
     } as const;
 
+    export interface DependentFlag {
+      /** Feature flag ID */
+      id: number;
+      /** Feature flag key */
+      key: string;
+      /** Feature flag name */
+      name: string;
+    }
+
     export interface DesktopRecording {
       readonly id: string;
       readonly team: number;
@@ -14647,6 +14683,13 @@ export namespace Schemas {
       tags?: string[];
       /** Evaluation context tags. Must be a subset of `tags`. */
       evaluation_tags?: string[];
+    }
+
+    export interface FeatureFlagStatusResponse {
+      /** Flag status: active, stale, deleted, or unknown */
+      status: string;
+      /** Human-readable explanation of the status */
+      reason: string;
     }
 
     export interface FileSystem {
@@ -18167,6 +18210,15 @@ export namespace Schemas {
       /** @nullable */
       previous?: string | null;
       results: Dataset[];
+    }
+
+    export interface PaginatedDependentFlagList {
+      count: number;
+      /** @nullable */
+      next?: string | null;
+      /** @nullable */
+      previous?: string | null;
+      results: DependentFlag[];
     }
 
     export interface PaginatedDesktopRecordingList {
@@ -27922,6 +27974,28 @@ export namespace Schemas {
       scores?: TraceReviewScoreWrite[];
     }
 
+    /**
+     * The release condition to evaluate
+     */
+    export type UserBlastRadiusRequestCondition = {[key: string]: unknown};
+
+    export interface UserBlastRadiusRequest {
+      /** The release condition to evaluate */
+      condition: UserBlastRadiusRequestCondition;
+      /**
+       * Group type index for group-based flags (null for person-based flags)
+       * @nullable
+       */
+      group_type_index?: number | null;
+    }
+
+    export interface UserBlastRadiusResponse {
+      /** Number of users matching the condition */
+      users_affected: number;
+      /** Total number of users in the project */
+      total_users: number;
+    }
+
     export interface ViewLinkValidation {
       /** @maxLength 255 */
       joining_table_name: string;
@@ -31071,6 +31145,17 @@ export namespace Schemas {
      * @minimum 1
      */
     page?: number;
+    };
+
+    export type FeatureFlagsDependentFlagsListParams = {
+    /**
+     * Number of results to return per page.
+     */
+    limit?: number;
+    /**
+     * The initial index from which to return the results.
+     */
+    offset?: number;
     };
 
     export type FeatureFlagsActivityRetrieveParams = {

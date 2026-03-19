@@ -35,7 +35,9 @@ class CopyFlagsRequestSerializer(serializers.Serializer):
 
 class CopyFlagsResultSerializer(serializers.Serializer):
     project_id = serializers.IntegerField(required=False, help_text="Project ID (present on failure)")
-    errors = serializers.CharField(required=False, help_text="Error message (present on failure)")
+    error_message = serializers.CharField(
+        required=False, source="errors", help_text="Error message (present on failure)"
+    )
 
 
 class CopyFlagsResponseSerializer(serializers.Serializer):

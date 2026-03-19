@@ -100,7 +100,7 @@ tools:
         operation: feature_flags_update
         enabled: false
     feature-flags-activity-retrieve:
-        operation: feature_flags_activity_retrieve
+        operation: feature_flags_activity_retrieve_2
         enabled: true
         scopes:
             - activity_log:read
@@ -108,7 +108,6 @@ tools:
             readOnly: true
             destructive: false
             idempotent: true
-        enrich_url: '{id}'
         title: Get feature flag activity log
         description: >
             Get the audit trail for a specific feature flag by ID. Returns a paginated list of changes
@@ -128,7 +127,6 @@ tools:
             readOnly: true
             destructive: false
             idempotent: true
-        enrich_url: '{id}'
         title: Get dependent feature flags
         description: >
             Get other active feature flags that depend on this flag. Use this to understand flag dependency
@@ -148,7 +146,6 @@ tools:
             readOnly: true
             destructive: false
             idempotent: true
-        enrich_url: '{id}'
         title: Get feature flag status
         description: >
             Check the health and evaluation status of a feature flag by ID. Returns a status

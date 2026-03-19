@@ -3,8 +3,8 @@ import { z } from 'zod'
 
 import type { Schemas } from '@/api/generated'
 import {
-    FeatureFlagsActivityRetrieveParams,
-    FeatureFlagsActivityRetrieveQueryParams,
+    FeatureFlagsActivityRetrieve2Params,
+    FeatureFlagsActivityRetrieve2QueryParams,
     FeatureFlagsCopyFlagsCreateBody,
     FeatureFlagsCreateBody,
     FeatureFlagsDependentFlagsListParams,
@@ -176,13 +176,13 @@ const deleteFeatureFlag = (): ToolBase<typeof DeleteFeatureFlagSchema, unknown> 
     },
 })
 
-const FeatureFlagsActivityRetrieveSchema = FeatureFlagsActivityRetrieveParams.omit({ project_id: true }).extend(
-    FeatureFlagsActivityRetrieveQueryParams.shape
+const FeatureFlagsActivityRetrieveSchema = FeatureFlagsActivityRetrieve2Params.omit({ project_id: true }).extend(
+    FeatureFlagsActivityRetrieve2QueryParams.shape
 )
 
 const featureFlagsActivityRetrieve = (): ToolBase<
     typeof FeatureFlagsActivityRetrieveSchema,
-    Schemas.ActivityLogPaginatedResponse & { _posthogUrl: string }
+    Schemas.ActivityLogPaginatedResponse
 > => ({
     name: 'feature-flags-activity-retrieve',
     schema: FeatureFlagsActivityRetrieveSchema,
@@ -196,10 +196,7 @@ const featureFlagsActivityRetrieve = (): ToolBase<
                 page: params.page,
             },
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/feature_flags/${(result as any).id}`,
-        }
+        return result
     },
 })
 
@@ -209,7 +206,7 @@ const FeatureFlagsDependentFlagsRetrieveSchema = FeatureFlagsDependentFlagsListP
 
 const featureFlagsDependentFlagsRetrieve = (): ToolBase<
     typeof FeatureFlagsDependentFlagsRetrieveSchema,
-    Schemas.PaginatedDependentFlagList & { _posthogUrl: string }
+    Schemas.PaginatedDependentFlagList
 > => ({
     name: 'feature-flags-dependent-flags-retrieve',
     schema: FeatureFlagsDependentFlagsRetrieveSchema,
@@ -223,10 +220,7 @@ const featureFlagsDependentFlagsRetrieve = (): ToolBase<
                 offset: params.offset,
             },
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/feature_flags/${(result as any).id}`,
-        }
+        return result
     },
 })
 
@@ -234,7 +228,7 @@ const FeatureFlagsStatusRetrieveSchema = FeatureFlagsStatusRetrieveParams.omit({
 
 const featureFlagsStatusRetrieve = (): ToolBase<
     typeof FeatureFlagsStatusRetrieveSchema,
-    Schemas.FeatureFlagStatusResponse & { _posthogUrl: string }
+    Schemas.FeatureFlagStatusResponse
 > => ({
     name: 'feature-flags-status-retrieve',
     schema: FeatureFlagsStatusRetrieveSchema,
@@ -244,10 +238,7 @@ const featureFlagsStatusRetrieve = (): ToolBase<
             method: 'GET',
             path: `/api/projects/${projectId}/feature_flags/${params.id}/status/`,
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/feature_flags/${(result as any).id}`,
-        }
+        return result
     },
 })
 

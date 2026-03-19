@@ -24,7 +24,7 @@ export interface CopyFlagsResultApi {
     /** Project ID (present on failure) */
     project_id?: number
     /** Error message (present on failure) */
-    errors?: string
+    error_message?: string
 }
 
 export interface CopyFlagsResponseApi {
