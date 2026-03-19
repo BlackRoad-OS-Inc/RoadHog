@@ -281,9 +281,41 @@ class EnterpriseExperimentsViewSet(
 
         return Response({"result": warning})
 
+    @extend_schema(
+        request=None,
+        responses=ExperimentSerializer,
+    )
+    @action(methods=["POST"], detail=True, required_scopes=["experiment:write"])
+    def launch(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Launch a draft experiment.
+
+        Validates the experiment is in draft state, activates its linked feature flag,
+        sets start_date to the current server time, and transitions the experiment to running.
+        Returns 400 if the experiment has already been launched or if the feature flag
+        configuration is invalid (e.g. missing "control" variant or fewer than 2 variants).
+        """
+        experiment: Experiment = self.get_object()
+        service = ExperimentService(team=self.team, user=request.user)
+        launched_experiment = service.launch_experiment(experiment)
+        return Response(ExperimentSerializer(launched_experiment, context=self.get_serializer_context()).data)
+
     @action(methods=["POST"], detail=True, required_scopes=["experiment:write"])
     def duplicate(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         source_experiment: Experiment = self.get_object()
+
+        legacy_kinds = ("ExperimentTrendsQuery", "ExperimentFunnelsQuery")
+        all_metrics = (source_experiment.metrics or []) + (source_experiment.metrics_secondary or [])
+        has_legacy_inline = any(m.get("kind") in legacy_kinds for m in all_metrics)
+        has_legacy_saved = source_experiment.experimenttosavedmetric_set.filter(
+            saved_metric__query__kind__in=legacy_kinds
+        ).exists()
+        if has_legacy_inline or has_legacy_saved:
+            return Response(
+                {"detail": "Duplication is not supported for experiments using legacy metrics."},
+                status=400,
+            )
+
         feature_flag_key = request.data.get("feature_flag_key")
 
         service = ExperimentService(team=self.team, user=request.user)
