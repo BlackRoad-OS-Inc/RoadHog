@@ -133,9 +133,14 @@ jobs:
               working-directory: rust
               run: |
                   ./target/release/feature-flags &
-                  echo "RUST_FLAGS_PID=$!" >> $GITHUB_ENV
-                  # Wait for service to be ready
+                  RUST_FLAGS_PID=$!
+                  echo "RUST_FLAGS_PID=$RUST_FLAGS_PID" >> $GITHUB_ENV
+                  # Wait for service to be ready, checking the process is still alive
                   for i in {1..30}; do
+                      if ! kill -0 "$RUST_FLAGS_PID" 2>/dev/null; then
+                          echo "ERROR: Rust flags service exited unexpectedly"
+                          exit 1
+                      fi
                       if curl -s http://127.0.0.1:3001/_readiness > /dev/null 2>&1; then
                           echo "Rust flags service is ready"
                           break
@@ -143,7 +148,6 @@ jobs:
                       echo "Waiting for Rust flags service... ($i/30)"
                       sleep 2
                   done
-                  # Fail if service is not ready after all retries
                   if ! curl -s http://127.0.0.1:3001/_readiness > /dev/null 2>&1; then
                       echo "ERROR: Rust flags service failed to start after 30 attempts"
                       exit 1
