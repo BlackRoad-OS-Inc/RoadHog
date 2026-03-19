@@ -16,3 +16,11 @@ cors_allow_origins:
     - "https://example.com"
     - "https://sub.example.com"
 parallelism: 7
+redis:
+    # address: 'localhost'  # Redis server address
+    # port: '6379'  # Redis server port
+    # tls: false  # Whether to use TLS for Redis connections
+    # flush_interval_ms: 500  # Flush interval in ms (minimum 50, default 500)
+    # use_pub_sub: false  # Enable Redis pub/sub for event broadcasting
+    # publish_buffer_size: 10000  # Size of the async publish buffer (default 10000)
+    # publish_workers: 256  # Number of concurrent publish workers (default 256)
