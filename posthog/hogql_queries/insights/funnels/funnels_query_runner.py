@@ -223,6 +223,7 @@ class FunnelsQueryRunner(AnalyticsQueryRunner[FunnelsQueryResponse]):
 
         funnelVizType = self.context.funnelsFilter.funnelVizType
 
+        results: list[dict[str, Any]] | list[list[dict[str, Any]]]
         if funnelVizType == FunnelVizType.TRENDS:
             results = self._merge_trends_results(in_response.results, not_in_response.results, cohort_id, cohort_name)
         else:
