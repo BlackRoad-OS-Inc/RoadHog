@@ -47,4 +47,5 @@ from hogli import (
     product,  # noqa: F401
     telemetry_commands,  # noqa: F401
 )
+from hogli.box import cli as box_cli  # noqa: F401
 from hogli.devenv import cli as devenv_cli  # noqa: F401
