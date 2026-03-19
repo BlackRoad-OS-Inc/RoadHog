@@ -285,7 +285,6 @@ describe('FilterMapBatchPipeline', () => {
                     for (const el of elements) {
                         subBatches.push([el])
                     }
-                    return { ok: true as const }
                 },
                 next() {
                     if (subIndex >= subBatches.length) {

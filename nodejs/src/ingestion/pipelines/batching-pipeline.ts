@@ -1,7 +1,9 @@
-import { BatchPipeline, BatchPipelineResultWithContext, FeedResult } from './batch-pipeline.interface'
+import { BatchPipeline, BatchPipelineResultWithContext } from './batch-pipeline.interface'
 import { createContext } from './helpers'
 import { Pipeline, PipelineResultWithContext } from './pipeline.interface'
 import { PipelineResult, isOkResult, ok } from './results'
+
+export type FeedResult = { ok: true } | { ok: false; reason: string }
 
 export interface BatchingContext {
     messageId: number

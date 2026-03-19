@@ -176,10 +176,7 @@ export async function runSessionReplayPipeline(
     }
 
     const batch = createBatch(messages.map((message) => ({ message })))
-    const feedResult = pipeline.feed(batch)
-    if (!feedResult.ok) {
-        throw new Error(`Pipeline rejected batch: ${feedResult.reason}`)
-    }
+    pipeline.feed(batch)
 
     const allResults: SessionReplayPipelineOutput[] = []
     let results = await pipeline.next()

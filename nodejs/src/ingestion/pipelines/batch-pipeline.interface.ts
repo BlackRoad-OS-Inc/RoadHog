@@ -5,12 +5,10 @@ import { PipelineResultWithContext } from './pipeline.interface'
  */
 export type BatchPipelineResultWithContext<T, C> = PipelineResultWithContext<T, C>[]
 
-export type FeedResult = { ok: true } | { ok: false; reason: string }
-
 /**
  * Interface for batch processing pipelines
  */
 export interface BatchPipeline<TInput, TOutput, CInput, COutput = CInput> {
-    feed(elements: BatchPipelineResultWithContext<TInput, CInput>): FeedResult
+    feed(elements: BatchPipelineResultWithContext<TInput, CInput>): void
     next(): Promise<BatchPipelineResultWithContext<TOutput, COutput> | null>
 }
