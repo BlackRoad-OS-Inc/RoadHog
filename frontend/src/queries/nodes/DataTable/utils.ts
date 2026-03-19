@@ -64,6 +64,8 @@ export function getDataNodeDefaultColumns(source: DataNode): HogQLExpression[] {
 }
 
 export function getColumnsForQuery(query: DataTableNode): HogQLExpression[] {
+    // Guard against `source` being undefined at runtime (e.g. from persisted
+    // activity-log queries that pre-date the required `source` field).
     if (!query.source) {
         return query.columns ?? []
     }
