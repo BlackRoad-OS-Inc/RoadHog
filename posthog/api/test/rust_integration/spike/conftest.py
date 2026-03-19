@@ -88,8 +88,16 @@ def _bootstrap_test_env() -> TestEnv:
 
 
 @pytest.fixture(scope="session")
-def env() -> TestEnv:
-    return _bootstrap_test_env()
+def env(django_db_blocker) -> TestEnv:
+    """Bootstrap test environment with Django ORM.
+
+    Uses django_db_blocker.unblock() because pytest-django blocks DB access
+    outside of @pytest.mark.django_db tests. We need session-scoped writes
+    that persist for the external Rust process, so the standard
+    transactional_db fixture (which rolls back) isn't appropriate.
+    """
+    with django_db_blocker.unblock():
+        return _bootstrap_test_env()
 
 
 @pytest.fixture(scope="session")
