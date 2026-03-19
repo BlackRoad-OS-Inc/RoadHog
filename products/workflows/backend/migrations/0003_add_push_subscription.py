@@ -53,7 +53,7 @@ class Migration(migrations.Migration):
             model_name="pushsubscription",
             index=models.Index(
                 fields=["team", "distinct_id", "platform", "is_active"],
-                name="workflows_p_team_id_90c92e_idx",
+                name="workflows_p_team_id_8df390_idx",
             ),
         ),
         migrations.AddIndex(

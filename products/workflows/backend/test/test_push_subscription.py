@@ -28,7 +28,7 @@ class TestPushSubscription(BaseTest):
 
         assert sub.distinct_id == "user-1"
         assert sub.platform == PushPlatform.ANDROID
-        assert sub.integration_id == integration.id
+        assert sub.integration.id == integration.id
         assert sub.is_active is True
         assert sub.token_hash == PushSubscription._hash_token("device-token-abc")
 
@@ -54,7 +54,7 @@ class TestPushSubscription(BaseTest):
 
         assert first.id == second.id
         second.refresh_from_db()
-        assert second.integration_id == integration_apns.id
+        assert second.integration.id == integration_apns.id
 
     def test_upsert_different_tokens_creates_separate_subscriptions(self):
         integration = self._create_integration()
