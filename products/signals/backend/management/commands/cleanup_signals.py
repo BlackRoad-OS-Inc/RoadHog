@@ -1,5 +1,4 @@
 import asyncio
-import subprocess
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -18,12 +17,6 @@ ALTER TABLE {table} DELETE
 WHERE product = 'signals'
   AND team_id = %(team_id)s
 """
-
-KAFKA_EMBEDDING_TOPICS = [
-    "clickhouse_document_embeddings",
-    "document_embeddings_input",
-    "document_embedding_results",
-]
 
 
 class Command(BaseCommand):
@@ -90,9 +83,6 @@ class Command(BaseCommand):
         # 3. Terminate Temporal workflows
         self._terminate_workflows(team, report_count)
 
-        # 4. Purge Kafka embedding topics (local Redpanda via docker)
-        self._purge_kafka_topics()
-
         self.stdout.write(
             self.style.SUCCESS(
                 f"Done. Cleaned up {report_count} reports, {artefact_count} artefacts, "
@@ -139,35 +129,3 @@ class Command(BaseCommand):
         except Exception:
             pass
         return False
-
-    def _purge_kafka_topics(self):
-        for topic in KAFKA_EMBEDDING_TOPICS:
-            try:
-                result = subprocess.run(
-                    [
-                        "docker",
-                        "exec",
-                        "posthog-kafka-1",
-                        "rpk",
-                        "topic",
-                        "trim-prefix",
-                        topic,
-                        "--offset",
-                        "end",
-                        "--no-confirm",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                )
-                if result.returncode == 0:
-                    self.stdout.write(f"  ✓ Purged Kafka topic: {topic}")
-                else:
-                    self.stdout.write(self.style.WARNING(f"  ✗ {topic}: {result.stderr.strip()}"))
-            except FileNotFoundError:
-                self.stdout.write(self.style.WARNING("  ✗ docker not found, skipping Kafka topic purge"))
-                return
-            except subprocess.TimeoutExpired:
-                self.stdout.write(self.style.WARNING(f"  ✗ {topic}: timed out"))
-            except Exception as e:
-                self.stdout.write(self.style.WARNING(f"  ✗ {topic}: {e}"))
