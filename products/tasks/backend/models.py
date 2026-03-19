@@ -50,6 +50,15 @@ class Task(DeletedMetaFields, models.Model):
     description = models.TextField()
     origin_product = models.CharField(max_length=20, choices=OriginProduct.choices)
 
+    parent_task = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subtasks",
+        help_text="Parent task for side chats and forks in PostHog Code",
+    )
+
     # Repository configuration
     github_integration = models.ForeignKey(
         "posthog.Integration",

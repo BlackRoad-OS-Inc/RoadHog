@@ -201,6 +201,79 @@ class TestTask(TestCase):
         task.refresh_from_db()
         self.assertIsNotNone(task.id)
 
+    def test_create_task_with_parent(self):
+        parent = Task.objects.create(
+            team=self.team,
+            title="Parent Task",
+            description="Parent",
+            origin_product=Task.OriginProduct.USER_CREATED,
+        )
+        child = Task.objects.create(
+            team=self.team,
+            title="Child Task",
+            description="Child",
+            origin_product=Task.OriginProduct.USER_CREATED,
+            parent_task=parent,
+        )
+        self.assertEqual(child.parent_task, parent)
+        self.assertEqual(child.parent_task_id, parent.id)
+        self.assertIn(child, parent.subtasks.all())
+
+    def test_parent_task_is_nullable(self):
+        task = Task.objects.create(
+            team=self.team,
+            title="Standalone Task",
+            description="No parent",
+            origin_product=Task.OriginProduct.USER_CREATED,
+        )
+        self.assertIsNone(task.parent_task)
+
+    def test_unset_parent_task(self):
+        parent = Task.objects.create(
+            team=self.team,
+            title="Parent Task",
+            description="Parent",
+            origin_product=Task.OriginProduct.USER_CREATED,
+        )
+        child = Task.objects.create(
+            team=self.team,
+            title="Child Task",
+            description="Child",
+            origin_product=Task.OriginProduct.USER_CREATED,
+            parent_task=parent,
+        )
+        self.assertEqual(child.parent_task_id, parent.id)
+
+        # Can unset the parent to make it a standalone task
+        child.parent_task = None
+        child.save()
+        child.refresh_from_db()
+        self.assertIsNone(child.parent_task_id)
+
+    def test_subtasks_related_name(self):
+        parent = Task.objects.create(
+            team=self.team,
+            title="Parent",
+            description="Parent",
+            origin_product=Task.OriginProduct.USER_CREATED,
+        )
+        child1 = Task.objects.create(
+            team=self.team,
+            title="Child 1",
+            description="Child 1",
+            origin_product=Task.OriginProduct.USER_CREATED,
+            parent_task=parent,
+        )
+        child2 = Task.objects.create(
+            team=self.team,
+            title="Child 2",
+            description="Child 2",
+            origin_product=Task.OriginProduct.USER_CREATED,
+            parent_task=parent,
+        )
+        subtask_ids = set(parent.subtasks.values_list("id", flat=True))
+        self.assertEqual(subtask_ids, {child1.id, child2.id})
+
 
 class TestTaskSlug(TestCase):
     def setUp(self):
