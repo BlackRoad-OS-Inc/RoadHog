@@ -391,3 +391,44 @@ class TestQueryCoalescingEndpoint(ClickhouseTestMixin, APIBaseTest):
         finally:
             redis.delete(f"{LOCK_KEY_PREFIX}:{key}")
             redis.delete(f"{DONE_KEY_PREFIX}:{key}")
+
+    def test_force_blocking_follower_waits_for_leader_and_hits_cache(self):
+        _create_event(team=self.team, event="test_event", distinct_id="user1")
+        flush_persons_and_events()
+
+        query, key = self._query_and_key()
+
+        # First request populates the cache (as leader, no lock held)
+        with mock.patch("posthog.api.query.posthoganalytics.feature_enabled", return_value=True):
+            first = self.client.post(
+                f"/api/environments/{self.team.id}/query/",
+                {"query": query.model_dump()},
+            )
+        self.assertEqual(first.status_code, 200)
+
+        # Now simulate a leader holding the lock with done signal
+        redis = posthog_redis.get_client()
+        redis.set(f"{LOCK_KEY_PREFIX}:{key}", "other_leader", ex=60)
+        redis.set(f"{DONE_KEY_PREFIX}:{key}", "1", ex=60)
+
+        before_follower = query_coalesce_counter.labels(outcome="follower")._value.get()
+        before_done = query_coalesce_counter.labels(outcome="follower_done")._value.get()
+
+        try:
+            with mock.patch("posthog.api.query.posthoganalytics.feature_enabled", return_value=True):
+                response = self.client.post(
+                    f"/api/environments/{self.team.id}/query/",
+                    {"query": query.model_dump(), "refresh": "force_blocking"},
+                )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.json().get("is_cached"))
+            events = [row[0] for row in response.json()["results"]]
+            self.assertIn("test_event", events)
+            after_follower = query_coalesce_counter.labels(outcome="follower")._value.get()
+            after_done = query_coalesce_counter.labels(outcome="follower_done")._value.get()
+            self.assertEqual(after_follower, before_follower + 1)
+            self.assertEqual(after_done, before_done + 1)
+        finally:
+            redis.delete(f"{LOCK_KEY_PREFIX}:{key}")
+            redis.delete(f"{DONE_KEY_PREFIX}:{key}")
