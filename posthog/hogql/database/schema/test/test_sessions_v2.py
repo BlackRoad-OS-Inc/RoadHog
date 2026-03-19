@@ -781,6 +781,7 @@ class TestGetLazySessionProperties(ClickhouseTestMixin, APIBaseTest):
                 "$entry_mc_cid",
                 "$entry_msclkid",
                 "$entry_pathname",
+                "$entry_referrer",
                 "$entry_referring_domain",
                 "$entry_ttclid",
                 "$entry_twclid",
