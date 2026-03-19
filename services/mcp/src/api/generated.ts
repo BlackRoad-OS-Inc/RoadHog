@@ -573,7 +573,8 @@ export namespace Schemas {
        * @nullable
        */
       pinned_at?: string | null;
-      readonly creation_context: string;
+      /** @nullable */
+      readonly creation_context: string | null;
       _create_in_folder?: string;
       /**
        * The effective access level the user has for this object
@@ -1408,6 +1409,11 @@ export namespace Schemas {
       created_at?: string;
     }
 
+    /**
+     * @nullable
+     */
+    export type ActivityLogEntryUser = { [key: string]: unknown } | null | null;
+
     export interface Change {
       readonly type: string;
       readonly action: string;
@@ -1439,7 +1445,8 @@ export namespace Schemas {
     }
 
     export interface ActivityLogEntry {
-      readonly user: string;
+      /** @nullable */
+      readonly user: ActivityLogEntryUser;
       readonly activity: string;
       readonly scope: string;
       readonly item_id: string;
@@ -2708,6 +2715,11 @@ export namespace Schemas {
        * @nullable
        */
       breakdownSorting?: string | null;
+      /**
+       * For data warehouse based funnel insights when the aggregation target can't be mapped to persons or groups.
+       * @nullable
+       */
+      customAggregationTarget?: boolean | null;
       /** @nullable */
       exclusions?: (FunnelExclusionEventsNode | FunnelExclusionActionsNode)[] | null;
       /** @nullable */
@@ -2781,6 +2793,66 @@ export namespace Schemas {
       timings?: QueryTiming[] | null;
     }
 
+    export type FunnelsDataWarehouseNodeKind = typeof FunnelsDataWarehouseNodeKind[keyof typeof FunnelsDataWarehouseNodeKind];
+
+
+    export const FunnelsDataWarehouseNodeKind = {
+      FunnelsDataWarehouseNode: 'FunnelsDataWarehouseNode',
+    } as const;
+
+    export const FunnelsDataWarehouseNodeMath = {...BaseMathType,...FunnelMathType,...PropertyMathType,...CountPerActorMathType,...ExperimentMetricMathType,...CalendarHeatmapMathType,  unique_group: 'unique_group',
+      hogql: 'hogql',
+    } as const
+    /**
+     * @nullable
+     */
+    export type FunnelsDataWarehouseNodeResponse = { [key: string]: unknown } | null | null;
+
+    export interface FunnelsDataWarehouseNode {
+      aggregation_target_field: string;
+      /** @nullable */
+      custom_name?: string | null;
+      /** @nullable */
+      dw_source_type?: string | null;
+      /**
+       * Fixed properties in the query, can't be edited in the interface (e.g. scoping down by person)
+       * @nullable
+       */
+      fixedProperties?: (EventPropertyFilter | PersonPropertyFilter | ElementPropertyFilter | EventMetadataPropertyFilter | SessionPropertyFilter | CohortPropertyFilter | RecordingPropertyFilter | LogEntryPropertyFilter | GroupPropertyFilter | FeaturePropertyFilter | FlagPropertyFilter | HogQLPropertyFilter | EmptyPropertyFilter | DataWarehousePropertyFilter | DataWarehousePersonPropertyFilter | ErrorTrackingIssueFilter | LogPropertyFilter | RevenueAnalyticsPropertyFilter)[] | null;
+      id: string;
+      id_field: string;
+      kind?: FunnelsDataWarehouseNodeKind;
+      math?: typeof FunnelsDataWarehouseNodeMath[keyof typeof FunnelsDataWarehouseNodeMath]  | null;
+      math_group_type_index?: MathGroupTypeIndex | null;
+      /** @nullable */
+      math_hogql?: string | null;
+      /** @nullable */
+      math_multiplier?: number | null;
+      /** @nullable */
+      math_property?: string | null;
+      math_property_revenue_currency?: RevenueCurrencyPropertyConfig | null;
+      /** @nullable */
+      math_property_type?: string | null;
+      /** @nullable */
+      name?: string | null;
+      /** @nullable */
+      optionalInFunnel?: boolean | null;
+      /**
+       * Properties configurable in the interface
+       * @nullable
+       */
+      properties?: (EventPropertyFilter | PersonPropertyFilter | ElementPropertyFilter | EventMetadataPropertyFilter | SessionPropertyFilter | CohortPropertyFilter | RecordingPropertyFilter | LogEntryPropertyFilter | GroupPropertyFilter | FeaturePropertyFilter | FlagPropertyFilter | HogQLPropertyFilter | EmptyPropertyFilter | DataWarehousePropertyFilter | DataWarehousePersonPropertyFilter | ErrorTrackingIssueFilter | LogPropertyFilter | RevenueAnalyticsPropertyFilter)[] | null;
+      /** @nullable */
+      response?: FunnelsDataWarehouseNodeResponse;
+      table_name: string;
+      timestamp_field: string;
+      /**
+       * version of the node, used for schema migrations
+       * @nullable
+       */
+      version?: number | null;
+    }
+
     export interface FunnelsQuery {
       /**
        * Groups aggregation
@@ -2817,7 +2889,7 @@ export namespace Schemas {
        */
       samplingFactor?: number | null;
       /** Events and actions to include */
-      series: (GroupNode | EventsNode | ActionsNode | DataWarehouseNode)[];
+      series: (GroupNode | EventsNode | ActionsNode | FunnelsDataWarehouseNode)[];
       /** Tags that will be added to the Query log comment */
       tags?: QueryLogTags | null;
       /**
@@ -4256,9 +4328,15 @@ export namespace Schemas {
     } as const;
 
     export interface InsightsThresholdBounds {
-      /** @nullable */
+      /**
+       * Alert fires when the value drops below this number.
+       * @nullable
+       */
       lower?: number | null;
-      /** @nullable */
+      /**
+       * Alert fires when the value exceeds this number.
+       * @nullable
+       */
       upper?: number | null;
     }
 
@@ -4272,14 +4350,16 @@ export namespace Schemas {
 
     export interface InsightThreshold {
       bounds?: InsightsThresholdBounds | null;
+      /** Whether bounds are compared as absolute values or as percentage change from the previous interval. */
       type: InsightThresholdType;
     }
 
     export interface Threshold {
       readonly id: string;
       readonly created_at: string;
-      /** @maxLength 255 */
+      /** Optional name for the threshold. */
       name?: string;
+      /** Threshold bounds and type. Includes bounds (lower/upper floats) and type (absolute or percentage). */
       configuration: InsightThreshold;
     }
 
@@ -4302,10 +4382,10 @@ export namespace Schemas {
     * `Errored` - Errored
     * `Snoozed` - Snoozed
      */
-    export type State66aEnum = typeof State66aEnum[keyof typeof State66aEnum];
+    export type AlertCheckStateEnum = typeof AlertCheckStateEnum[keyof typeof AlertCheckStateEnum];
 
 
-    export const State66aEnum = {
+    export const AlertCheckStateEnum = {
       Firing: 'Firing',
       NotFiring: 'Not firing',
       Errored: 'Errored',
@@ -4317,8 +4397,13 @@ export namespace Schemas {
       readonly created_at: string;
       /** @nullable */
       readonly calculated_value: number | null;
-      readonly state: State66aEnum;
+      readonly state: AlertCheckStateEnum;
       readonly targets_notified: boolean;
+      readonly anomaly_scores: unknown | null;
+      readonly triggered_points: unknown | null;
+      readonly triggered_dates: unknown | null;
+      /** @nullable */
+      readonly interval: string | null;
     }
 
     export type TrendsAlertConfigType = typeof TrendsAlertConfigType[keyof typeof TrendsAlertConfigType];
@@ -4329,11 +4414,130 @@ export namespace Schemas {
     } as const;
 
     export interface TrendsAlertConfig {
-      /** @nullable */
+      /**
+       * When true, evaluate the current (still incomplete) time interval in addition to completed ones.
+       * @nullable
+       */
       check_ongoing_interval?: boolean | null;
+      /** Zero-based index of the series in the insight's query to monitor. */
       series_index: number;
       type?: TrendsAlertConfigType;
     }
+
+    export interface PreprocessingConfig {
+      /**
+       * Order of differencing. 0 = raw values, 1 = first-order diffs (default: 0)
+       * @nullable
+       */
+      diffs_n?: number | null;
+      /**
+       * Number of lag features. 0 = none, >0 = include n lagged values (default: 0)
+       * @nullable
+       */
+      lags_n?: number | null;
+      /**
+       * Moving average window size. 0 = no smoothing, >1 = smooth over n points (default: 0)
+       * @nullable
+       */
+      smooth_n?: number | null;
+    }
+
+    export type ZScoreDetectorConfigType = typeof ZScoreDetectorConfigType[keyof typeof ZScoreDetectorConfigType];
+
+
+    export const ZScoreDetectorConfigType = {
+      Zscore: 'zscore',
+    } as const;
+
+    export interface ZScoreDetectorConfig {
+      /** Preprocessing transforms applied before detection */
+      preprocessing?: PreprocessingConfig | null;
+      /**
+       * Anomaly probability threshold [0-1]. Points above this probability are flagged (default: 0.9)
+       * @nullable
+       */
+      threshold?: number | null;
+      type?: ZScoreDetectorConfigType;
+      /**
+       * Rolling window size for calculating mean/std (default: 30)
+       * @nullable
+       */
+      window?: number | null;
+    }
+
+    export type MADDetectorConfigType = typeof MADDetectorConfigType[keyof typeof MADDetectorConfigType];
+
+
+    export const MADDetectorConfigType = {
+      Mad: 'mad',
+    } as const;
+
+    export interface MADDetectorConfig {
+      /** Preprocessing transforms applied before detection */
+      preprocessing?: PreprocessingConfig | null;
+      /**
+       * Anomaly probability threshold [0-1]. Points above this probability are flagged (default: 0.9)
+       * @nullable
+       */
+      threshold?: number | null;
+      type?: MADDetectorConfigType;
+      /**
+       * Rolling window size for calculating median/MAD (default: 30)
+       * @nullable
+       */
+      window?: number | null;
+    }
+
+    export type ThresholdDetectorConfigType = typeof ThresholdDetectorConfigType[keyof typeof ThresholdDetectorConfigType];
+
+
+    export const ThresholdDetectorConfigType = {
+      Threshold: 'threshold',
+    } as const;
+
+    export interface ThresholdDetectorConfig {
+      /**
+       * Lower bound - values below this are anomalies
+       * @nullable
+       */
+      lower_bound?: number | null;
+      /** Preprocessing transforms applied before detection */
+      preprocessing?: PreprocessingConfig | null;
+      type?: ThresholdDetectorConfigType;
+      /**
+       * Upper bound - values above this are anomalies
+       * @nullable
+       */
+      upper_bound?: number | null;
+    }
+
+    export type EnsembleOperator = typeof EnsembleOperator[keyof typeof EnsembleOperator];
+
+
+    export const EnsembleOperator = {
+      And: 'and',
+      Or: 'or',
+    } as const;
+
+    export type EnsembleDetectorConfigType = typeof EnsembleDetectorConfigType[keyof typeof EnsembleDetectorConfigType];
+
+
+    export const EnsembleDetectorConfigType = {
+      Ensemble: 'ensemble',
+    } as const;
+
+    export interface EnsembleDetectorConfig {
+      /** Sub-detector configurations (minimum 2) */
+      detectors: (ZScoreDetectorConfig | MADDetectorConfig | ThresholdDetectorConfig)[];
+      /** How to combine sub-detector results */
+      operator: EnsembleOperator;
+      type?: EnsembleDetectorConfigType;
+    }
+
+    /**
+     * Detector configuration types
+     */
+    export type DetectorConfig = EnsembleDetectorConfig | ZScoreDetectorConfig | MADDetectorConfig | ThresholdDetectorConfig;
 
     /**
      * * `hourly` - hourly
@@ -4357,13 +4561,17 @@ export namespace Schemas {
       readonly created_at: string;
       /** Insight ID monitored by this alert. Note: Response returns full InsightBasicSerializer object. */
       insight: number;
-      /** @maxLength 255 */
+      /** Human-readable name for the alert. */
       name?: string;
       /** User IDs to subscribe to this alert. Note: Response returns full UserBasicSerializer object. */
       subscribed_users: number[];
+      /** Threshold configuration with bounds and type for evaluating the alert. */
       threshold: Threshold;
+      /** Alert condition type. Determines how the value is evaluated: absolute_value, relative_increase, or relative_decrease. */
       condition?: AlertCondition | null;
-      readonly state: State66aEnum;
+      /** Current alert state: Firing, Not firing, Errored, or Snoozed. */
+      readonly state: string;
+      /** Whether the alert is actively being evaluated. */
       enabled?: boolean;
       /** @nullable */
       readonly last_notified_at: string | null;
@@ -4371,14 +4579,32 @@ export namespace Schemas {
       readonly last_checked_at: string | null;
       /** @nullable */
       readonly next_check_at: string | null;
+      /** The last 5 alert check results (only populated on retrieve). */
       readonly checks: readonly AlertCheck[];
+      /** Trends-specific alert configuration. Includes series_index (which series to monitor) and check_ongoing_interval (whether to check the current incomplete interval). */
       config?: TrendsAlertConfig | null;
-      calculation_interval?: CalculationIntervalEnum | BlankEnum | NullEnum | null;
-      /** @nullable */
+      detector_config?: DetectorConfig | null;
+      /** How often the alert is checked: hourly, daily, weekly, or monthly.
+
+    * `hourly` - hourly
+    * `daily` - daily
+    * `weekly` - weekly
+    * `monthly` - monthly */
+      calculation_interval?: CalculationIntervalEnum | NullEnum | null;
+      /**
+       * Snooze the alert until this time. Pass a relative date string (e.g. '2h', '1d') or null to unsnooze.
+       * @nullable
+       */
       snoozed_until?: string | null;
-      /** @nullable */
+      /**
+       * Skip alert evaluation on weekends (Saturday and Sunday).
+       * @nullable
+       */
       skip_weekend?: boolean | null;
-      /** @nullable */
+      /**
+       * The last calculated value from the most recent alert check.
+       * @nullable
+       */
       readonly last_value: number | null;
     }
 
@@ -5382,6 +5608,18 @@ export namespace Schemas {
     }
 
     /**
+     * @nullable
+     */
+    export type BatchExportBackfillProgress = {
+      /** @nullable */
+      readonly total_runs?: number | null;
+      /** @nullable */
+      readonly finished_runs?: number | null;
+      /** @nullable */
+      readonly progress?: number | null;
+    } | null | null;
+
+    /**
      * * `Cancelled` - Cancelled
     * `Completed` - Completed
     * `ContinuedAsNew` - Continued As New
@@ -5409,7 +5647,8 @@ export namespace Schemas {
 
     export interface BatchExportBackfill {
       readonly id: string;
-      readonly progress: string;
+      /** @nullable */
+      readonly progress: BatchExportBackfillProgress;
       /**
        * The start of the data interval.
        * @nullable
@@ -5460,6 +5699,11 @@ export namespace Schemas {
     }
 
     /**
+     * @nullable
+     */
+    export type BatchImportCreatedBy = { [key: string]: unknown } | null | null;
+
+    /**
      * * `completed` - Completed
     * `failed` - Failed
     * `paused` - Paused
@@ -5484,7 +5728,8 @@ export namespace Schemas {
       readonly created_at: string;
       readonly updated_at: string;
       readonly state: unknown | null;
-      readonly created_by: string;
+      /** @nullable */
+      readonly created_by: BatchImportCreatedBy;
       status?: BatchImportStatusEnum;
       /** @nullable */
       readonly display_status_message: string | null;
@@ -5905,6 +6150,8 @@ export namespace Schemas {
       Transactional: 'transactional',
     } as const;
 
+    export type ChangeRequestApprovalsItem = {[key: string]: unknown};
+
     /**
      * * `valid` - Valid
     * `invalid` - Invalid
@@ -5966,7 +6213,7 @@ export namespace Schemas {
       readonly applied_at: string | null;
       readonly apply_error: string;
       readonly result_data: unknown | null;
-      readonly approvals: string;
+      readonly approvals: readonly ChangeRequestApprovalsItem[];
       /** Check if current user can approve this change request. */
       readonly can_approve: boolean;
       readonly can_cancel: boolean;
@@ -6156,14 +6403,66 @@ export namespace Schemas {
       yAxisAtZero?: boolean | null;
     }
 
+    export type ClickhouseEventProperties = {[key: string]: unknown};
+
+    /**
+     * @nullable
+     */
+    export type ClickhouseEventPerson = {[key: string]: unknown} | null | null;
+
+    export interface Element {
+      /**
+       * @maxLength 10000
+       * @nullable
+       */
+      text?: string | null;
+      /**
+       * @maxLength 1000
+       * @nullable
+       */
+      tag_name?: string | null;
+      /** @nullable */
+      attr_class?: string[] | null;
+      /**
+       * @maxLength 10000
+       * @nullable
+       */
+      href?: string | null;
+      /**
+       * @maxLength 10000
+       * @nullable
+       */
+      attr_id?: string | null;
+      /**
+       * @minimum -2147483648
+       * @maximum 2147483647
+       * @nullable
+       */
+      nth_child?: number | null;
+      /**
+       * @minimum -2147483648
+       * @maximum 2147483647
+       * @nullable
+       */
+      nth_of_type?: number | null;
+      attributes?: unknown;
+      /**
+       * @minimum -2147483648
+       * @maximum 2147483647
+       * @nullable
+       */
+      order?: number | null;
+    }
+
     export interface ClickhouseEvent {
       readonly id: string;
       readonly distinct_id: string;
-      readonly properties: string;
+      readonly properties: ClickhouseEventProperties;
       readonly event: string;
       readonly timestamp: string;
-      readonly person: string;
-      readonly elements: string;
+      /** @nullable */
+      readonly person: ClickhouseEventPerson;
+      readonly elements: readonly Element[];
       readonly elements_chain: string;
     }
 
@@ -6429,6 +6728,8 @@ export namespace Schemas {
       readonly created_at: string | null;
       /** @nullable */
       readonly last_calculation: string | null;
+      /** @nullable */
+      readonly last_backfill_person_properties_at: string | null;
       readonly errors_calculating: number;
       /** @nullable */
       readonly last_error_message: string | null;
@@ -7399,7 +7700,7 @@ export namespace Schemas {
       /** @maxLength 100 */
       name: string;
       colors?: unknown;
-      readonly is_global: string;
+      readonly is_global: boolean;
       /** @nullable */
       readonly created_at: string | null;
       readonly created_by: UserBasic;
@@ -10815,6 +11116,8 @@ export namespace Schemas {
       readonly updated_at: string | null;
     }
 
+    export type DataWarehouseSavedQueryColumnsItem = {[key: string]: unknown};
+
     /**
      * * `Cancelled` - Cancelled
     * `Modified` - Modified
@@ -10865,8 +11168,9 @@ export namespace Schemas {
       query?: unknown | null;
       readonly created_by: UserBasic;
       readonly created_at: string;
-      readonly sync_frequency: string;
-      readonly columns: string;
+      /** @nullable */
+      readonly sync_frequency: string | null;
+      readonly columns: readonly DataWarehouseSavedQueryColumnsItem[];
       /** The status of when this SavedQuery last ran.
 
     * `Cancelled` - Cancelled
@@ -10877,7 +11181,8 @@ export namespace Schemas {
       readonly status: StatusD5cEnum | NullEnum | null;
       /** @nullable */
       readonly last_run_at: string | null;
-      readonly managed_viewset_kind: string;
+      /** @nullable */
+      readonly managed_viewset_kind: string | null;
       /** @nullable */
       readonly latest_error: string | null;
       /**
@@ -10885,7 +11190,8 @@ export namespace Schemas {
        * @nullable
        */
       edited_history_id?: string | null;
-      readonly latest_history_id: string;
+      /** @nullable */
+      readonly latest_history_id: number | null;
       /**
        * If true, skip column inference and validation. For saving drafts.
        * @nullable
@@ -10920,6 +11226,8 @@ export namespace Schemas {
       edited_history_id?: string | null;
     }
 
+    export type DataWarehouseSavedQueryMinimalColumnsItem = {[key: string]: unknown};
+
     /**
      * Lightweight serializer for list views - excludes large query field to reduce memory usage.
      */
@@ -10930,8 +11238,9 @@ export namespace Schemas {
       readonly name: string;
       readonly created_by: UserBasic;
       readonly created_at: string;
-      readonly sync_frequency: string;
-      readonly columns: string;
+      /** @nullable */
+      readonly sync_frequency: string | null;
+      readonly columns: readonly DataWarehouseSavedQueryMinimalColumnsItem[];
       /** The status of when this SavedQuery last ran.
 
     * `Cancelled` - Cancelled
@@ -10942,7 +11251,8 @@ export namespace Schemas {
       readonly status: StatusD5cEnum | NullEnum | null;
       /** @nullable */
       readonly last_run_at: string | null;
-      readonly managed_viewset_kind: string;
+      /** @nullable */
+      readonly managed_viewset_kind: string | null;
       /** @nullable */
       readonly latest_error: string | null;
       /** @nullable */
@@ -11581,6 +11891,11 @@ export namespace Schemas {
     }
 
     /**
+     * Feature flag payload for this early access feature
+     */
+    export type EarlyAccessFeaturePayload = {[key: string]: unknown};
+
+    /**
      * * `server` - Server
     * `client` - Client
     * `all` - All
@@ -11662,7 +11977,8 @@ export namespace Schemas {
       stage: StageEnum;
       /** @maxLength 800 */
       documentation_url?: string;
-      readonly payload: string;
+      /** Feature flag payload for this early access feature */
+      readonly payload: EarlyAccessFeaturePayload;
       readonly created_at: string;
     }
 
@@ -11703,50 +12019,6 @@ export namespace Schemas {
       Number8: 8,
       Number15: 15,
     } as const;
-
-    export interface Element {
-      /**
-       * @maxLength 10000
-       * @nullable
-       */
-      text?: string | null;
-      /**
-       * @maxLength 1000
-       * @nullable
-       */
-      tag_name?: string | null;
-      /** @nullable */
-      attr_class?: string[] | null;
-      /**
-       * @maxLength 10000
-       * @nullable
-       */
-      href?: string | null;
-      /**
-       * @maxLength 10000
-       * @nullable
-       */
-      attr_id?: string | null;
-      /**
-       * @minimum -2147483648
-       * @maximum 2147483647
-       * @nullable
-       */
-      nth_child?: number | null;
-      /**
-       * @minimum -2147483648
-       * @maximum 2147483647
-       * @nullable
-       */
-      nth_of_type?: number | null;
-      attributes?: unknown;
-      /**
-       * @minimum -2147483648
-       * @maximum 2147483647
-       * @nullable
-       */
-      order?: number | null;
-    }
 
     export type ElementTypeAttributes = {[key: string]: string};
 
@@ -12142,10 +12414,19 @@ export namespace Schemas {
       error: string;
     }
 
+    /**
+     * @nullable
+     */
+    export type ErrorTrackingAssignmentRuleAssignee = {
+      readonly type?: 'user' | 'role';
+      readonly id?: number | string;
+    } | null | null;
+
     export interface ErrorTrackingAssignmentRule {
       readonly id: string;
       filters: unknown;
-      readonly assignee: string;
+      /** @nullable */
+      readonly assignee: ErrorTrackingAssignmentRuleAssignee;
       /**
        * @minimum -2147483648
        * @maximum 2147483647
@@ -12222,6 +12503,14 @@ export namespace Schemas {
     }
 
     /**
+     * @nullable
+     */
+    export type ErrorTrackingGroupingRuleAssignee = {
+      readonly type?: 'user' | 'role';
+      readonly id?: number | string;
+    } | null | null;
+
+    /**
      * Issue linked to this rule
      * @nullable
      */
@@ -12230,7 +12519,8 @@ export namespace Schemas {
     export interface ErrorTrackingGroupingRule {
       readonly id: string;
       filters: unknown;
-      readonly assignee: string;
+      /** @nullable */
+      readonly assignee: ErrorTrackingGroupingRuleAssignee;
       /**
        * Issue linked to this rule
        * @nullable
@@ -12247,9 +12537,17 @@ export namespace Schemas {
     }
 
     export interface ErrorTrackingIssueAssignment {
-      readonly id: string;
+      readonly id: number | string | null;
       readonly type: string;
     }
+
+    /**
+     * @nullable
+     */
+    export type ErrorTrackingIssueFullCohort = {
+      readonly id?: number;
+      readonly name?: string;
+    } | null | null;
 
     /**
      * * `archived` - Archived
@@ -12279,7 +12577,8 @@ export namespace Schemas {
       first_seen: string;
       assignee: ErrorTrackingIssueAssignment;
       external_issues: ErrorTrackingExternalReference[];
-      readonly cohort: string;
+      /** @nullable */
+      readonly cohort: ErrorTrackingIssueFullCohort;
     }
 
     export interface ErrorTrackingRelease {
@@ -12367,6 +12666,7 @@ export namespace Schemas {
 
     export interface ErrorTrackingStackFrame {
       readonly id: string;
+      /** Raw frame ID in 'hash/part' format */
       readonly raw_id: string;
       readonly created_at: string;
       contents: unknown;
@@ -12390,6 +12690,12 @@ export namespace Schemas {
       readonly updated_at: string;
     }
 
+    /**
+     * Release associated with this symbol set
+     * @nullable
+     */
+    export type ErrorTrackingSymbolSetRelease = {[key: string]: unknown} | null | null;
+
     export interface ErrorTrackingSymbolSet {
       readonly id: string;
       ref: string;
@@ -12401,7 +12707,11 @@ export namespace Schemas {
       storage_ptr?: string | null;
       /** @nullable */
       failure_reason?: string | null;
-      readonly release: string;
+      /**
+       * Release associated with this symbol set
+       * @nullable
+       */
+      readonly release: ErrorTrackingSymbolSetRelease;
     }
 
     /**
@@ -12536,6 +12846,11 @@ export namespace Schemas {
       statistics: EvaluationSummaryStatistics;
     }
 
+    export interface EventDefinitionBasic {
+      id: string;
+      name: string;
+    }
+
     /**
      * * `DateTime` - DateTime
     * `String` - String
@@ -12572,7 +12887,7 @@ export namespace Schemas {
       name: string;
       description?: string;
       properties?: SchemaPropertyGroupProperty[];
-      readonly events: string;
+      readonly events: readonly EventDefinitionBasic[];
       readonly created_at: string;
       readonly updated_at: string;
       readonly created_by: UserBasic;
@@ -13045,6 +13360,8 @@ export namespace Schemas {
 
     export interface FeatureFlagGroupType {
       /** @nullable */
+      aggregation_group_type_index?: number | null;
+      /** @nullable */
       description?: string | null;
       /** @nullable */
       properties?: (EventPropertyFilter | PersonPropertyFilter | ElementPropertyFilter | EventMetadataPropertyFilter | SessionPropertyFilter | CohortPropertyFilter | RecordingPropertyFilter | LogEntryPropertyFilter | GroupPropertyFilter | FeaturePropertyFilter | FlagPropertyFilter | HogQLPropertyFilter | EmptyPropertyFilter | DataWarehousePropertyFilter | DataWarehousePersonPropertyFilter | ErrorTrackingIssueFilter | LogPropertyFilter | RevenueAnalyticsPropertyFilter)[] | null;
@@ -13383,6 +13700,11 @@ export namespace Schemas {
       hogql?: string | null;
       /** @nullable */
       insight?: ExperimentQueryResponseInsightItem[] | null;
+      /**
+       * Whether exposures were served from the precomputation system
+       * @nullable
+       */
+      is_precomputed?: boolean | null;
       kind?: ExperimentQueryResponseKind;
       metric?: ExperimentMeanMetric | ExperimentFunnelMetric | ExperimentRatioMetric | ExperimentRetentionMetric | null;
       /** @nullable */
@@ -13484,7 +13806,7 @@ export namespace Schemas {
       insight?: number | null;
       export_format: ExportFormatEnum;
       readonly created_at: string;
-      readonly has_content: string;
+      readonly has_content: boolean;
       export_context?: unknown | null;
       readonly filename: string;
       /** @nullable */
@@ -13528,8 +13850,10 @@ export namespace Schemas {
       readonly incremental_field: string | null;
       /** @nullable */
       readonly incremental_field_type: string | null;
-      readonly sync_frequency: string;
-      readonly sync_time_of_day: string;
+      /** @nullable */
+      readonly sync_frequency: string | null;
+      /** @nullable */
+      readonly sync_time_of_day: string | null;
       /** @nullable */
       readonly description: string | null;
     }
@@ -13538,6 +13862,8 @@ export namespace Schemas {
       enabled?: boolean;
       include_invoiceless_charges?: boolean;
     }
+
+    export type ExternalDataSourceSerializersSchemasItem = {[key: string]: unknown};
 
     /**
      * * `Ashby` - Ashby
@@ -13839,7 +14165,8 @@ export namespace Schemas {
       client_secret: string;
       account_id: string;
       readonly source_type: SourceTypeE09Enum;
-      readonly latest_error: string;
+      /** @nullable */
+      readonly latest_error: string | null;
       /**
        * @maxLength 100
        * @nullable
@@ -13852,7 +14179,7 @@ export namespace Schemas {
       description?: string | null;
       readonly access_method: AccessMethodEnum;
       readonly last_run_at: string;
-      readonly schemas: string;
+      readonly schemas: readonly ExternalDataSourceSerializersSchemasItem[];
       job_inputs?: unknown | null;
       readonly revenue_analytics_config: ExternalDataSourceRevenueAnalyticsConfig;
       /**
@@ -14338,6 +14665,11 @@ export namespace Schemas {
        * @nullable
        */
       variant?: string | null;
+      /**
+       * Group type index for this condition set. None means person-level aggregation.
+       * @nullable
+       */
+      aggregation_group_type_index?: number | null;
     }
 
     export interface FeatureFlagMultivariateVariantSchema {
@@ -14797,6 +15129,11 @@ export namespace Schemas {
       readonly billable_action_types: unknown | null;
     }
 
+    /**
+     * @nullable
+     */
+    export type HogFlowTemplateCreatedBy = { [key: string]: unknown } | null | null;
+
     export type HogFlowTemplateVariablesItem = {[key: string]: string};
 
     /**
@@ -14849,7 +15186,8 @@ export namespace Schemas {
       tags?: string[];
       scope: HogFlowTemplateScopeEnum;
       readonly created_at: string;
-      readonly created_by: string;
+      /** @nullable */
+      readonly created_by: HogFlowTemplateCreatedBy;
       readonly updated_at: string;
       trigger?: unknown;
       trigger_masking?: HogFlowMasking | null;
@@ -16538,6 +16876,14 @@ export namespace Schemas {
       version?: number | null;
     }
 
+    /**
+     * @nullable
+     */
+    export type InsightResolvedDateRange = {
+      readonly date_from?: string;
+      readonly date_to?: string;
+    } | null | null;
+
     export type InsightVizNodeKind = typeof InsightVizNodeKind[keyof typeof InsightVizNodeKind];
 
 
@@ -16642,23 +16988,34 @@ export namespace Schemas {
         A dashboard tile ID and dashboard_id for each of the dashboards that this insight is displayed on.
          */
       readonly dashboard_tiles: readonly DashboardTileBasic[];
-      /** 
+      /**
+       * 
         The datetime this insight's results were generated.
         If added to one or more dashboards the insight can be refreshed separately on each.
         Returns the appropriate last_refresh datetime for the context the insight is viewed in
         (see from_dashboard query parameter).
-         */
-      readonly last_refresh: string;
-      /** The target age of the cached results for this insight. */
-      readonly cache_target_age: string;
-      /** 
+        
+       * @nullable
+       */
+      readonly last_refresh: string | null;
+      /**
+       * The target age of the cached results for this insight.
+       * @nullable
+       */
+      readonly cache_target_age: string | null;
+      /**
+       * 
         The earliest possible datetime at which we'll allow the cached results for this insight to be refreshed
         by querying the database.
-         */
-      readonly next_allowed_client_refresh: string;
-      readonly result: string;
-      readonly hasMore: string;
-      readonly columns: string;
+        
+       * @nullable
+       */
+      readonly next_allowed_client_refresh: string | null;
+      readonly result: unknown;
+      /** @nullable */
+      readonly hasMore: boolean | null;
+      /** @nullable */
+      readonly columns: readonly string[] | null;
       /** @nullable */
       readonly created_at: string | null;
       readonly created_by: UserBasic;
@@ -16680,16 +17037,23 @@ export namespace Schemas {
        * @nullable
        */
       readonly user_access_level: string | null;
-      /** The timezone this chart is displayed in. */
-      readonly timezone: string;
-      readonly is_cached: string;
-      readonly query_status: string;
-      readonly hogql: string;
-      readonly types: string;
-      readonly resolved_date_range: string;
+      /**
+       * The timezone this chart is displayed in.
+       * @nullable
+       */
+      readonly timezone: string | null;
+      readonly is_cached: boolean;
+      readonly query_status: unknown;
+      /** @nullable */
+      readonly hogql: string | null;
+      /** @nullable */
+      readonly types: readonly unknown[] | null;
+      /** @nullable */
+      readonly resolved_date_range: InsightResolvedDateRange;
       _create_in_folder?: string;
-      readonly alerts: string;
-      readonly last_viewed_at: string;
+      readonly alerts: readonly unknown[];
+      /** @nullable */
+      readonly last_viewed_at: string | null;
     }
 
     /**
@@ -17223,7 +17587,7 @@ export namespace Schemas {
     export interface MinimalPerson {
       readonly id: number;
       readonly name: string;
-      readonly distinct_ids: string;
+      readonly distinct_ids: readonly string[];
       properties?: unknown;
       readonly created_at: string;
       readonly uuid: string;
@@ -17288,21 +17652,30 @@ export namespace Schemas {
     }
 
     export interface Notebook {
+      /** UUID of the notebook. */
       readonly id: string;
+      /** Short alphanumeric identifier used in URLs and API lookups. */
       readonly short_id: string;
       /**
+       * Title of the notebook.
        * @maxLength 256
        * @nullable
        */
       title?: string | null;
+      /** Notebook content as a ProseMirror JSON document structure. */
       content?: unknown | null;
-      /** @nullable */
+      /**
+       * Plain text representation of the notebook content for search.
+       * @nullable
+       */
       text_content?: string | null;
       /**
+       * Version number for optimistic concurrency control. Must match the current version when updating content.
        * @minimum -2147483648
        * @maximum 2147483647
        */
       version?: number;
+      /** Whether the notebook has been soft-deleted. */
       deleted?: boolean;
       readonly created_at: string;
       readonly created_by: UserBasic;
@@ -17317,10 +17690,16 @@ export namespace Schemas {
     }
 
     export interface NotebookMinimal {
+      /** UUID of the notebook. */
       readonly id: string;
+      /** Short alphanumeric identifier used in URLs and API lookups. */
       readonly short_id: string;
-      /** @nullable */
+      /**
+       * Title of the notebook.
+       * @nullable
+       */
       readonly title: string | null;
+      /** Whether the notebook has been soft-deleted. */
       readonly deleted: boolean;
       readonly created_at: string;
       readonly created_by: UserBasic;
@@ -17377,6 +17756,8 @@ export namespace Schemas {
 
     export type OrganizationProjectsItem = {[key: string]: unknown};
 
+    export type OrganizationMetadata = {[key: string]: string};
+
     /**
      * * `0` - none
     * `3` - config
@@ -17410,7 +17791,7 @@ export namespace Schemas {
       /** @nullable */
       readonly available_product_features: readonly unknown[] | null;
       is_member_join_email_enabled?: boolean;
-      readonly metadata: string;
+      readonly metadata: OrganizationMetadata;
       /** @nullable */
       readonly customer_id: string | null;
       /** @nullable */
@@ -17419,7 +17800,7 @@ export namespace Schemas {
       members_can_invite?: boolean | null;
       members_can_use_personal_api_keys?: boolean;
       allow_publicly_shared_resources?: boolean;
-      readonly member_count: string;
+      readonly member_count: number;
       /** @nullable */
       is_ai_data_processing_approved?: boolean | null;
       /** Default statistical method for new experiments in this organization.
@@ -18574,7 +18955,7 @@ export namespace Schemas {
       property_name: string;
       type?: QuickFilterTypeEnum;
       options?: unknown | null;
-      readonly contexts: string;
+      readonly contexts: readonly string[];
       readonly created_at: string;
       readonly updated_at: string;
     }
@@ -18639,14 +19020,65 @@ export namespace Schemas {
       results: Repo[];
     }
 
+    export interface ReviewQueueItem {
+      readonly id: string;
+      /** Review queue ID that currently owns this pending trace. */
+      readonly queue_id: string;
+      /** Human-readable name of the queue that currently owns this pending trace. */
+      readonly queue_name: string;
+      /** Trace ID currently pending human review. */
+      readonly trace_id: string;
+      readonly created_at: string;
+      /** @nullable */
+      readonly updated_at: string | null;
+      /** User who queued this trace. */
+      readonly created_by: UserBasic;
+      readonly team: number;
+    }
+
+    export interface PaginatedReviewQueueItemList {
+      count: number;
+      /** @nullable */
+      next?: string | null;
+      /** @nullable */
+      previous?: string | null;
+      results: ReviewQueueItem[];
+    }
+
+    export interface ReviewQueue {
+      readonly id: string;
+      /** Human-readable queue name. */
+      readonly name: string;
+      /** Number of pending traces currently assigned to this queue. */
+      readonly pending_item_count: number;
+      readonly created_at: string;
+      /** @nullable */
+      readonly updated_at: string | null;
+      /** User who created this review queue. */
+      readonly created_by: UserBasic;
+      readonly team: number;
+    }
+
+    export interface PaginatedReviewQueueList {
+      count: number;
+      /** @nullable */
+      next?: string | null;
+      /** @nullable */
+      previous?: string | null;
+      results: ReviewQueue[];
+    }
+
+    export type RoleMembersItem = {[key: string]: unknown};
+
     export interface Role {
       readonly id: string;
       /** @maxLength 200 */
       name: string;
       readonly created_at: string;
       readonly created_by: UserBasic;
-      readonly members: string;
-      readonly is_default: string;
+      /** Members assigned to this role */
+      readonly members: readonly RoleMembersItem[];
+      readonly is_default: boolean;
     }
 
     export interface PaginatedRoleList {
@@ -19116,6 +19548,13 @@ export namespace Schemas {
     } as const;
 
     /**
+     * @nullable
+     */
+    export type SurveyConditions = {[key: string]: unknown} | null | null;
+
+    export type SurveyFeatureFlagKeysItem = {[key: string]: string | null};
+
+    /**
      * Mixin for serializers to add user access control fields
      */
     export interface Survey {
@@ -19246,7 +19685,8 @@ export namespace Schemas {
             ```
              */
       questions?: unknown | null;
-      readonly conditions: string;
+      /** @nullable */
+      readonly conditions: SurveyConditions;
       appearance?: unknown | null;
       readonly created_at: string;
       readonly created_by: UserBasic;
@@ -19261,7 +19701,7 @@ export namespace Schemas {
        * @nullable
        */
       responses_limit?: number | null;
-      readonly feature_flag_keys: readonly unknown[];
+      readonly feature_flag_keys: readonly SurveyFeatureFlagKeysItem[];
       /**
        * @minimum 0
        * @maximum 500
@@ -19351,6 +19791,13 @@ export namespace Schemas {
       readonly source_type: SourceTypeE09Enum;
     }
 
+    export type TableColumnsItem = {[key: string]: unknown};
+
+    /**
+     * @nullable
+     */
+    export type TableExternalSchema = {[key: string]: unknown} | null | null;
+
     export type TableOptions = {[key: string]: unknown};
 
     export interface Table {
@@ -19365,9 +19812,10 @@ export namespace Schemas {
       /** @maxLength 500 */
       url_pattern: string;
       credential: Credential;
-      readonly columns: string;
+      readonly columns: readonly TableColumnsItem[];
       readonly external_data_source: SimpleExternalDataSourceSerializers;
-      readonly external_schema: string;
+      /** @nullable */
+      readonly external_schema: TableExternalSchema;
       options?: TableOptions;
     }
 
@@ -19523,8 +19971,9 @@ export namespace Schemas {
     export interface ThresholdWithAlert {
       readonly id: string;
       readonly created_at: string;
-      /** @maxLength 255 */
+      /** Optional name for the threshold. */
       name?: string;
+      /** Threshold bounds and type. Includes bounds (lower/upper floats) and type (absolute or percentage). */
       configuration: InsightThreshold;
       readonly alerts: readonly Alert[];
     }
@@ -19571,13 +20020,26 @@ export namespace Schemas {
     } as const;
 
     /**
+     * @nullable
+     */
+    export type TicketAssignmentUser = {[key: string]: string} | null | null;
+
+    /**
+     * @nullable
+     */
+    export type TicketAssignmentRole = {[key: string]: string} | null | null;
+
+    /**
      * Serializer for ticket assignment (user or role).
      */
     export interface TicketAssignment {
-      readonly id: string;
+      /** @nullable */
+      readonly id: string | null;
       readonly type: string;
-      readonly user: string;
-      readonly role: string;
+      /** @nullable */
+      readonly user: TicketAssignmentUser;
+      /** @nullable */
+      readonly role: TicketAssignmentRole;
     }
 
     export type TicketPersonProperties = {[key: string]: unknown};
@@ -19630,6 +20092,10 @@ export namespace Schemas {
       readonly slack_thread_ts: string | null;
       /** @nullable */
       readonly slack_team_id: string | null;
+      /** @nullable */
+      readonly email_subject: string | null;
+      /** @nullable */
+      readonly email_from: string | null;
       readonly person: TicketPerson | null;
       tags?: unknown[];
     }
@@ -20010,7 +20476,8 @@ export namespace Schemas {
        * @nullable
        */
       pinned_at?: string | null;
-      readonly creation_context?: string;
+      /** @nullable */
+      readonly creation_context?: string | null;
       _create_in_folder?: string;
       /**
        * The effective access level the user has for this object
@@ -20030,13 +20497,17 @@ export namespace Schemas {
       readonly created_at?: string;
       /** Insight ID monitored by this alert. Note: Response returns full InsightBasicSerializer object. */
       insight?: number;
-      /** @maxLength 255 */
+      /** Human-readable name for the alert. */
       name?: string;
       /** User IDs to subscribe to this alert. Note: Response returns full UserBasicSerializer object. */
       subscribed_users?: number[];
+      /** Threshold configuration with bounds and type for evaluating the alert. */
       threshold?: Threshold;
+      /** Alert condition type. Determines how the value is evaluated: absolute_value, relative_increase, or relative_decrease. */
       condition?: AlertCondition | null;
-      readonly state?: State66aEnum;
+      /** Current alert state: Firing, Not firing, Errored, or Snoozed. */
+      readonly state?: string;
+      /** Whether the alert is actively being evaluated. */
       enabled?: boolean;
       /** @nullable */
       readonly last_notified_at?: string | null;
@@ -20044,14 +20515,32 @@ export namespace Schemas {
       readonly last_checked_at?: string | null;
       /** @nullable */
       readonly next_check_at?: string | null;
+      /** The last 5 alert check results (only populated on retrieve). */
       readonly checks?: readonly AlertCheck[];
+      /** Trends-specific alert configuration. Includes series_index (which series to monitor) and check_ongoing_interval (whether to check the current incomplete interval). */
       config?: TrendsAlertConfig | null;
-      calculation_interval?: CalculationIntervalEnum | BlankEnum | NullEnum | null;
-      /** @nullable */
+      detector_config?: DetectorConfig | null;
+      /** How often the alert is checked: hourly, daily, weekly, or monthly.
+
+    * `hourly` - hourly
+    * `daily` - daily
+    * `weekly` - weekly
+    * `monthly` - monthly */
+      calculation_interval?: CalculationIntervalEnum | NullEnum | null;
+      /**
+       * Snooze the alert until this time. Pass a relative date string (e.g. '2h', '1d') or null to unsnooze.
+       * @nullable
+       */
       snoozed_until?: string | null;
-      /** @nullable */
+      /**
+       * Skip alert evaluation on weekends (Saturday and Sunday).
+       * @nullable
+       */
       skip_weekend?: boolean | null;
-      /** @nullable */
+      /**
+       * The last calculated value from the most recent alert check.
+       * @nullable
+       */
       readonly last_value?: number | null;
     }
 
@@ -20178,6 +20667,11 @@ export namespace Schemas {
     }
 
     /**
+     * @nullable
+     */
+    export type PatchedBatchImportCreatedBy = { [key: string]: unknown } | null | null;
+
+    /**
      * Serializer for BatchImport model
      */
     export interface PatchedBatchImport {
@@ -20186,7 +20680,8 @@ export namespace Schemas {
       readonly created_at?: string;
       readonly updated_at?: string;
       readonly state?: unknown | null;
-      readonly created_by?: string;
+      /** @nullable */
+      readonly created_by?: PatchedBatchImportCreatedBy;
       status?: BatchImportStatusEnum;
       /** @nullable */
       readonly display_status_message?: string | null;
@@ -20227,6 +20722,8 @@ export namespace Schemas {
       readonly created_at?: string | null;
       /** @nullable */
       readonly last_calculation?: string | null;
+      /** @nullable */
+      readonly last_backfill_person_properties_at?: string | null;
       readonly errors_calculating?: number;
       /** @nullable */
       readonly last_error_message?: string | null;
@@ -20510,11 +21007,13 @@ export namespace Schemas {
       /** @maxLength 100 */
       name?: string;
       colors?: unknown;
-      readonly is_global?: string;
+      readonly is_global?: boolean;
       /** @nullable */
       readonly created_at?: string | null;
       readonly created_by?: UserBasic;
     }
+
+    export type PatchedDataWarehouseSavedQueryColumnsItem = {[key: string]: unknown};
 
     /**
      * Shared methods for DataWarehouseSavedQuery serializers.
@@ -20534,8 +21033,9 @@ export namespace Schemas {
       query?: unknown | null;
       readonly created_by?: UserBasic;
       readonly created_at?: string;
-      readonly sync_frequency?: string;
-      readonly columns?: string;
+      /** @nullable */
+      readonly sync_frequency?: string | null;
+      readonly columns?: readonly PatchedDataWarehouseSavedQueryColumnsItem[];
       /** The status of when this SavedQuery last ran.
 
     * `Cancelled` - Cancelled
@@ -20546,7 +21046,8 @@ export namespace Schemas {
       readonly status?: StatusD5cEnum | NullEnum | null;
       /** @nullable */
       readonly last_run_at?: string | null;
-      readonly managed_viewset_kind?: string;
+      /** @nullable */
+      readonly managed_viewset_kind?: string | null;
       /** @nullable */
       readonly latest_error?: string | null;
       /**
@@ -20554,7 +21055,8 @@ export namespace Schemas {
        * @nullable
        */
       edited_history_id?: string | null;
-      readonly latest_history_id?: string;
+      /** @nullable */
+      readonly latest_history_id?: number | null;
       /**
        * If true, skip column inference and validation. For saving drafts.
        * @nullable
@@ -20693,6 +21195,11 @@ export namespace Schemas {
       readonly updated_at?: string;
     }
 
+    /**
+     * Feature flag payload for this early access feature
+     */
+    export type PatchedEarlyAccessFeaturePayload = {[key: string]: unknown};
+
     export interface PatchedEarlyAccessFeature {
       readonly id?: string;
       readonly feature_flag?: MinimalFeatureFlag;
@@ -20705,7 +21212,8 @@ export namespace Schemas {
       stage?: StageEnum;
       /** @maxLength 800 */
       documentation_url?: string;
-      readonly payload?: string;
+      /** Feature flag payload for this early access feature */
+      readonly payload?: PatchedEarlyAccessFeaturePayload;
       readonly created_at?: string;
     }
 
@@ -20823,10 +21331,19 @@ export namespace Schemas {
       hidden?: boolean | null;
     }
 
+    /**
+     * @nullable
+     */
+    export type PatchedErrorTrackingAssignmentRuleAssignee = {
+      readonly type?: 'user' | 'role';
+      readonly id?: number | string;
+    } | null | null;
+
     export interface PatchedErrorTrackingAssignmentRule {
       readonly id?: string;
       filters?: unknown;
-      readonly assignee?: string;
+      /** @nullable */
+      readonly assignee?: PatchedErrorTrackingAssignmentRuleAssignee;
       /**
        * @minimum -2147483648
        * @maximum 2147483647
@@ -20847,6 +21364,14 @@ export namespace Schemas {
     }
 
     /**
+     * @nullable
+     */
+    export type PatchedErrorTrackingGroupingRuleAssignee = {
+      readonly type?: 'user' | 'role';
+      readonly id?: number | string;
+    } | null | null;
+
+    /**
      * Issue linked to this rule
      * @nullable
      */
@@ -20855,7 +21380,8 @@ export namespace Schemas {
     export interface PatchedErrorTrackingGroupingRule {
       readonly id?: string;
       filters?: unknown;
-      readonly assignee?: string;
+      /** @nullable */
+      readonly assignee?: PatchedErrorTrackingGroupingRuleAssignee;
       /**
        * Issue linked to this rule
        * @nullable
@@ -20871,6 +21397,14 @@ export namespace Schemas {
       readonly updated_at?: string;
     }
 
+    /**
+     * @nullable
+     */
+    export type PatchedErrorTrackingIssueFullCohort = {
+      readonly id?: number;
+      readonly name?: string;
+    } | null | null;
+
     export interface PatchedErrorTrackingIssueFull {
       readonly id?: string;
       status?: ErrorTrackingIssueFullStatusEnum;
@@ -20881,7 +21415,8 @@ export namespace Schemas {
       first_seen?: string;
       assignee?: ErrorTrackingIssueAssignment;
       external_issues?: ErrorTrackingExternalReference[];
-      readonly cohort?: string;
+      /** @nullable */
+      readonly cohort?: PatchedErrorTrackingIssueFullCohort;
     }
 
     export interface PatchedErrorTrackingRelease {
@@ -20908,6 +21443,12 @@ export namespace Schemas {
       readonly updated_at?: string;
     }
 
+    /**
+     * Release associated with this symbol set
+     * @nullable
+     */
+    export type PatchedErrorTrackingSymbolSetRelease = {[key: string]: unknown} | null | null;
+
     export interface PatchedErrorTrackingSymbolSet {
       readonly id?: string;
       ref?: string;
@@ -20919,7 +21460,11 @@ export namespace Schemas {
       storage_ptr?: string | null;
       /** @nullable */
       failure_reason?: string | null;
-      readonly release?: string;
+      /**
+       * Release associated with this symbol set
+       * @nullable
+       */
+      readonly release?: PatchedErrorTrackingSymbolSetRelease;
     }
 
     export interface PatchedEvaluation {
@@ -21070,11 +21615,15 @@ export namespace Schemas {
       readonly incremental_field?: string | null;
       /** @nullable */
       readonly incremental_field_type?: string | null;
-      readonly sync_frequency?: string;
-      readonly sync_time_of_day?: string;
+      /** @nullable */
+      readonly sync_frequency?: string | null;
+      /** @nullable */
+      readonly sync_time_of_day?: string | null;
       /** @nullable */
       readonly description?: string | null;
     }
+
+    export type PatchedExternalDataSourceSerializersSchemasItem = {[key: string]: unknown};
 
     /**
      * Mixin for serializers to add user access control fields
@@ -21088,7 +21637,8 @@ export namespace Schemas {
       client_secret?: string;
       account_id?: string;
       readonly source_type?: SourceTypeE09Enum;
-      readonly latest_error?: string;
+      /** @nullable */
+      readonly latest_error?: string | null;
       /**
        * @maxLength 100
        * @nullable
@@ -21101,7 +21651,7 @@ export namespace Schemas {
       description?: string | null;
       readonly access_method?: AccessMethodEnum;
       readonly last_run_at?: string;
-      readonly schemas?: string;
+      readonly schemas?: readonly PatchedExternalDataSourceSerializersSchemasItem[];
       job_inputs?: unknown | null;
       readonly revenue_analytics_config?: ExternalDataSourceRevenueAnalyticsConfig;
       /**
@@ -21270,6 +21820,11 @@ export namespace Schemas {
       readonly billable_action_types?: unknown | null;
     }
 
+    /**
+     * @nullable
+     */
+    export type PatchedHogFlowTemplateCreatedBy = { [key: string]: unknown } | null | null;
+
     export type PatchedHogFlowTemplateVariablesItem = {[key: string]: string};
 
     /**
@@ -21289,7 +21844,8 @@ export namespace Schemas {
       tags?: string[];
       scope?: HogFlowTemplateScopeEnum;
       readonly created_at?: string;
-      readonly created_by?: string;
+      /** @nullable */
+      readonly created_by?: PatchedHogFlowTemplateCreatedBy;
       readonly updated_at?: string;
       trigger?: unknown;
       trigger_masking?: HogFlowMasking | null;
@@ -21391,6 +21947,14 @@ export namespace Schemas {
     }
 
     /**
+     * @nullable
+     */
+    export type PatchedInsightResolvedDateRange = {
+      readonly date_from?: string;
+      readonly date_to?: string;
+    } | null | null;
+
+    /**
      * Simplified serializer to speed response times when loading large amounts of objects.
      */
     export interface PatchedInsight {
@@ -21423,23 +21987,34 @@ export namespace Schemas {
         A dashboard tile ID and dashboard_id for each of the dashboards that this insight is displayed on.
          */
       readonly dashboard_tiles?: readonly DashboardTileBasic[];
-      /** 
+      /**
+       * 
         The datetime this insight's results were generated.
         If added to one or more dashboards the insight can be refreshed separately on each.
         Returns the appropriate last_refresh datetime for the context the insight is viewed in
         (see from_dashboard query parameter).
-         */
-      readonly last_refresh?: string;
-      /** The target age of the cached results for this insight. */
-      readonly cache_target_age?: string;
-      /** 
+        
+       * @nullable
+       */
+      readonly last_refresh?: string | null;
+      /**
+       * The target age of the cached results for this insight.
+       * @nullable
+       */
+      readonly cache_target_age?: string | null;
+      /**
+       * 
         The earliest possible datetime at which we'll allow the cached results for this insight to be refreshed
         by querying the database.
-         */
-      readonly next_allowed_client_refresh?: string;
-      readonly result?: string;
-      readonly hasMore?: string;
-      readonly columns?: string;
+        
+       * @nullable
+       */
+      readonly next_allowed_client_refresh?: string | null;
+      readonly result?: unknown;
+      /** @nullable */
+      readonly hasMore?: boolean | null;
+      /** @nullable */
+      readonly columns?: readonly string[] | null;
       /** @nullable */
       readonly created_at?: string | null;
       readonly created_by?: UserBasic;
@@ -21461,16 +22036,23 @@ export namespace Schemas {
        * @nullable
        */
       readonly user_access_level?: string | null;
-      /** The timezone this chart is displayed in. */
-      readonly timezone?: string;
-      readonly is_cached?: string;
-      readonly query_status?: string;
-      readonly hogql?: string;
-      readonly types?: string;
-      readonly resolved_date_range?: string;
+      /**
+       * The timezone this chart is displayed in.
+       * @nullable
+       */
+      readonly timezone?: string | null;
+      readonly is_cached?: boolean;
+      readonly query_status?: unknown;
+      /** @nullable */
+      readonly hogql?: string | null;
+      /** @nullable */
+      readonly types?: readonly unknown[] | null;
+      /** @nullable */
+      readonly resolved_date_range?: PatchedInsightResolvedDateRange;
       _create_in_folder?: string;
-      readonly alerts?: string;
-      readonly last_viewed_at?: string;
+      readonly alerts?: readonly unknown[];
+      /** @nullable */
+      readonly last_viewed_at?: string | null;
     }
 
     export interface PatchedInsightVariable {
@@ -21693,21 +22275,30 @@ export namespace Schemas {
     }
 
     export interface PatchedNotebook {
+      /** UUID of the notebook. */
       readonly id?: string;
+      /** Short alphanumeric identifier used in URLs and API lookups. */
       readonly short_id?: string;
       /**
+       * Title of the notebook.
        * @maxLength 256
        * @nullable
        */
       title?: string | null;
+      /** Notebook content as a ProseMirror JSON document structure. */
       content?: unknown | null;
-      /** @nullable */
+      /**
+       * Plain text representation of the notebook content for search.
+       * @nullable
+       */
       text_content?: string | null;
       /**
+       * Version number for optimistic concurrency control. Must match the current version when updating content.
        * @minimum -2147483648
        * @maximum 2147483647
        */
       version?: number;
+      /** Whether the notebook has been soft-deleted. */
       deleted?: boolean;
       readonly created_at?: string;
       readonly created_by?: UserBasic;
@@ -21742,6 +22333,8 @@ export namespace Schemas {
 
     export type PatchedOrganizationProjectsItem = {[key: string]: unknown};
 
+    export type PatchedOrganizationMetadata = {[key: string]: string};
+
     export interface PatchedOrganization {
       readonly id?: string;
       /** @maxLength 64 */
@@ -21759,7 +22352,7 @@ export namespace Schemas {
       /** @nullable */
       readonly available_product_features?: readonly unknown[] | null;
       is_member_join_email_enabled?: boolean;
-      readonly metadata?: string;
+      readonly metadata?: PatchedOrganizationMetadata;
       /** @nullable */
       readonly customer_id?: string | null;
       /** @nullable */
@@ -21768,7 +22361,7 @@ export namespace Schemas {
       members_can_invite?: boolean | null;
       members_can_use_personal_api_keys?: boolean;
       allow_publicly_shared_resources?: boolean;
-      readonly member_count?: string;
+      readonly member_count?: number;
       /** @nullable */
       is_ai_data_processing_approved?: boolean | null;
       /** Default statistical method for new experiments in this organization.
@@ -21932,6 +22525,14 @@ export namespace Schemas {
 
     export type PatchedProjectBackwardCompatGroupTypesItem = {[key: string]: unknown};
 
+    export type PatchedProjectBackwardCompatProductIntentsItem = {
+      product_type?: string;
+      created_at?: string;
+      /** @nullable */
+      onboarding_completed_at?: string | null;
+      updated_at?: string;
+    };
+
     /**
      * * `0` - Sunday
     * `1` - Monday
@@ -22043,7 +22644,7 @@ export namespace Schemas {
       surveys_opt_in?: boolean | null;
       /** @nullable */
       heatmaps_opt_in?: boolean | null;
-      readonly product_intents?: string;
+      readonly product_intents?: readonly PatchedProjectBackwardCompatProductIntentsItem[];
       /** @nullable */
       flags_persistence_default?: boolean | null;
       /** @nullable */
@@ -22086,7 +22687,7 @@ export namespace Schemas {
       property_name?: string;
       type?: QuickFilterTypeEnum;
       options?: unknown | null;
-      readonly contexts?: string;
+      readonly contexts?: readonly string[];
       readonly created_at?: string;
       readonly updated_at?: string;
     }
@@ -22096,14 +22697,30 @@ export namespace Schemas {
       person_id?: string;
     }
 
+    export interface PatchedReviewQueueItemUpdate {
+      /** Review queue ID that should own this pending trace. */
+      queue_id?: string;
+    }
+
+    export interface PatchedReviewQueueUpdate {
+      /**
+       * Human-readable queue name.
+       * @maxLength 255
+       */
+      name?: string;
+    }
+
+    export type PatchedRoleMembersItem = {[key: string]: unknown};
+
     export interface PatchedRole {
       readonly id?: string;
       /** @maxLength 200 */
       name?: string;
       readonly created_at?: string;
       readonly created_by?: UserBasic;
-      readonly members?: string;
-      readonly is_default?: string;
+      /** Members assigned to this role */
+      readonly members?: readonly PatchedRoleMembersItem[];
+      readonly is_default?: boolean;
     }
 
     export interface PatchedScheduledChange {
@@ -22138,7 +22755,7 @@ export namespace Schemas {
       name?: string;
       description?: string;
       properties?: SchemaPropertyGroupProperty[];
-      readonly events?: string;
+      readonly events?: readonly EventDefinitionBasic[];
       readonly created_at?: string;
       readonly updated_at?: string;
       readonly created_by?: UserBasic;
@@ -22543,6 +23160,13 @@ export namespace Schemas {
       form_content?: unknown | null;
     }
 
+    export type PatchedTableColumnsItem = {[key: string]: unknown};
+
+    /**
+     * @nullable
+     */
+    export type PatchedTableExternalSchema = {[key: string]: unknown} | null | null;
+
     export type PatchedTableOptions = {[key: string]: unknown};
 
     export interface PatchedTable {
@@ -22557,11 +23181,18 @@ export namespace Schemas {
       /** @maxLength 500 */
       url_pattern?: string;
       credential?: Credential;
-      readonly columns?: string;
+      readonly columns?: readonly PatchedTableColumnsItem[];
       readonly external_data_source?: SimpleExternalDataSourceSerializers;
-      readonly external_schema?: string;
+      /** @nullable */
+      readonly external_schema?: PatchedTableExternalSchema;
       options?: PatchedTableOptions;
     }
+
+    /**
+     * Latest run details for this task
+     * @nullable
+     */
+    export type PatchedTaskLatestRun = {[key: string]: unknown} | null | null;
 
     export interface PatchedTask {
       readonly id?: string;
@@ -22585,7 +23216,11 @@ export namespace Schemas {
       github_integration?: number | null;
       /** JSON schema for the task. This is used to validate the output of the task. */
       json_schema?: unknown | null;
-      readonly latest_run?: string;
+      /**
+       * Latest run details for this task
+       * @nullable
+       */
+      readonly latest_run?: PatchedTaskLatestRun;
       readonly created_at?: string;
       readonly updated_at?: string;
       readonly created_by?: UserBasic;
@@ -22645,6 +23280,10 @@ export namespace Schemas {
     export type PatchedTeamDefaultModifiers = {[key: string]: unknown};
 
     export type PatchedTeamGroupTypesItem = {[key: string]: unknown};
+
+    export type PatchedTeamProductIntentsItem = {[key: string]: unknown};
+
+    export type PatchedTeamManagedViewsets = {[key: string]: boolean};
 
     /**
      * * `30d` - 30 Days
@@ -22873,8 +23512,8 @@ export namespace Schemas {
       readonly group_types?: readonly PatchedTeamGroupTypesItem[];
       /** @nullable */
       readonly live_events_token?: string | null;
-      readonly product_intents?: string;
-      readonly managed_viewsets?: string;
+      readonly product_intents?: readonly PatchedTeamProductIntentsItem[];
+      readonly managed_viewsets?: PatchedTeamManagedViewsets;
       readonly available_setup_task_ids?: readonly AvailableSetupTaskIdsEnum[];
     }
 
@@ -22914,6 +23553,10 @@ export namespace Schemas {
       readonly slack_thread_ts?: string | null;
       /** @nullable */
       readonly slack_team_id?: string | null;
+      /** @nullable */
+      readonly email_subject?: string | null;
+      /** @nullable */
+      readonly email_from?: string | null;
       readonly person?: TicketPerson | null;
       tags?: unknown[];
     }
@@ -23233,6 +23876,14 @@ export namespace Schemas {
 
     export type ProjectBackwardCompatGroupTypesItem = {[key: string]: unknown};
 
+    export type ProjectBackwardCompatProductIntentsItem = {
+      product_type?: string;
+      created_at?: string;
+      /** @nullable */
+      onboarding_completed_at?: string | null;
+      updated_at?: string;
+    };
+
     /**
      * Like `ProjectBasicSerializer`, but also works as a drop-in replacement for `TeamBasicSerializer` by way of
     passthrough fields. This allows the meaning of `Team` to change from "project" to "environment" without breaking
@@ -23332,7 +23983,7 @@ export namespace Schemas {
       surveys_opt_in?: boolean | null;
       /** @nullable */
       heatmaps_opt_in?: boolean | null;
-      readonly product_intents: string;
+      readonly product_intents: readonly ProjectBackwardCompatProductIntentsItem[];
       /** @nullable */
       flags_persistence_default?: boolean | null;
       /** @nullable */
@@ -23897,7 +24548,7 @@ export namespace Schemas {
     ```
 
     For more details on HogQL queries, see the [PostHog HogQL documentation](/docs/hogql#api-access). */
-      query: EventsNode | ActionsNode | PersonsNode | DataWarehouseNode | LifecycleDataWarehouseNode | EventsQuery | SessionsQuery | ActorsQuery | GroupsQuery | InsightActorsQuery | InsightActorsQueryOptions | SessionsTimelineQuery | HogQuery | HogQLQuery | HogQLMetadata | HogQLAutocomplete | SessionAttributionExplorerQuery | RevenueExampleEventsQuery | RevenueExampleDataWarehouseTablesQuery | ErrorTrackingQuery | ErrorTrackingSimilarIssuesQuery | ErrorTrackingBreakdownsQuery | ErrorTrackingIssueCorrelationQuery | ExperimentFunnelsQuery | ExperimentTrendsQuery | ExperimentQuery | ExperimentExposureQuery | DocumentSimilarityQuery | WebOverviewQuery | WebStatsTableQuery | WebExternalClicksTableQuery | WebGoalsQuery | WebVitalsQuery | WebVitalsPathBreakdownQuery | WebPageURLSearchQuery | WebAnalyticsExternalSummaryQuery | RevenueAnalyticsGrossRevenueQuery | RevenueAnalyticsMetricsQuery | RevenueAnalyticsMRRQuery | RevenueAnalyticsOverviewQuery | RevenueAnalyticsTopCustomersQuery | MarketingAnalyticsTableQuery | MarketingAnalyticsAggregatedQuery | NonIntegratedConversionsTableQuery | DataVisualizationNode | DataTableNode | SavedInsightNode | InsightVizNode | TrendsQuery | FunnelsQuery | RetentionQuery | PathsQuery | StickinessQuery | LifecycleQuery | FunnelCorrelationQuery | DatabaseSchemaQuery | LogsQuery | LogAttributesQuery | LogValuesQuery | SuggestedQuestionsQuery | TeamTaxonomyQuery | EventTaxonomyQuery | ActorsPropertyTaxonomyQuery | TracesQuery | TraceQuery | TraceNeighborsQuery | VectorSearchQuery | UsageMetricsQuery | EndpointsUsageOverviewQuery | EndpointsUsageTableQuery | EndpointsUsageTrendsQuery | PropertyValuesQuery;
+      query: EventsNode | ActionsNode | PersonsNode | DataWarehouseNode | FunnelsDataWarehouseNode | LifecycleDataWarehouseNode | EventsQuery | SessionsQuery | ActorsQuery | GroupsQuery | InsightActorsQuery | InsightActorsQueryOptions | SessionsTimelineQuery | HogQuery | HogQLQuery | HogQLMetadata | HogQLAutocomplete | SessionAttributionExplorerQuery | RevenueExampleEventsQuery | RevenueExampleDataWarehouseTablesQuery | ErrorTrackingQuery | ErrorTrackingSimilarIssuesQuery | ErrorTrackingBreakdownsQuery | ErrorTrackingIssueCorrelationQuery | ExperimentFunnelsQuery | ExperimentTrendsQuery | ExperimentQuery | ExperimentExposureQuery | DocumentSimilarityQuery | WebOverviewQuery | WebStatsTableQuery | WebExternalClicksTableQuery | WebGoalsQuery | WebVitalsQuery | WebVitalsPathBreakdownQuery | WebPageURLSearchQuery | WebAnalyticsExternalSummaryQuery | RevenueAnalyticsGrossRevenueQuery | RevenueAnalyticsMetricsQuery | RevenueAnalyticsMRRQuery | RevenueAnalyticsOverviewQuery | RevenueAnalyticsTopCustomersQuery | MarketingAnalyticsTableQuery | MarketingAnalyticsAggregatedQuery | NonIntegratedConversionsTableQuery | DataVisualizationNode | DataTableNode | SavedInsightNode | InsightVizNode | TrendsQuery | FunnelsQuery | RetentionQuery | PathsQuery | StickinessQuery | LifecycleQuery | FunnelCorrelationQuery | DatabaseSchemaQuery | LogsQuery | LogAttributesQuery | LogValuesQuery | SuggestedQuestionsQuery | TeamTaxonomyQuery | EventTaxonomyQuery | ActorsPropertyTaxonomyQuery | TracesQuery | TraceQuery | TraceNeighborsQuery | VectorSearchQuery | UsageMetricsQuery | EndpointsUsageOverviewQuery | EndpointsUsageTableQuery | EndpointsUsageTrendsQuery | PropertyValuesQuery;
       /** Whether results should be calculated sync or async, and how much to rely on the cache:
     - `'blocking'` - calculate synchronously (returning only when the query is done), UNLESS there are very fresh results in the cache
     - `'async'` - kick off background calculation (returning immediately with a query status), UNLESS there are very fresh results in the cache
@@ -24428,6 +25079,11 @@ export namespace Schemas {
       hogql?: string | null;
       /** @nullable */
       insight?: QueryResponseAlternative20InsightItem[] | null;
+      /**
+       * Whether exposures were served from the precomputation system
+       * @nullable
+       */
+      is_precomputed?: boolean | null;
       kind?: QueryResponseAlternative20Kind;
       metric?: ExperimentMeanMetric | ExperimentFunnelMetric | ExperimentRatioMetric | ExperimentRetentionMetric | null;
       /** @nullable */
@@ -26267,11 +26923,11 @@ export namespace Schemas {
     }
 
     export interface QueryUpgradeRequest {
-      query: EventsNode | ActionsNode | PersonsNode | DataWarehouseNode | LifecycleDataWarehouseNode | EventsQuery | SessionsQuery | ActorsQuery | GroupsQuery | InsightActorsQuery | InsightActorsQueryOptions | SessionsTimelineQuery | HogQuery | HogQLQuery | HogQLMetadata | HogQLAutocomplete | SessionAttributionExplorerQuery | RevenueExampleEventsQuery | RevenueExampleDataWarehouseTablesQuery | ErrorTrackingQuery | ErrorTrackingSimilarIssuesQuery | ErrorTrackingBreakdownsQuery | ErrorTrackingIssueCorrelationQuery | ExperimentFunnelsQuery | ExperimentTrendsQuery | ExperimentQuery | ExperimentExposureQuery | DocumentSimilarityQuery | WebOverviewQuery | WebStatsTableQuery | WebExternalClicksTableQuery | WebGoalsQuery | WebVitalsQuery | WebVitalsPathBreakdownQuery | WebPageURLSearchQuery | WebAnalyticsExternalSummaryQuery | RevenueAnalyticsGrossRevenueQuery | RevenueAnalyticsMetricsQuery | RevenueAnalyticsMRRQuery | RevenueAnalyticsOverviewQuery | RevenueAnalyticsTopCustomersQuery | MarketingAnalyticsTableQuery | MarketingAnalyticsAggregatedQuery | NonIntegratedConversionsTableQuery | DataVisualizationNode | DataTableNode | SavedInsightNode | InsightVizNode | TrendsQuery | FunnelsQuery | RetentionQuery | PathsQuery | StickinessQuery | LifecycleQuery | FunnelCorrelationQuery | DatabaseSchemaQuery | LogsQuery | LogAttributesQuery | LogValuesQuery | SuggestedQuestionsQuery | TeamTaxonomyQuery | EventTaxonomyQuery | ActorsPropertyTaxonomyQuery | TracesQuery | TraceQuery | TraceNeighborsQuery | VectorSearchQuery | UsageMetricsQuery | EndpointsUsageOverviewQuery | EndpointsUsageTableQuery | EndpointsUsageTrendsQuery | PropertyValuesQuery;
+      query: EventsNode | ActionsNode | PersonsNode | DataWarehouseNode | FunnelsDataWarehouseNode | LifecycleDataWarehouseNode | EventsQuery | SessionsQuery | ActorsQuery | GroupsQuery | InsightActorsQuery | InsightActorsQueryOptions | SessionsTimelineQuery | HogQuery | HogQLQuery | HogQLMetadata | HogQLAutocomplete | SessionAttributionExplorerQuery | RevenueExampleEventsQuery | RevenueExampleDataWarehouseTablesQuery | ErrorTrackingQuery | ErrorTrackingSimilarIssuesQuery | ErrorTrackingBreakdownsQuery | ErrorTrackingIssueCorrelationQuery | ExperimentFunnelsQuery | ExperimentTrendsQuery | ExperimentQuery | ExperimentExposureQuery | DocumentSimilarityQuery | WebOverviewQuery | WebStatsTableQuery | WebExternalClicksTableQuery | WebGoalsQuery | WebVitalsQuery | WebVitalsPathBreakdownQuery | WebPageURLSearchQuery | WebAnalyticsExternalSummaryQuery | RevenueAnalyticsGrossRevenueQuery | RevenueAnalyticsMetricsQuery | RevenueAnalyticsMRRQuery | RevenueAnalyticsOverviewQuery | RevenueAnalyticsTopCustomersQuery | MarketingAnalyticsTableQuery | MarketingAnalyticsAggregatedQuery | NonIntegratedConversionsTableQuery | DataVisualizationNode | DataTableNode | SavedInsightNode | InsightVizNode | TrendsQuery | FunnelsQuery | RetentionQuery | PathsQuery | StickinessQuery | LifecycleQuery | FunnelCorrelationQuery | DatabaseSchemaQuery | LogsQuery | LogAttributesQuery | LogValuesQuery | SuggestedQuestionsQuery | TeamTaxonomyQuery | EventTaxonomyQuery | ActorsPropertyTaxonomyQuery | TracesQuery | TraceQuery | TraceNeighborsQuery | VectorSearchQuery | UsageMetricsQuery | EndpointsUsageOverviewQuery | EndpointsUsageTableQuery | EndpointsUsageTrendsQuery | PropertyValuesQuery;
     }
 
     export interface QueryUpgradeResponse {
-      query: EventsNode | ActionsNode | PersonsNode | DataWarehouseNode | LifecycleDataWarehouseNode | EventsQuery | SessionsQuery | ActorsQuery | GroupsQuery | InsightActorsQuery | InsightActorsQueryOptions | SessionsTimelineQuery | HogQuery | HogQLQuery | HogQLMetadata | HogQLAutocomplete | SessionAttributionExplorerQuery | RevenueExampleEventsQuery | RevenueExampleDataWarehouseTablesQuery | ErrorTrackingQuery | ErrorTrackingSimilarIssuesQuery | ErrorTrackingBreakdownsQuery | ErrorTrackingIssueCorrelationQuery | ExperimentFunnelsQuery | ExperimentTrendsQuery | ExperimentQuery | ExperimentExposureQuery | DocumentSimilarityQuery | WebOverviewQuery | WebStatsTableQuery | WebExternalClicksTableQuery | WebGoalsQuery | WebVitalsQuery | WebVitalsPathBreakdownQuery | WebPageURLSearchQuery | WebAnalyticsExternalSummaryQuery | RevenueAnalyticsGrossRevenueQuery | RevenueAnalyticsMetricsQuery | RevenueAnalyticsMRRQuery | RevenueAnalyticsOverviewQuery | RevenueAnalyticsTopCustomersQuery | MarketingAnalyticsTableQuery | MarketingAnalyticsAggregatedQuery | NonIntegratedConversionsTableQuery | DataVisualizationNode | DataTableNode | SavedInsightNode | InsightVizNode | TrendsQuery | FunnelsQuery | RetentionQuery | PathsQuery | StickinessQuery | LifecycleQuery | FunnelCorrelationQuery | DatabaseSchemaQuery | LogsQuery | LogAttributesQuery | LogValuesQuery | SuggestedQuestionsQuery | TeamTaxonomyQuery | EventTaxonomyQuery | ActorsPropertyTaxonomyQuery | TracesQuery | TraceQuery | TraceNeighborsQuery | VectorSearchQuery | UsageMetricsQuery | EndpointsUsageOverviewQuery | EndpointsUsageTableQuery | EndpointsUsageTrendsQuery | PropertyValuesQuery;
+      query: EventsNode | ActionsNode | PersonsNode | DataWarehouseNode | FunnelsDataWarehouseNode | LifecycleDataWarehouseNode | EventsQuery | SessionsQuery | ActorsQuery | GroupsQuery | InsightActorsQuery | InsightActorsQueryOptions | SessionsTimelineQuery | HogQuery | HogQLQuery | HogQLMetadata | HogQLAutocomplete | SessionAttributionExplorerQuery | RevenueExampleEventsQuery | RevenueExampleDataWarehouseTablesQuery | ErrorTrackingQuery | ErrorTrackingSimilarIssuesQuery | ErrorTrackingBreakdownsQuery | ErrorTrackingIssueCorrelationQuery | ExperimentFunnelsQuery | ExperimentTrendsQuery | ExperimentQuery | ExperimentExposureQuery | DocumentSimilarityQuery | WebOverviewQuery | WebStatsTableQuery | WebExternalClicksTableQuery | WebGoalsQuery | WebVitalsQuery | WebVitalsPathBreakdownQuery | WebPageURLSearchQuery | WebAnalyticsExternalSummaryQuery | RevenueAnalyticsGrossRevenueQuery | RevenueAnalyticsMetricsQuery | RevenueAnalyticsMRRQuery | RevenueAnalyticsOverviewQuery | RevenueAnalyticsTopCustomersQuery | MarketingAnalyticsTableQuery | MarketingAnalyticsAggregatedQuery | NonIntegratedConversionsTableQuery | DataVisualizationNode | DataTableNode | SavedInsightNode | InsightVizNode | TrendsQuery | FunnelsQuery | RetentionQuery | PathsQuery | StickinessQuery | LifecycleQuery | FunnelCorrelationQuery | DatabaseSchemaQuery | LogsQuery | LogAttributesQuery | LogValuesQuery | SuggestedQuestionsQuery | TeamTaxonomyQuery | EventTaxonomyQuery | ActorsPropertyTaxonomyQuery | TracesQuery | TraceQuery | TraceNeighborsQuery | VectorSearchQuery | UsageMetricsQuery | EndpointsUsageOverviewQuery | EndpointsUsageTableQuery | EndpointsUsageTrendsQuery | PropertyValuesQuery;
     }
 
     export interface ReorderTilesRequest {
@@ -26322,6 +26978,24 @@ export namespace Schemas {
       cacheAgeSeconds: number;
       /** Scan evidence details */
       scan?: ScanEvidence;
+    }
+
+    export interface ReviewQueueCreate {
+      /**
+       * Human-readable queue name.
+       * @maxLength 255
+       */
+      name: string;
+    }
+
+    export interface ReviewQueueItemCreate {
+      /** Review queue ID that should own this pending trace. */
+      queue_id: string;
+      /**
+       * Trace ID to add to the selected review queue.
+       * @maxLength 255
+       */
+      trace_id: string;
     }
 
     export interface ReviewStateCounts {
@@ -26422,6 +27096,18 @@ export namespace Schemas {
       focus_area?: string;
     }
 
+    export interface SharePassword {
+      readonly id: number;
+      readonly created_at: string;
+      /**
+       * @maxLength 100
+       * @nullable
+       */
+      note?: string | null;
+      readonly created_by_email: string;
+      readonly is_active: boolean;
+    }
+
     export interface SharingConfiguration {
       readonly created_at: string;
       enabled?: boolean;
@@ -26429,7 +27115,7 @@ export namespace Schemas {
       readonly access_token: string | null;
       settings?: unknown | null;
       password_required?: boolean;
-      readonly share_passwords: string;
+      readonly share_passwords: readonly SharePassword[];
     }
 
     export interface SummaryBullet {
@@ -27059,6 +27745,10 @@ export namespace Schemas {
 
     export type TeamGroupTypesItem = {[key: string]: unknown};
 
+    export type TeamProductIntentsItem = {[key: string]: unknown};
+
+    export type TeamManagedViewsets = {[key: string]: boolean};
+
     export interface Team {
       readonly id: number;
       readonly uuid: string;
@@ -27241,8 +27931,8 @@ export namespace Schemas {
       readonly group_types: readonly TeamGroupTypesItem[];
       /** @nullable */
       readonly live_events_token: string | null;
-      readonly product_intents: string;
-      readonly managed_viewsets: string;
+      readonly product_intents: readonly TeamProductIntentsItem[];
+      readonly managed_viewsets: TeamManagedViewsets;
       readonly available_setup_task_ids: readonly AvailableSetupTaskIdsEnum[];
     }
 
@@ -29017,6 +29707,57 @@ export namespace Schemas {
      * The initial index from which to return the results.
      */
     offset?: number;
+    };
+
+    export type LlmAnalyticsReviewQueueItemsListParams = {
+    /**
+     * Number of results to return per page.
+     */
+    limit?: number;
+    /**
+     * The initial index from which to return the results.
+     */
+    offset?: number;
+    /**
+     * Order by `created_at` or `updated_at`.
+     */
+    order_by?: string;
+    /**
+     * Filter by a specific review queue ID.
+     */
+    queue_id?: string;
+    /**
+     * Search pending trace IDs.
+     */
+    search?: string;
+    /**
+     * Filter by an exact trace ID.
+     */
+    trace_id?: string;
+    /**
+     * Filter by multiple trace IDs separated by commas.
+     */
+    trace_id__in?: string;
+    };
+
+    export type LlmAnalyticsReviewQueuesListParams = {
+    /**
+     * Number of results to return per page.
+     */
+    limit?: number;
+    name?: string;
+    /**
+     * The initial index from which to return the results.
+     */
+    offset?: number;
+    /**
+     * Order by `name`, `updated_at`, or `created_at`.
+     */
+    order_by?: string;
+    /**
+     * Search review queue names.
+     */
+    search?: string;
     };
 
     export type LlmAnalyticsScoreDefinitionsListParams = {

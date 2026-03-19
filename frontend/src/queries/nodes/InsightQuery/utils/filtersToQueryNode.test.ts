@@ -18,6 +18,7 @@ import {
     BreakdownAttributionType,
     ChartDisplayType,
     FilterLogicalOperator,
+    FunnelDatawarehouseFilter,
     FilterType,
     FunnelConversionWindowTimeUnit,
     FunnelPathType,
@@ -194,6 +195,40 @@ describe('actionsAndEventsToSeries', () => {
                 name: '$pageview',
                 funnelAggregationTarget: 'posthog_person_id',
                 funnelAggregationTargetType: 'event_properties',
+            },
+        ])
+    })
+
+    it('converts funnels data warehouse series to funnels nodes', () => {
+        const data_warehouse: FunnelDatawarehouseFilter[] = [
+            {
+                type: 'data_warehouse' as const,
+                id: 'warehouse_orders',
+                order: 0,
+                name: 'Orders',
+                table_name: 'warehouse_orders',
+                timestamp_field: 'timestamp',
+                id_field: 'id',
+                aggregation_target_field: 'person_id',
+            },
+        ]
+
+        const result = actionsAndEventsToSeries(
+            { data_warehouse },
+            true,
+            MathAvailability.FunnelsOnly,
+            NodeKind.FunnelsDataWarehouseNode
+        )
+
+        expect(result).toEqual([
+            {
+                kind: NodeKind.FunnelsDataWarehouseNode,
+                id: 'warehouse_orders',
+                name: 'Orders',
+                table_name: 'warehouse_orders',
+                timestamp_field: 'timestamp',
+                id_field: 'id',
+                aggregation_target_field: 'person_id',
             },
         ])
     })
