@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 from hogli import telemetry
-from hogli.core.cli import cli
+from hogli.cli import cli
 
 
 @cli.command(name="telemetry:on", help="Enable anonymous usage telemetry")

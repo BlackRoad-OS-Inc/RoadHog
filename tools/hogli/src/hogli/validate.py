@@ -3,20 +3,21 @@
 from __future__ import annotations
 
 import yaml
-from hogli.core.manifest import REPO_ROOT, get_manifest
+
+from hogli.manifest import MANIFEST_FILE, get_manifest
 
 
 def get_bin_scripts() -> set[str]:
-    """Get all executable scripts in bin/ directory (excludes entry points and config)."""
-    bin_dir = REPO_ROOT / "bin"
-    if not bin_dir.exists():
+    """Get all executable scripts in scripts_dir (excludes entry points and config)."""
+    scripts_dir = get_manifest().scripts_dir
+    if not scripts_dir.exists():
         return set()
 
     # Exclude these from the manifest check (entry points, config files, etc)
     excluded = {"hogli", "mprocs.yaml", "mprocs-test.yaml"}
 
     scripts = set()
-    for f in bin_dir.iterdir():
+    for f in scripts_dir.iterdir():
         if f.name in excluded or not f.is_file() or f.is_symlink():
             continue
         # Check if executable and not a config file
@@ -79,12 +80,11 @@ def auto_update_manifest() -> set[str]:
     if not entries:
         return set()
 
-    manifest_file = REPO_ROOT / "common" / "hogli" / "manifest.yaml"
-    if not manifest_file.exists():
+    if not MANIFEST_FILE.exists():
         return set()
 
     # Load existing manifest to check for duplicates
-    with open(manifest_file) as f:
+    with open(MANIFEST_FILE) as f:
         manifest = yaml.safe_load(f) or {}
 
     existing_tools = manifest.get("tools", {})
@@ -95,7 +95,7 @@ def auto_update_manifest() -> set[str]:
     # Append new entries as YAML text to preserve existing file formatting.
     # Round-tripping the entire file through yaml.dump() destroys indentation
     # style and line wrapping, causing the whole file to show as modified.
-    content = manifest_file.read_text()
+    content = MANIFEST_FILE.read_text()
 
     if "tools" not in manifest:
         content = content.rstrip() + "\ntools:\n"
@@ -105,5 +105,5 @@ def auto_update_manifest() -> set[str]:
     indented = "\n".join("    " + line if line.strip() else line for line in fragment.splitlines())
     content = content.rstrip() + "\n" + indented + "\n"
 
-    manifest_file.write_text(content)
+    MANIFEST_FILE.write_text(content)
     return set(new_entries.keys())

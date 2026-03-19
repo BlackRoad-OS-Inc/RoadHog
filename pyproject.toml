@@ -68,7 +68,7 @@ dependencies = [
     "grimp==3.13",
     "grpcio~=1.71.0",
     "gspread==6.2.1",
-    "hogql-parser==1.3.29",
+    "hogql-parser==1.3.28",
     "infi-clickhouse-orm",
     "jsonref==1.1.0",
     "kafka-python==2.3.0",
@@ -260,6 +260,8 @@ dev = [
     "types-tzlocal~=5.1.0.1",
     "pywatchman>=2.0.0",
     "watchdog==5.0.3",
+    # Developer CLI
+    "hogli",
 ]
 sentiment = [
     "optimum[onnxruntime]~=1.25.0",
@@ -270,6 +272,7 @@ sentiment = [
 required-version = "~=0.10.2"
 
 [tool.uv.sources]
+hogli = { path = "tools/hogli", editable = true }
 infi-clickhouse-orm = { git = "https://github.com/PostHog/infi.clickhouse_orm", rev = "4e3996becf66bf5c26580aff12a80425d9d56fe5" }
 
 

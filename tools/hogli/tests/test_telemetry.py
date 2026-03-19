@@ -11,7 +11,7 @@ from unittest.mock import patch
 import click
 from click.testing import CliRunner
 from hogli import telemetry
-from hogli.core.cli import cli
+from hogli.cli import cli
 
 _TELEMETRY_ENV_VARS = (
     "CI",
