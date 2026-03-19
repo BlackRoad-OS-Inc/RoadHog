@@ -1198,7 +1198,7 @@ jobs:
               run: | # async_migrations covered in ci-async-migrations.yml
                   # Kill pytest immediately on cancellation to avoid Django DB teardown
                   # holding the runner alive for minutes after GitHub requests cancellation.
-                  trap '[ -n "$pytest_pgid" ] && kill -KILL -$pytest_pgid 2>/dev/null; exit 130' TERM INT
+                  trap '[ -n "$pytest_pgid" ] && { echo "[trap] Caught signal, killing pytest pgid=$pytest_pgid"; kill -KILL -$pytest_pgid 2>/dev/null; }; exit 130' TERM INT
                   pytest -v --tb=short ${{
                       matrix.compat
                       && env.CLICKHOUSE_COMPAT_PYTEST_TARGETS
@@ -1222,8 +1222,12 @@ jobs:
                       $PYTEST_ARGS &
                   pytest_pid=$!
                   pytest_pgid=$(ps -o pgid= -p $pytest_pid | tr -d ' ')
+                  echo "[trap-debug] pytest pid=$pytest_pid pgid=$pytest_pgid"
                   exit_code=0
-                  wait $pytest_pid || exit_code=$?
+                  # Loop in case wait is interrupted by a signal but pytest is still running
+                  while kill -0 "$pytest_pid" 2>/dev/null; do
+                      wait $pytest_pid || exit_code=$?
+                  done
                   trap - TERM INT
                   if [ $exit_code -eq 5 ]; then
                       echo "No tests collected for this shard, this is expected when splitting tests"
@@ -1270,7 +1274,7 @@ jobs:
               run: |
                   # Kill pytest immediately on cancellation to avoid Django DB teardown
                   # holding the runner alive for minutes after GitHub requests cancellation.
-                  trap '[ -n "$pytest_pgid" ] && kill -KILL -$pytest_pgid 2>/dev/null; exit 130' TERM INT
+                  trap '[ -n "$pytest_pgid" ] && { echo "[trap] Caught signal, killing pytest pgid=$pytest_pgid"; kill -KILL -$pytest_pgid 2>/dev/null; }; exit 130' TERM INT
                   pytest -v --tb=short --timeout=600 --timeout-method=thread posthog/temporal products/batch_exports/backend/tests/temporal products/tasks/backend/temporal -m "not async_migrations" \
                       --splits ${{ matrix.concurrency }} --group ${{ matrix.group }} \
                       --durations=100 --durations-min=1.0 --store-durations \
@@ -1281,8 +1285,12 @@ jobs:
                       $PYTEST_ARGS &
                   pytest_pid=$!
                   pytest_pgid=$(ps -o pgid= -p $pytest_pid | tr -d ' ')
+                  echo "[trap-debug] pytest pid=$pytest_pid pgid=$pytest_pgid"
                   exit_code=0
-                  wait $pytest_pid || exit_code=$?
+                  # Loop in case wait is interrupted by a signal but pytest is still running
+                  while kill -0 "$pytest_pid" 2>/dev/null; do
+                      wait $pytest_pid || exit_code=$?
+                  done
                   trap - TERM INT
                   if [ $exit_code -eq 5 ]; then
                       echo "No tests collected for this shard, this is expected when splitting tests"
