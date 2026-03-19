@@ -32,23 +32,23 @@ pub fn parse_event_timestamp(
     let effective_sent_at = if ignore_sent_at { None } else { sent_at };
 
     // Handle timestamp parsing and clock skew adjustment
-    let (mut parsed_ts, clock_skew) = handle_timestamp(timestamp, offset, effective_sent_at, now);
+    let mut result = handle_timestamp(timestamp, offset, effective_sent_at, now);
 
     // Check for future events - clamp to now
-    let now_diff = parsed_ts.signed_duration_since(now).num_milliseconds();
+    let now_diff = result
+        .timestamp
+        .signed_duration_since(now)
+        .num_milliseconds();
     if now_diff > FUTURE_EVENT_HOURS_CUTOFF_MILLIS {
-        parsed_ts = now;
+        result.timestamp = now;
     }
 
     // Check if timestamp is out of bounds - fallback to epoch
-    if parsed_ts.year() < 0 || parsed_ts.year() > 9999 {
-        parsed_ts = DateTime::UNIX_EPOCH;
+    if result.timestamp.year() < 0 || result.timestamp.year() > 9999 {
+        result.timestamp = DateTime::UNIX_EPOCH;
     }
 
-    ParsedTimestamp {
-        timestamp: parsed_ts,
-        clock_skew,
-    }
+    result
 }
 
 fn handle_timestamp(
@@ -56,7 +56,7 @@ fn handle_timestamp(
     offset: Option<i64>,
     sent_at: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
-) -> (DateTime<Utc>, Option<Duration>) {
+) -> ParsedTimestamp {
     let mut parsed_ts = now;
     let mut clock_skew = None;
 
@@ -80,7 +80,10 @@ fn handle_timestamp(
         parsed_ts = now - Duration::milliseconds(offset_ms);
     }
 
-    (parsed_ts, clock_skew)
+    ParsedTimestamp {
+        timestamp: parsed_ts,
+        clock_skew,
+    }
 }
 
 /// Parse a date string using a streamlined approach
@@ -167,9 +170,7 @@ mod tests {
     use super::*;
 
     fn dt(s: &str) -> DateTime<Utc> {
-        DateTime::parse_from_rfc3339(s)
-            .unwrap()
-            .with_timezone(&Utc)
+        DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc)
     }
 
     #[test]
