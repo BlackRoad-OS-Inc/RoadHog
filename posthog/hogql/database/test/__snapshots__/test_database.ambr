@@ -1251,6 +1251,7 @@
                       "$end_pathname",
                       "$end_hostname",
                       "$entry_referring_domain",
+                      "$entry_referrer",
                       "$entry_utm_source",
                       "$entry_utm_campaign",
                       "$entry_utm_medium",
@@ -1786,6 +1787,16 @@
                   "hogql_value": "`$entry_referring_domain`",
                   "id": null,
                   "name": "$entry_referring_domain",
+                  "schema_valid": true,
+                  "table": null,
+                  "type": "string"
+              },
+              "$entry_referrer": {
+                  "chain": null,
+                  "fields": null,
+                  "hogql_value": "`$entry_referrer`",
+                  "id": null,
+                  "name": "$entry_referrer",
                   "schema_valid": true,
                   "table": null,
                   "type": "string"
