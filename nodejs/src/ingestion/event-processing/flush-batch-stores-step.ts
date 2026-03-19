@@ -40,7 +40,7 @@ export function createFlushBatchStoresStep<TOutput, COutput, CBatch>(
 ): AfterBatchStep<TOutput, COutput, CBatch> {
     const { personsStore, groupStore, kafkaProducer } = config
 
-    return async (input) => {
+    return async function flushBatchStoresStep(input) {
         try {
             // Flush both stores in parallel (DB operations, still blocking)
             const [_groupResults, personsStoreMessages] = await Promise.all([groupStore.flush(), personsStore.flush()])
