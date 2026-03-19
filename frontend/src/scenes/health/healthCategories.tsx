@@ -1,6 +1,6 @@
-import { IconCode, IconDatabase, IconPulse, IconTrending, IconWarning } from '@posthog/icons'
+import { IconCode, IconDatabase, IconDecisionTree, IconPulse, IconTrending, IconWarning } from '@posthog/icons'
 
-export type HealthIssueCategory = 'ingestion' | 'sdk' | 'web_analytics' | 'pipelines' | 'other'
+export type HealthIssueCategory = 'ingestion' | 'sdk' | 'web_analytics' | 'data_modeling' | 'pipelines' | 'other'
 
 export type HealthIssueKind =
     | 'no_live_events'
@@ -11,6 +11,8 @@ export type HealthIssueKind =
     | 'web_vitals'
     | 'ingestion_lag'
     | 'sdk_outdated'
+    | 'materialized_view_failure'
+    | 'external_data_failure'
 
 interface CategoryConfig {
     label: string
@@ -49,6 +51,13 @@ export const HEALTH_CATEGORY_CONFIG: Record<HealthIssueCategory, CategoryConfig>
         icon: <IconDatabase className="size-5" />,
         showInSummary: true,
     },
+    data_modeling: {
+        label: 'Data modeling',
+        description: 'Materialized views and data models',
+        healthyDescription: 'All healthy',
+        icon: <IconDecisionTree className="size-5" />,
+        showInSummary: true,
+    },
     other: {
         label: 'Other',
         description: 'Other health issues',
@@ -63,6 +72,9 @@ const KIND_TO_CATEGORY: Record<HealthIssueKind, HealthIssueCategory> = {
 
     // Pipelines
     external_data_failure: 'pipelines',
+
+    // Data modeling
+    materialized_view_failure: 'data_modeling',
 
     // SDKs
     sdk_outdated: 'sdk',
@@ -86,10 +98,18 @@ export const KIND_LABELS: Record<HealthIssueKind, string> = {
     ingestion_lag: 'Ingestion lag',
     external_data_failure: 'External data failures',
     sdk_outdated: 'SDK outdated',
+    materialized_view_failure: 'Materialized view failure',
 }
 
 export const categoryForKind = (kind: string): HealthIssueCategory => {
     return KIND_TO_CATEGORY[kind as HealthIssueKind] ?? 'other'
 }
 
-export const CATEGORY_ORDER: HealthIssueCategory[] = ['ingestion', 'sdk', 'web_analytics', 'pipelines', 'other']
+export const CATEGORY_ORDER: HealthIssueCategory[] = [
+    'ingestion',
+    'sdk',
+    'web_analytics',
+    'data_modeling',
+    'pipelines',
+    'other',
+]
