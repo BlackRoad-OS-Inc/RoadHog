@@ -185,7 +185,10 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                             data-attr="configure-homepage-modal-set-launchpad"
                                             disabled={isUsingProjectDefault}
                                         >
-                                            Launchpad
+                                            Launchpad{' '}
+                                            <LemonTag size="small" type="highlight" className="ml-1">
+                                                New
+                                            </LemonTag>
                                         </LemonButton>
                                         <LemonButton
                                             size="small"
