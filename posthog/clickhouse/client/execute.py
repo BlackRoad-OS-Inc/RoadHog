@@ -31,6 +31,7 @@ from posthog.clickhouse.query_tagging import (
     Feature,
     Product,
     QueryTags,
+    get_caller_source,
     get_query_tag_value,
     get_query_tags,
 )
@@ -322,6 +323,10 @@ def sync_execute(
             tags=",".join(missing),
             stacktrace="".join(traceback.format_stack()),
         )
+
+    source_file, source_line = get_caller_source()
+    tags.source_file = source_file
+    tags.source_line = source_line
 
     settings = {
         **core_settings,
