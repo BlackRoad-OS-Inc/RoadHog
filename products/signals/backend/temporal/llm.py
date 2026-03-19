@@ -12,13 +12,16 @@ from posthoganalytics.ai.anthropic import AsyncAnthropic
 
 logger = structlog.get_logger(__name__)
 
-MATCHING_MODEL = os.getenv("SIGNAL_MATCHING_LLM_MODEL", "claude-sonnet-4-5")
+JUDGING_MODEL = os.getenv("SIGNAL_JUDGING_LLM_MODEL", "claude-sonnet-4-6")
+GROUPING_MODEL = os.getenv("SIGNAL_GROUPING_LLM_MODEL", "claude-haiku-4-5")
 
 # Models that support Anthropic extended thinking. Keep in sync with the models we actually use.
 ANTHROPIC_THINKING_MODELS = {
     "claude-haiku-4-5",
     "claude-sonnet-4-5",
+    "claude-sonnet-4-6",
     "claude-opus-4-5",
+    "claude-opus-4-6",
     "claude-opus-4-1",
     "claude-sonnet-4-0",
     "claude-opus-4-0",
@@ -99,10 +102,12 @@ async def call_llm(
     thinking: bool = False,
     temperature: Optional[float] = 0.2,
     retries: int = MAX_RETRIES,
+    model: Optional[str] = None,
 ) -> T:
     # Worth noting a lot of this code only really works for the Anthropic API, I think (prefilling and thinking in particular). Haven't
     # looked into the OpenAI SDK yet - that'll be for the switch to the LLM gateway.
-    thinking = thinking and MATCHING_MODEL in ANTHROPIC_THINKING_MODELS
+    effective_model = model or JUDGING_MODEL
+    thinking = thinking and effective_model in ANTHROPIC_THINKING_MODELS
     client = get_async_anthropic_client()
 
     messages: list[MessageParam] = [
@@ -115,7 +120,7 @@ async def call_llm(
         messages.append({"role": "assistant", "content": "{"})
 
     create_kwargs: dict = {
-        "model": MATCHING_MODEL,
+        "model": effective_model,
         "system": system_prompt,
         "messages": messages,
         "max_tokens": MAX_RESPONSE_TOKENS,

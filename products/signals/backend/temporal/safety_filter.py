@@ -6,7 +6,7 @@ import structlog
 from pydantic import BaseModel, Field, model_validator
 from temporalio import activity
 
-from products.signals.backend.temporal.llm import EmptyLLMResponseError, call_llm
+from products.signals.backend.temporal.llm import GROUPING_MODEL, EmptyLLMResponseError, call_llm
 
 logger = structlog.get_logger(__name__)
 
@@ -119,6 +119,7 @@ async def safety_filter(description: str) -> SafetyFilterJudgeResponse:
             system_prompt=SAFETY_FILTER_PROMPT,
             user_prompt=description,
             validate=validate,
+            model=GROUPING_MODEL,
         )
     except EmptyLLMResponseError:
         return SafetyFilterJudgeResponse(

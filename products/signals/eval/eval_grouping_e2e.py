@@ -163,6 +163,7 @@ class TestGroupingPipeline:
         self.no_capture = no_capture
         self.online = online
         self.start_time = time()
+        self._match_failures: list[dict] = []
 
         # Suppress structlog noise from downstream modules during the eval
         root_logger = logging.getLogger()
@@ -227,6 +228,7 @@ class TestGroupingPipeline:
 
         self._capture_grouping_quality()
         self._capture_aggregate_metrics(stream)
+        self._dump_match_failures()
 
     async def _pre_match(
         self, sem: asyncio.Semaphore, record_id: int, case: EvalSignalCase
@@ -477,6 +479,34 @@ class TestGroupingPipeline:
             else None,
         }
 
+        if not correct:
+            self._match_failures.append(
+                {
+                    "group_index": case.group_index,
+                    "signal_index": case.signal_index,
+                    "scenario": GROUP_DATA[case.group_index].scenario,
+                    "signal_description": case.signal.content.description,
+                    "failure_mode": specificity_failure_mode.value,
+                    "pre_specificity_failure_mode": match_failure_mode.value,
+                    "match_decision": "EXISTING_REPORT" if is_existing else "NEW_REPORT",
+                    "expected": expected,
+                    "match_reason": specificity_match_result.match_metadata.reason
+                    if hasattr(specificity_match_result.match_metadata, "reason")
+                    else "",
+                    "queries": queries,
+                    "top_candidates": [
+                        {
+                            "signal_id": c.signal_id,
+                            "distance": round(c.distance, 4),
+                            "content": c.content,
+                            "report_id": c.report_id,
+                        }
+                        for cands in candidates
+                        for c in cands[:3]
+                    ],
+                }
+            )
+
         self._capture(
             eval_name="match-quality",
             item_name=f"match-{case.group_index}-{case.signal_index}",
@@ -713,6 +743,19 @@ class TestGroupingPipeline:
                 ),
             ],
         )
+
+    def _dump_match_failures(self):
+        """Write match failures to a JSON file for debugging by a human or coding agent.
+        This is context to diagnose results.
+        """
+        if not self._match_failures:
+            return
+        import json as json_mod
+
+        path = "/tmp/signals_eval_match_failures.json"
+        with open(path, "w") as f:
+            json_mod.dump(self._match_failures, f, indent=2)
+        tqdm.write(f"\n{len(self._match_failures)} match failures written to {path}", file=sys.stderr)
 
     def _capture(
         self,

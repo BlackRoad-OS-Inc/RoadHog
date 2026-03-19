@@ -29,7 +29,12 @@ from posthog.sync import database_sync_to_async
 
 from products.signals.backend.models import SignalReport
 from products.signals.backend.temporal.clickhouse import execute_hogql_query_with_retry
-from products.signals.backend.temporal.llm import MAX_QUERY_TOKENS, call_llm, truncate_query_to_token_limit
+from products.signals.backend.temporal.llm import (
+    GROUPING_MODEL,
+    MAX_QUERY_TOKENS,
+    call_llm,
+    truncate_query_to_token_limit,
+)
 from products.signals.backend.temporal.summary import (
     FetchSignalsForReportInput,
     FetchSignalsForReportOutput,
@@ -245,6 +250,7 @@ async def generate_search_queries(
         user_prompt=user_prompt,
         validate=validate,
         temperature=0.7,
+        model=GROUPING_MODEL,
     )
 
 
@@ -619,6 +625,7 @@ async def match_signal_to_report(
         user_prompt=user_prompt,
         validate=validate,
         temperature=0.2,
+        model=GROUPING_MODEL,
     )
 
 
@@ -739,6 +746,7 @@ async def verify_match_specificity(
         user_prompt=specificity_prompt,
         validate=lambda text: SpecificityResult.model_validate_json(text),
         temperature=0.2,
+        model=GROUPING_MODEL,
     )
 
     return VerifyMatchSpecificityOutput(
