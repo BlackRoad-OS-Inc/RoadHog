@@ -42,7 +42,7 @@ pub struct Mechanism {
     pub synthetic: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ExceptionList(pub Vec<Exception>);
 
@@ -160,7 +160,7 @@ pub struct FingerprintedErrProps {
 }
 
 // We emit this
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct OutputErrProps {
     #[serde(rename = "$exception_list")]
     pub exception_list: ExceptionList,
@@ -369,7 +369,8 @@ impl OutputErrProps {
         });
     }
 
-    pub fn to_fingerprint_embedding_request(&self, issue: &Issue) -> EmbeddingRequest {
+    /// Render exception types, messages, and stack frames as a human-readable string.
+    pub fn print_stacktrace(&self) -> String {
         let mut content = String::with_capacity(2048);
 
         for exception in &self.exception_list.0 {
@@ -417,6 +418,10 @@ impl OutputErrProps {
             }
         }
 
+        content
+    }
+
+    pub fn to_fingerprint_embedding_request(&self, issue: &Issue) -> EmbeddingRequest {
         EmbeddingRequest {
             team_id: issue.team_id,
             product: "error_tracking".to_string(),
@@ -424,7 +429,7 @@ impl OutputErrProps {
             rendering: "type_message_and_stack".to_string(),
             document_id: self.fingerprint.clone(),
             timestamp: issue.created_at,
-            content,
+            content: self.print_stacktrace(),
             models: vec![
                 EmbeddingModel::OpenAITextEmbeddingLarge,
                 EmbeddingModel::OpenAITextEmbeddingSmall,
