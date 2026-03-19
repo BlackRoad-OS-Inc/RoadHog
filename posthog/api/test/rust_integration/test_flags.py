@@ -1,5 +1,5 @@
 """
-Rust /flags integration tests — standalone spike.
+Rust /flags integration tests.
 
 No Django test framework. Each test:
 1. Inserts persons via psycopg2 (persons database)

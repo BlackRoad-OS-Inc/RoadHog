@@ -17,7 +17,7 @@ import os
 import json
 import uuid
 import hashlib
-from collections.abc import Generator
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -77,6 +77,7 @@ def _bootstrap_test_env() -> TestEnv:
         user=user,
         label="rust-integration-test",
         secure_value=f"sha256${secure_value}",
+        scopes=["*"],
     )
 
     return TestEnv(
@@ -189,17 +190,27 @@ class TestDB:
         )
 
     def cleanup(self) -> None:
-        for conn, tables in [
-            (self.persons_conn, ["posthog_cohortpeople", "posthog_persondistinctid", "posthog_person"]),
-            (self.main_conn, ["posthog_group", "posthog_grouptypemapping"]),
-        ]:
-            cur = conn.cursor()
-            for table in tables:
-                cur.execute(f"DELETE FROM {table} WHERE team_id = %s", (self.team_id,))  # noqa: S608
+        # posthog_cohortpeople has no team_id — delete via cohort_id from the main DB
+        persons_cur = self.persons_conn.cursor()
+        main_cur = self.main_conn.cursor()
+
+        main_cur.execute("SELECT id FROM posthog_cohort WHERE team_id = %s", (self.team_id,))
+        cohort_ids = [row[0] for row in main_cur.fetchall()]
+        if cohort_ids:
+            persons_cur.execute(
+                "DELETE FROM posthog_cohortpeople WHERE cohort_id = ANY(%s)",
+                (cohort_ids,),
+            )
+
+        for table in ["posthog_persondistinctid", "posthog_person"]:
+            persons_cur.execute(f"DELETE FROM {table} WHERE team_id = %s", (self.team_id,))  # noqa: S608
+
+        for table in ["posthog_group", "posthog_grouptypemapping"]:
+            main_cur.execute(f"DELETE FROM {table} WHERE team_id = %s", (self.team_id,))  # noqa: S608
 
 
 @pytest.fixture()
-def db(env: TestEnv) -> Generator[TestDB, None, None]:
+def db(env: TestEnv) -> Iterator[TestDB]:
     persons_conn = psycopg2.connect(PERSONS_DATABASE_URL)
     persons_conn.autocommit = True
     main_conn = psycopg2.connect(DATABASE_URL)
@@ -258,7 +269,7 @@ class DjangoAPI:
 
 
 @pytest.fixture()
-def api(api_session: requests.Session, env: TestEnv) -> Generator[DjangoAPI, None, None]:
+def api(api_session: requests.Session, env: TestEnv) -> Iterator[DjangoAPI]:
     client = DjangoAPI(session=api_session, base_url=DJANGO_API_URL, team_id=env.team_id)
     yield client
     client.cleanup()
