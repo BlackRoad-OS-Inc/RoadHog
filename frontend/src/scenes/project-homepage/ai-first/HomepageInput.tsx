@@ -289,7 +289,7 @@ function HomePageOfframp(): JSX.Element {
             <ButtonPrimitive
                 variant="panel"
                 onClick={() => {
-                    posthog.capture('homepage offramp configure home clicked')
+                    posthog.capture('homepage configure home clicked', { source: 'offramp' })
                     showConfigurePinnedTabsModal()
                 }}
                 tooltip="Configure tabs & home"

@@ -408,9 +408,9 @@ export function PanelLayoutNavBar({ children }: { children: React.ReactNode }): 
                                                                 isSideActionRight
                                                                 onClick={(e) => {
                                                                     e.stopPropagation()
-                                                                    posthog.capture(
-                                                                        'navbar home side action configure home clicked'
-                                                                    )
+                                                                    posthog.capture('homepage configure home clicked', {
+                                                                        source: 'navbar',
+                                                                    })
                                                                     showConfigurePinnedTabsModal()
                                                                 }}
                                                                 data-attr="menu-item-side-action-configure-home"

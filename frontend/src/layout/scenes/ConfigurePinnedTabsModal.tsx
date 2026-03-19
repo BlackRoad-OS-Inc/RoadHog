@@ -177,7 +177,9 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                             size="small"
                                             type="secondary"
                                             onClick={() => {
-                                                posthog.capture('configure homepage modal set launchpad clicked')
+                                                posthog.capture('homepage configure set homepage', {
+                                                    value: 'launchpad',
+                                                })
                                                 setHomepage(null)
                                             }}
                                             data-attr="configure-homepage-modal-set-launchpad"
@@ -189,7 +191,7 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                             size="small"
                                             type="secondary"
                                             onClick={() => {
-                                                posthog.capture('configure homepage modal set search clicked')
+                                                posthog.capture('homepage configure set homepage', { value: 'search' })
                                                 setHomepage(newTabHomepage)
                                             }}
                                             data-attr="configure-homepage-modal-set-search"
@@ -201,9 +203,9 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                             size="small"
                                             type="secondary"
                                             onClick={() => {
-                                                posthog.capture(
-                                                    'configure homepage modal set default dashboard clicked'
-                                                )
+                                                posthog.capture('homepage configure set homepage', {
+                                                    value: 'default_dashboard',
+                                                })
                                                 const dashboardId = currentTeam?.primary_dashboard
                                                 if (dashboardId) {
                                                     setHomepage({
@@ -271,7 +273,7 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                     value={projectDefaultDashboardId}
                                     data-attr="configure-homepage-modal-set-default-dashboard-select"
                                     onChange={(dashboardId) => {
-                                        posthog.capture('configure homepage modal set default dashboard changed')
+                                        posthog.capture('homepage configure default dashboard changed')
                                         updateCurrentTeam({ primary_dashboard: dashboardId ?? null })
                                     }}
                                     disabledReason={dashboardsLoading ? 'Loading dashboards…' : undefined}
