@@ -5,6 +5,10 @@ import time
 import hashlib
 from typing import Any
 
+from django.conf import settings as django_settings
+from django.core import mail
+from django.utils.module_loading import import_string
+
 import requests
 import structlog
 
@@ -63,7 +67,7 @@ def add_domain(domain: str) -> dict[str, Any]:
         timeout=15,
     )
 
-    if resp.status_code == 200:
+    if resp.status_code in (200, 201):
         data = resp.json()
         return {
             "sending_dns_records": data.get("sending_dns_records", []),
@@ -121,3 +125,24 @@ def delete_domain(domain: str) -> None:
         logger.info("mailgun_domain_not_found_on_delete", domain=domain)
         return
     resp.raise_for_status()
+
+
+def get_smtp_connection():
+    """Create an SMTP connection from instance settings.
+
+    Raises a clear error if the email backend is misconfigured.
+    """
+    backend_path = django_settings.EMAIL_BACKEND
+    try:
+        klass = import_string(backend_path) if backend_path else mail.get_connection().__class__
+    except ImportError:
+        raise ValueError(f"Invalid EMAIL_BACKEND: {backend_path!r}")
+
+    return klass(
+        host=get_instance_setting("EMAIL_HOST"),
+        port=get_instance_setting("EMAIL_PORT"),
+        username=get_instance_setting("EMAIL_HOST_USER"),
+        password=get_instance_setting("EMAIL_HOST_PASSWORD"),
+        use_tls=get_instance_setting("EMAIL_USE_TLS"),
+        use_ssl=get_instance_setting("EMAIL_USE_SSL"),
+    )

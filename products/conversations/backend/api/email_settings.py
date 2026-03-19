@@ -3,10 +3,8 @@
 import secrets
 from email.utils import formataddr, make_msgid
 
-from django.conf import settings as django_settings
 from django.core import mail
 from django.db import IntegrityError, transaction
-from django.utils.module_loading import import_string
 
 import structlog
 from rest_framework import serializers
@@ -21,6 +19,7 @@ from posthog.models.user import User
 from products.conversations.backend.mailgun import (
     add_domain as mailgun_add_domain,
     delete_domain as mailgun_delete_domain,
+    get_smtp_connection,
     verify_domain as mailgun_verify_domain,
 )
 from products.conversations.backend.models import TeamConversationsEmailConfig
@@ -241,16 +240,7 @@ class EmailSendTestView(APIView):
         email_message.attach_alternative(html_body, "text/html")
 
         try:
-            email_backend = django_settings.EMAIL_BACKEND
-            klass = import_string(email_backend) if email_backend else mail.get_connection().__class__
-            connection = klass(
-                host=get_instance_setting("EMAIL_HOST"),
-                port=get_instance_setting("EMAIL_PORT"),
-                username=get_instance_setting("EMAIL_HOST_USER"),
-                password=get_instance_setting("EMAIL_HOST_PASSWORD"),
-                use_tls=get_instance_setting("EMAIL_USE_TLS"),
-                use_ssl=get_instance_setting("EMAIL_USE_SSL"),
-            )
+            connection = get_smtp_connection()
             connection.open()
             connection.send_messages([email_message])
             connection.close()

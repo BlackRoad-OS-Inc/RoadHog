@@ -6,10 +6,8 @@ from typing import Any, cast
 from urllib.parse import urlparse
 from uuid import UUID
 
-from django.conf import settings as django_settings
 from django.core import mail
 from django.core.cache import cache
-from django.utils.module_loading import import_string
 
 import requests
 import structlog
@@ -27,6 +25,7 @@ from products.conversations.backend.formatting import (
     rich_content_to_markdown,
     rich_content_to_slack_payload,
 )
+from products.conversations.backend.mailgun import get_smtp_connection
 from products.conversations.backend.models import EmailMessageMapping, TeamConversationsEmailConfig
 from products.conversations.backend.models.ticket import Ticket
 from products.conversations.backend.slack import get_slack_client
@@ -444,16 +443,7 @@ def send_email_reply(
 
     connection = None
     try:
-        email_backend = django_settings.EMAIL_BACKEND
-        klass = import_string(email_backend) if email_backend else mail.get_connection().__class__
-        connection = klass(
-            host=get_instance_setting("EMAIL_HOST"),
-            port=get_instance_setting("EMAIL_PORT"),
-            username=get_instance_setting("EMAIL_HOST_USER"),
-            password=get_instance_setting("EMAIL_HOST_PASSWORD"),
-            use_tls=get_instance_setting("EMAIL_USE_TLS"),
-            use_ssl=get_instance_setting("EMAIL_USE_SSL"),
-        )
+        connection = get_smtp_connection()
         connection.open()
         connection.send_messages([email_message])
     except Exception as e:
