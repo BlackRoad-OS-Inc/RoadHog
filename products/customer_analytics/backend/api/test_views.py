@@ -1,3 +1,5 @@
+import importlib
+
 import pytest
 from posthog.test.base import APIBaseTest
 
@@ -13,10 +15,9 @@ from posthog.models.user import User
 
 from products.customer_analytics.backend.models import CustomerJourney, CustomerProfileConfig
 
-try:
-    from ee.models.rbac.access_control import AccessControl
-except ImportError:
-    pass
+
+def _get_access_control_model():
+    return importlib.import_module("ee.models.rbac.access_control").AccessControl
 
 
 class TestCustomerProfileConfigViewSet(APIBaseTest):
@@ -429,7 +430,7 @@ class TestCustomerAnalyticsAccessControl(APIBaseTest):
 
     def _set_access_level(self, user: User, resource: str = "customer_analytics", access_level: str = "viewer") -> None:
         membership = OrganizationMembership.objects.get(user=user, organization=self.organization)
-        AccessControl.objects.create(
+        _get_access_control_model().objects.create(
             team=self.team,
             resource=resource,
             resource_id=None,
