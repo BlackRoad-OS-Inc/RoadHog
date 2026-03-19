@@ -83,19 +83,10 @@ interface TrackedBatch<TOutput, CBatch, COutput> {
  * - TInput/TOutput: value types flowing through the pipeline
  * - CInput: context type accepted by feed() (without messageId)
  * - CBatch: opaque batch context passed to hooks
- * - CSubIn: context type fed to the sub-pipeline after beforeBatch maps elements.
- *   Must extend CInput & BatchingContext.
  * - COutput: context type returned by the sub-pipeline.
  *   Must extend BatchingContext (messageId flows through the sub-pipeline).
  */
-export class BatchingPipeline<
-    TInput,
-    TOutput,
-    CInput,
-    CBatch,
-    CSubIn extends CInput & BatchingContext,
-    COutput extends BatchingContext,
-> {
+export class BatchingPipeline<TInput, TOutput, CInput, CBatch, COutput extends BatchingContext> {
     private nextBatchId = 0
     private nextMessageId = 0
     private batches = new Map<number, TrackedBatch<TOutput, CBatch, COutput>>()
@@ -105,7 +96,7 @@ export class BatchingPipeline<
     private options: BatchingPipelineOptions
 
     constructor(
-        private subPipeline: BatchPipeline<TInput & CBatch, TOutput, CSubIn, COutput>,
+        private subPipeline: BatchPipeline<TInput & CBatch, TOutput, CInput & BatchingContext, COutput>,
         private beforePipeline: Pipeline<
             BeforeBatchInput<TInput, CInput>,
             BeforeBatchOutput<TInput, CInput, CBatch>,
@@ -154,7 +145,7 @@ export class BatchingPipeline<
                     messageId,
                 },
             }
-        }) as unknown as BatchPipelineResultWithContext<TInput & CBatch, CSubIn>
+        })
 
         this.batches.set(batchId, {
             batchContext,

@@ -46,7 +46,7 @@ export function newBatchingPipeline<TInput, TOutput, CInput, CBatch = NonNullabl
         Record<string, never>
     >,
     options?: Partial<BatchingPipelineOptions>
-): BatchingPipeline<TInput, TOutput, CInput, CBatch, CInput & BatchingContext, COutput & BatchingContext> {
+): BatchingPipeline<TInput, TOutput, CInput, CBatch, COutput & BatchingContext> {
     const startBuilder = new BatchPipelineBuilder(
         new BufferingBatchPipeline<TInput & CBatch, CInput & BatchingContext>()
     )
