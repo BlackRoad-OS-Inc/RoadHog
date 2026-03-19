@@ -16,11 +16,11 @@ import { CdpInternalEventsConsumer } from './cdp/consumers/cdp-internal-event.co
 import { CdpLegacyEventsConsumer, CdpLegacyEventsConsumerDeps } from './cdp/consumers/cdp-legacy-event.consumer'
 import { CdpPersonUpdatesConsumer } from './cdp/consumers/cdp-person-updates-consumer'
 import { CdpPrecalculatedFiltersConsumer } from './cdp/consumers/cdp-precalculated-filters.consumer'
-import { CyclotronV2JanitorService } from './cdp/services/cyclotron-v2'
 import {
     HogTransformerServiceDeps,
     createHogTransformerService,
 } from './cdp/hog-transformations/hog-transformer.service'
+import { CyclotronV2JanitorService } from './cdp/services/cyclotron-v2'
 import { EncryptedFields } from './cdp/utils/encryption-utils'
 import { defaultConfig } from './config/config'
 import { createIngestionRedisConnectionConfig, createPosthogRedisConnectionConfig } from './config/redis-pools'

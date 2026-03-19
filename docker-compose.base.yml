@@ -408,6 +408,9 @@ services:
             CLICKHOUSE_VERIFY: 'false'
             SESSION_RECORDING_API_REDIS_HOST: redis7
             SESSION_RECORDING_API_REDIS_PORT: 6379
+            # Logs/traces consumers default to 127.0.0.1 which doesn't work in Docker
+            LOGS_REDIS_HOST: redis7
+            TRACES_REDIS_HOST: redis7
 
     ingestion-general:
         command: node nodejs/dist/index.js
