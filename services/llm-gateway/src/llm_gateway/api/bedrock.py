@@ -1,3 +1,4 @@
+import functools
 import json
 import time
 from typing import Any
@@ -34,11 +35,16 @@ def ensure_bedrock_configured(settings: Any) -> None:
     )
 
 
+@functools.lru_cache
+def _get_bedrock_runtime_client(region_name: str):
+    return boto3.client("bedrock-runtime", region_name=region_name)
+
+
 # The Bedrock CountTokens API requires a max_tokens field, but it's ignored in the calculation—tokens are counted from the input only.
 def count_tokens_with_bedrock(
     messages: list[dict[str, Any]], model: str, aws_region_name: str, max_tokens: int = 4096
 ) -> int:
-    bedrock_runtime_client = boto3.client("bedrock-runtime", region_name=aws_region_name)
+    bedrock_runtime_client = _get_bedrock_runtime_client(aws_region_name)
 
     body = {
         "anthropic_version": "bedrock-2023-05-31",
