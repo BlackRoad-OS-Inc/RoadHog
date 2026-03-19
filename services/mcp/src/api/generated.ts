@@ -18212,15 +18212,6 @@ export namespace Schemas {
       results: Dataset[];
     }
 
-    export interface PaginatedDependentFlagList {
-      count: number;
-      /** @nullable */
-      next?: string | null;
-      /** @nullable */
-      previous?: string | null;
-      results: DependentFlag[];
-    }
-
     export interface PaginatedDesktopRecordingList {
       count: number;
       /** @nullable */
@@ -31145,17 +31136,6 @@ export namespace Schemas {
      * @minimum 1
      */
     page?: number;
-    };
-
-    export type FeatureFlagsDependentFlagsListParams = {
-    /**
-     * Number of results to return per page.
-     */
-    limit?: number;
-    /**
-     * The initial index from which to return the results.
-     */
-    offset?: number;
     };
 
     export type FeatureFlagsActivityRetrieveParams = {

@@ -35,9 +35,7 @@ class CopyFlagsRequestSerializer(serializers.Serializer):
 
 class CopyFlagsResultSerializer(serializers.Serializer):
     project_id = serializers.IntegerField(required=False, help_text="Project ID (present on failure)")
-    error_message = serializers.CharField(
-        required=False, source="errors", help_text="Error message (present on failure)"
-    )
+    error_message = serializers.CharField(required=False, help_text="Error message (present on failure)")
 
 
 class CopyFlagsResponseSerializer(serializers.Serializer):
@@ -140,7 +138,7 @@ class OrganizationFeatureFlagView(
                 failed_projects.append(
                     {
                         "project_id": target_project_id,
-                        "errors": "Project not found.",
+                        "error_message": "Project not found.",
                     }
                 )
                 continue
@@ -313,7 +311,9 @@ class OrganizationFeatureFlagView(
                 failed_projects.append(
                     {
                         "project_id": target_project_id,
-                        "errors": str(e) if not feature_flag_serializer.errors else feature_flag_serializer.errors,
+                        "error_message": str(e)
+                        if not feature_flag_serializer.errors
+                        else feature_flag_serializer.errors,
                     }
                 )
 

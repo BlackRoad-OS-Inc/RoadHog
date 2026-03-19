@@ -738,15 +738,6 @@ export interface DependentFlagApi {
     name: string
 }
 
-export interface PaginatedDependentFlagListApi {
-    count: number
-    /** @nullable */
-    next?: string | null
-    /** @nullable */
-    previous?: string | null
-    results: DependentFlagApi[]
-}
-
 export interface FeatureFlagStatusResponseApi {
     /** Flag status: active, stale, deleted, or unknown */
     status: string
@@ -913,17 +904,6 @@ export type FeatureFlagsActivityRetrieve2Params = {
      * @minimum 1
      */
     page?: number
-}
-
-export type FeatureFlagsDependentFlagsListParams = {
-    /**
-     * Number of results to return per page.
-     */
-    limit?: number
-    /**
-     * The initial index from which to return the results.
-     */
-    offset?: number
 }
 
 export type FeatureFlagsActivityRetrieveParams = {

@@ -12,19 +12,18 @@ import type {
     ActivityLogPaginatedResponseApi,
     CopyFlagsRequestApi,
     CopyFlagsResponseApi,
+    DependentFlagApi,
     FeatureFlagApi,
     FeatureFlagCreateRequestSchemaApi,
     FeatureFlagStatusResponseApi,
     FeatureFlagsActivityRetrieve2Params,
     FeatureFlagsActivityRetrieveParams,
-    FeatureFlagsDependentFlagsListParams,
     FeatureFlagsEvaluationReasonsRetrieveParams,
     FeatureFlagsListParams,
     FeatureFlagsLocalEvaluationRetrieveParams,
     FeatureFlagsMyFlagsRetrieveParams,
     LocalEvaluationResponseApi,
     MyFlagsResponseApi,
-    PaginatedDependentFlagListApi,
     PaginatedFeatureFlagListApi,
     PatchedFeatureFlagPartialUpdateRequestSchemaApi,
     UserBlastRadiusRequestApi,
@@ -300,33 +299,16 @@ export const featureFlagsDashboardCreate = async (
 /**
  * Get other active flags that depend on this flag.
  */
-export const getFeatureFlagsDependentFlagsListUrl = (
-    projectId: string,
-    id: number,
-    params?: FeatureFlagsDependentFlagsListParams
-) => {
-    const normalizedParams = new URLSearchParams()
-
-    Object.entries(params || {}).forEach(([key, value]) => {
-        if (value !== undefined) {
-            normalizedParams.append(key, value === null ? 'null' : value.toString())
-        }
-    })
-
-    const stringifiedParams = normalizedParams.toString()
-
-    return stringifiedParams.length > 0
-        ? `/api/projects/${projectId}/feature_flags/${id}/dependent_flags/?${stringifiedParams}`
-        : `/api/projects/${projectId}/feature_flags/${id}/dependent_flags/`
+export const getFeatureFlagsDependentFlagsListUrl = (projectId: string, id: number) => {
+    return `/api/projects/${projectId}/feature_flags/${id}/dependent_flags/`
 }
 
 export const featureFlagsDependentFlagsList = async (
     projectId: string,
     id: number,
-    params?: FeatureFlagsDependentFlagsListParams,
     options?: RequestInit
-): Promise<PaginatedDependentFlagListApi> => {
-    return apiMutator<PaginatedDependentFlagListApi>(getFeatureFlagsDependentFlagsListUrl(projectId, id, params), {
+): Promise<DependentFlagApi[]> => {
+    return apiMutator<DependentFlagApi[]>(getFeatureFlagsDependentFlagsListUrl(projectId, id), {
         ...options,
         method: 'GET',
     })

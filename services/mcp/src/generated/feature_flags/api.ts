@@ -719,11 +719,6 @@ export const FeatureFlagsDependentFlagsListParams = /* @__PURE__ */ zod.object({
         ),
 })
 
-export const FeatureFlagsDependentFlagsListQueryParams = /* @__PURE__ */ zod.object({
-    limit: zod.number().optional().describe('Number of results to return per page.'),
-    offset: zod.number().optional().describe('The initial index from which to return the results.'),
-})
-
 /**
  * Create, read, update and delete feature flags. [See docs](https://posthog.com/docs/feature-flags) for more information on feature flags.
 

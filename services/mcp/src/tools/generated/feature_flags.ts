@@ -8,7 +8,6 @@ import {
     FeatureFlagsCopyFlagsCreateBody,
     FeatureFlagsCreateBody,
     FeatureFlagsDependentFlagsListParams,
-    FeatureFlagsDependentFlagsListQueryParams,
     FeatureFlagsDestroyParams,
     FeatureFlagsEvaluationReasonsRetrieveQueryParams,
     FeatureFlagsListQueryParams,
@@ -200,25 +199,19 @@ const featureFlagsActivityRetrieve = (): ToolBase<
     },
 })
 
-const FeatureFlagsDependentFlagsRetrieveSchema = FeatureFlagsDependentFlagsListParams.omit({ project_id: true }).extend(
-    FeatureFlagsDependentFlagsListQueryParams.shape
-)
+const FeatureFlagsDependentFlagsRetrieveSchema = FeatureFlagsDependentFlagsListParams.omit({ project_id: true })
 
 const featureFlagsDependentFlagsRetrieve = (): ToolBase<
     typeof FeatureFlagsDependentFlagsRetrieveSchema,
-    Schemas.PaginatedDependentFlagList
+    Schemas.DependentFlag
 > => ({
     name: 'feature-flags-dependent-flags-retrieve',
     schema: FeatureFlagsDependentFlagsRetrieveSchema,
     handler: async (context: Context, params: z.infer<typeof FeatureFlagsDependentFlagsRetrieveSchema>) => {
         const projectId = await context.stateManager.getProjectId()
-        const result = await context.api.request<Schemas.PaginatedDependentFlagList>({
+        const result = await context.api.request<Schemas.DependentFlag>({
             method: 'GET',
             path: `/api/projects/${projectId}/feature_flags/${params.id}/dependent_flags/`,
-            query: {
-                limit: params.limit,
-                offset: params.offset,
-            },
         })
         return result
     },

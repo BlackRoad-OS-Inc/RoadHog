@@ -69,7 +69,7 @@ from posthog.models.feature_flag import (
     set_feature_flags_for_team_in_cache,
 )
 from posthog.models.feature_flag.flag_analytics import increment_request_count
-from posthog.models.feature_flag.flag_status import FeatureFlagStatus, FeatureFlagStatusChecker
+from posthog.models.feature_flag.flag_status import FeatureFlagStatusChecker
 from posthog.models.feature_flag.flag_validation import check_flag_evaluation_query_is_ok
 from posthog.models.feature_flag.local_evaluation import (
     DATABASE_FOR_LOCAL_EVALUATION,
@@ -2114,7 +2114,7 @@ class FeatureFlagViewSet(
     @extend_schema(
         responses={200: DependentFlagSerializer(many=True)},
     )
-    @action(methods=["GET"], detail=True, required_scopes=["feature_flag:read"])
+    @action(methods=["GET"], detail=True, required_scopes=["feature_flag:read"], pagination_class=None)
     def dependent_flags(self, request: request.Request, **kwargs):
         """Get other active flags that depend on this flag."""
         feature_flag: FeatureFlag = self.get_object()
@@ -3017,7 +3017,7 @@ class FeatureFlagViewSet(
 
         return Response(
             {"status": flag_status, "reason": reason},
-            status=status.HTTP_404_NOT_FOUND if flag_status == FeatureFlagStatus.UNKNOWN else status.HTTP_200_OK,
+            status=status.HTTP_200_OK,
         )
 
     @action(
