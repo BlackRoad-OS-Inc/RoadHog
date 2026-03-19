@@ -163,7 +163,7 @@ class ModelRegistryService:
 
         # If product has explicit allowed_models, check against those
         if config is not None and config.allowed_models is not None:
-            if config.allowed_models and not _model_matches_allowlist(model_id, config.allowed_models):
+            if not _model_matches_allowlist(model_id, config.allowed_models):
                 return False
 
         configured_providers = _get_configured_providers()
