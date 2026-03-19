@@ -15,6 +15,10 @@ from openai import OpenAI
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+BEDROCK_ENABLED = bool(
+    (os.environ.get("AWS_ACCESS_KEY_ID") or os.environ.get("AWS_PROFILE"))
+    and os.environ.get("LLM_GATEWAY_BEDROCK_REGION_NAME")
+)
 
 TEST_POSTHOG_API_KEY = "phx_fake_personal_api_key"
 
@@ -50,6 +54,14 @@ MOCK_MODEL_COSTS = {
         "mode": "chat",
         "input_cost_per_token": 0.000000075,
         "output_cost_per_token": 0.0000003,
+    },
+    "us.anthropic.claude-haiku-4-5-20251001-v1:0": {
+        "litellm_provider": "bedrock",
+        "max_input_tokens": 200000,
+        "supports_vision": True,
+        "mode": "chat",
+        "input_cost_per_token": 0.0000008,
+        "output_cost_per_token": 0.000004,
     },
 }
 
@@ -168,4 +180,12 @@ def anthropic_client(gateway_url):
     return Anthropic(
         api_key=TEST_POSTHOG_API_KEY,
         base_url=gateway_url,
+    )
+
+
+@pytest.fixture
+def bedrock_client(gateway_url):
+    return Anthropic(
+        api_key=TEST_POSTHOG_API_KEY,
+        base_url=f"{gateway_url}/bedrock",
     )
