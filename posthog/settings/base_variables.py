@@ -50,6 +50,10 @@ SERVER_GATEWAY_INTERFACE = get_from_env("SERVER_GATEWAY_INTERFACE", "WSGI", type
 # GitHub secret alert relay URL - set in US deployment to forward alerts to EU
 GITHUB_SECRET_ALERT_RELAY_URL: str | None = get_from_env("GITHUB_SECRET_ALERT_RELAY_URL", optional=True)
 
+# Duckgres provisioning API - URL and bearer token for the managed warehouse provisioning service
+DUCKGRES_PROVISIONING_URL: str | None = get_from_env("DUCKGRES_PROVISIONING_URL", optional=True)
+DUCKGRES_PROVISIONING_TOKEN: str | None = get_from_env("DUCKGRES_PROVISIONING_TOKEN", optional=True)
+
 # Bulk deletion operations can be disabled during database migrations
 DISABLE_BULK_DELETES: bool = get_from_env("DISABLE_BULK_DELETES", False, type_cast=str_to_bool)
 

@@ -2,10 +2,12 @@ from datetime import datetime, timedelta
 from typing import cast
 from zoneinfo import ZoneInfo
 
+from django.conf import settings as django_settings
 from django.db import connection
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate, TruncHour
 
+import requests as http_requests
 import structlog
 from dateutil import parser
 from rest_framework import serializers, status, viewsets
@@ -771,3 +773,61 @@ class DataWarehouseViewSet(TeamAndOrgViewSetMixin, viewsets.ViewSet):
         # For now we only expose the first one (by creation order) to keep the UI simple.
         first_dashboard = config.overview_dashboards.order_by("id").first()
         return Response({"dashboard_id": first_dashboard.id if first_dashboard else None})
+
+    # --- Managed warehouse provisioning (proxied to duckgres) ---
+
+    def _provisioning_request(self, method: str, path: str, json_body: dict | None = None) -> Response:
+        """Proxy a request to the duckgres provisioning API."""
+        base_url = getattr(django_settings, "DUCKGRES_PROVISIONING_URL", None)
+        token = getattr(django_settings, "DUCKGRES_PROVISIONING_TOKEN", None)
+
+        if not base_url:
+            return Response(
+                {"error": "Managed warehouse provisioning is not configured"},
+                status=status.HTTP_501_NOT_IMPLEMENTED,
+            )
+
+        # Use the PostHog team_id as the duckgres team identifier
+        team_id = str(self.team_id)
+        url = f"{base_url.rstrip('/')}/api/v1/teams/{team_id}{path}"
+        headers = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+        try:
+            resp = http_requests.request(method, url, json=json_body, headers=headers, timeout=30)
+            return Response(resp.json(), status=resp.status_code)
+        except http_requests.Timeout:
+            logger.warning("Provisioning API timeout", url=url, team_id=team_id)
+            return Response({"error": "Provisioning service timed out"}, status=status.HTTP_504_GATEWAY_TIMEOUT)
+        except http_requests.ConnectionError:
+            logger.warning("Provisioning API unreachable", url=url, team_id=team_id)
+            return Response({"error": "Provisioning service is unreachable"}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception:
+            logger.exception("Provisioning API error", url=url, team_id=team_id)
+            return Response(
+                {"error": "An error occurred contacting the provisioning service"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(methods=["POST"], detail=False)
+    def provision(self, request: Request, **kwargs) -> Response:
+        """Start provisioning a managed warehouse for this team."""
+        return self._provisioning_request(
+            "POST",
+            "/provision",
+            json_body={
+                "image": "ghcr.io/posthog/duckgres:latest",
+                "metadata_store": {"type": "aurora", "aurora": {"min_acu": 0.5, "max_acu": 2}},
+            },
+        )
+
+    @action(methods=["POST"], detail=False)
+    def deprovision(self, request: Request, **kwargs) -> Response:
+        """Start deprovisioning the managed warehouse for this team."""
+        return self._provisioning_request("POST", "/deprovision")
+
+    @action(methods=["GET"], detail=False)
+    def warehouse_status(self, request: Request, **kwargs) -> Response:
+        """Get the current provisioning status of the managed warehouse."""
+        return self._provisioning_request("GET", "/warehouse")

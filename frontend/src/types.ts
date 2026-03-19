@@ -6651,6 +6651,48 @@ export interface DataWarehouseActivityRecord {
     origin?: DataWarehouseSavedQueryOrigin | null
 }
 
+export type DataWarehouseProvisioningState = 'pending' | 'provisioning' | 'ready' | 'failed' | 'deleting' | 'deleted'
+
+export interface DataWarehouseProvisioningStatus {
+    team_name: string
+    state: DataWarehouseProvisioningState
+    status_message: string
+    s3_state: DataWarehouseProvisioningState
+    metadata_store_state: DataWarehouseProvisioningState
+    identity_state: DataWarehouseProvisioningState
+    secrets_state: DataWarehouseProvisioningState
+    warehouse_database_state: DataWarehouseProvisioningState
+    ready_at: string | null
+    failed_at: string | null
+    warehouse_database: {
+        region: string
+        endpoint: string
+        port: number
+        database_name: string
+        username: string
+    }
+    metadata_store: {
+        kind: string
+        engine: string
+        region: string
+        endpoint: string
+        port: number
+        database_name: string
+        username: string
+    }
+    s3: {
+        provider: string
+        region: string
+        bucket: string
+        path_prefix: string
+    }
+    worker_identity: {
+        namespace: string
+        service_account_name: string
+        iam_role_arn: string
+    }
+}
+
 export type HeatmapType = 'screenshot' | 'iframe' | 'recording'
 export type HeatmapStatus = 'processing' | 'completed' | 'failed'
 
