@@ -37,12 +37,21 @@ export type InlineMarkdownSlashCommandItem = {
      * Omit from custom `slashCommands` if uploads are not available.
      */
     isImagePick?: boolean
+    /**
+     * Opens the link URL popover via {@link InlineMarkdownSlashLinkHostRef} (inline editor); `command` is not invoked.
+     */
+    isLinkPopover?: boolean
 }
 
 /** Mutable ref the inline editor sets each render; passed into `createInlineMarkdownSlashCommandsExtension`. */
 export type InlineMarkdownSlashImageHostRef = {
     pick: () => void
     showSlashImageUpload: boolean
+}
+
+/** Mutable ref the inline editor sets each render; opens the same link popover as the bubble toolbar. */
+export type InlineMarkdownSlashLinkHostRef = {
+    openLinkPopover: () => void
 }
 
 function HeadingIcon({ level }: { level: 1 | 2 | 3 }): JSX.Element {
@@ -205,16 +214,12 @@ export const DEFAULT_INLINE_MARKDOWN_SLASH_COMMANDS: InlineMarkdownSlashCommandI
     },
     {
         title: 'Link',
-        description: 'Add a link (you will be asked for a URL)',
+        description: 'Add or edit a link',
         icon: <IconLink />,
         keywords: ['url', 'href', 'hyperlink'],
         section: INSERT_SECTION,
-        command: (editor) => {
-            const href = window.prompt('Link URL')
-            if (href) {
-                editor.chain().focus().setLink({ href }).run()
-            }
-        },
+        isLinkPopover: true,
+        command: () => {},
     },
     {
         title: 'Image',
@@ -234,6 +239,7 @@ type InlineMarkdownSlashMenuProps = {
     onClose?: () => void
     commands: InlineMarkdownSlashCommandItem[]
     slashImageHostRef?: MutableRefObject<InlineMarkdownSlashImageHostRef | null>
+    slashLinkHostRef?: MutableRefObject<InlineMarkdownSlashLinkHostRef | null>
 }
 
 type InlineMarkdownSlashMenuRef = {
@@ -249,7 +255,10 @@ function sectionRank(section: string): number {
 
 /** Exported for tests; production uses this via {@link createInlineMarkdownSlashCommandsExtension}. */
 export const InlineMarkdownSlashMenu = forwardRef<InlineMarkdownSlashMenuRef, InlineMarkdownSlashMenuProps>(
-    function InlineMarkdownSlashMenu({ editor, range, query, onClose, commands, slashImageHostRef }, ref): JSX.Element {
+    function InlineMarkdownSlashMenu(
+        { editor, range, query, onClose, commands, slashImageHostRef, slashLinkHostRef },
+        ref
+    ): JSX.Element {
         const [selectedFlatIndex, setSelectedFlatIndex] = useState(0)
         const activeItemRef = useRef<HTMLButtonElement | null>(null)
         const { objectStorageAvailable } = useValues(preflightLogic)
@@ -257,7 +266,8 @@ export const InlineMarkdownSlashMenu = forwardRef<InlineMarkdownSlashMenuRef, In
         // Compute each render (not memoized on ref identity) so `slashImageHostRef.current.showSlashImageUpload`
         // stays in sync whenever this menu re-renders (e.g. suggestion onUpdate).
         const visibleCommands = commands.filter(
-            (item) => !item.isImagePick || (slashImageHostRef != null && slashImageHostRef.current.showSlashImageUpload)
+            (item) =>
+                !item.isImagePick || (slashImageHostRef != null && slashImageHostRef.current?.showSlashImageUpload)
         )
         const filteredCommands = !query
             ? visibleCommands
@@ -320,11 +330,19 @@ export const InlineMarkdownSlashMenu = forwardRef<InlineMarkdownSlashMenuRef, In
                     })
                     return
                 }
+                if (item.isLinkPopover) {
+                    editor.chain().focus().deleteRange(range).run()
+                    onClose?.()
+                    requestAnimationFrame(() => {
+                        slashLinkHostRef?.current?.openLinkPopover()
+                    })
+                    return
+                }
                 editor.chain().focus().deleteRange(range).run()
                 item.command(editor)
                 onClose?.()
             },
-            [editor, objectStorageAvailable, onClose, range, slashImageHostRef]
+            [editor, objectStorageAvailable, onClose, range, slashImageHostRef, slashLinkHostRef]
         )
 
         const onKeyDown = useCallback(
@@ -448,6 +466,8 @@ const InlineMarkdownSlashMenuPopover = forwardRef<InlineMarkdownSlashMenuRef, In
 export type CreateInlineMarkdownSlashCommandsExtensionOptions = {
     /** When set, **Image** slash item opens this picker after closing the menu. */
     slashImageHostRef?: MutableRefObject<InlineMarkdownSlashImageHostRef | null>
+    /** When set, **Link** slash item opens the same link popover as the bubble toolbar. */
+    slashLinkHostRef?: MutableRefObject<InlineMarkdownSlashLinkHostRef | null>
 }
 
 export function createInlineMarkdownSlashCommandsExtension(
@@ -456,6 +476,7 @@ export function createInlineMarkdownSlashCommandsExtension(
     options?: CreateInlineMarkdownSlashCommandsExtensionOptions
 ): Extension {
     const slashImageHostRef = options?.slashImageHostRef
+    const slashLinkHostRef = options?.slashLinkHostRef
 
     return Extension.create({
         name: 'inlineMarkdownSlashCommands',
@@ -486,6 +507,7 @@ export function createInlineMarkdownSlashCommandsExtension(
                                         visible: true,
                                         onClose: () => dismiss(view),
                                         slashImageHostRef,
+                                        slashLinkHostRef,
                                     },
                                     editor: props.editor,
                                 })
@@ -502,6 +524,7 @@ export function createInlineMarkdownSlashCommandsExtension(
                                     visible: true,
                                     onClose: () => dismiss(view),
                                     slashImageHostRef,
+                                    slashLinkHostRef,
                                 })
 
                                 if (!props.clientRect) {

@@ -14,6 +14,8 @@ export type RichMarkdownEditorBubbleMenuProps = {
     setLinkUrl: (url: string) => void
     showLinkPopover: boolean
     setShowLinkPopover: (visible: boolean) => void
+    linkPopoverReferenceElement?: HTMLElement | null
+    clearLinkPopoverReference?: () => void
     /** Editor shell (or content wrapper) used as drag-and-drop target for images */
     alternativeDropTargetRef: RefObject<HTMLElement | null>
     showImageUpload?: boolean
@@ -27,6 +29,8 @@ export function RichMarkdownEditorBubbleMenu({
     setLinkUrl,
     showLinkPopover,
     setShowLinkPopover,
+    linkPopoverReferenceElement = null,
+    clearLinkPopoverReference,
     alternativeDropTargetRef,
     showImageUpload = true,
     showEmoji = true,
@@ -91,6 +95,8 @@ export function RichMarkdownEditorBubbleMenu({
                         setLinkUrl={setLinkUrl}
                         showLinkPopover={showLinkPopover}
                         setShowLinkPopover={setShowLinkPopover}
+                        linkPopoverReferenceElement={linkPopoverReferenceElement}
+                        clearLinkPopoverReference={clearLinkPopoverReference}
                     />
                 </div>
                 {showMedia ? (

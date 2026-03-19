@@ -37,6 +37,12 @@ export type RichMarkdownEditorFormatControlsProps = {
     setLinkUrl: (url: string) => void
     showLinkPopover: boolean
     setShowLinkPopover: (visible: boolean) => void
+    /**
+     * When set (e.g. after **Link** from `/` slash), positions the link popover on this node instead of the toolbar button.
+     */
+    linkPopoverReferenceElement?: HTMLElement | null
+    /** Reset external reference (slash); call when opening the popover from the link toolbar button. */
+    clearLinkPopoverReference?: () => void
 }
 
 export function RichMarkdownEditorFormatControls({
@@ -45,6 +51,8 @@ export function RichMarkdownEditorFormatControls({
     setLinkUrl,
     showLinkPopover,
     setShowLinkPopover,
+    linkPopoverReferenceElement = null,
+    clearLinkPopoverReference,
 }: RichMarkdownEditorFormatControlsProps): JSX.Element {
     const hasExistingLink = editor?.isActive('link') ?? false
 
@@ -64,8 +72,9 @@ export function RichMarkdownEditorFormatControls({
     }
 
     const openLinkPopover = (): void => {
+        clearLinkPopoverReference?.()
         const previousUrl = editor?.getAttributes('link').href || ''
-        setLinkUrl(previousUrl)
+        setLinkUrl(String(previousUrl ?? ''))
         setShowLinkPopover(true)
     }
 
@@ -194,7 +203,11 @@ export function RichMarkdownEditorFormatControls({
                 />
             </LemonMenu>
             <Popover
+                key={
+                    linkPopoverReferenceElement ? 'markdown-link-popover-external-ref' : 'markdown-link-popover-toolbar'
+                }
                 visible={showLinkPopover}
+                referenceElement={linkPopoverReferenceElement ?? undefined}
                 onClickOutside={() => setShowLinkPopover(false)}
                 overlay={
                     <div className="p-2 flex flex-col gap-2 min-w-64">

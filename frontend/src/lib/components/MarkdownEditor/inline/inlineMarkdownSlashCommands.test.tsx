@@ -263,4 +263,40 @@ describe('InlineMarkdownSlashMenu', () => {
 
         raf.mockRestore()
     })
+
+    it('choosing Link deletes the slash range and opens the host link popover', () => {
+        const openLinkPopover = jest.fn()
+        const deleteRun = jest.fn(() => true)
+        const chainApi = {
+            focus() {
+                return this
+            },
+            deleteRange: () => ({ run: deleteRun }),
+        }
+        const editor = makeEditorWithChain(chainApi)
+        const onClose = jest.fn()
+        const raf = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+            cb(0)
+            return 0
+        })
+
+        render(
+            <InlineMarkdownSlashMenu
+                editor={editor}
+                range={{ from: 2, to: 5 }}
+                query="link"
+                onClose={onClose}
+                commands={DEFAULT_INLINE_MARKDOWN_SLASH_COMMANDS}
+                slashLinkHostRef={{ current: { openLinkPopover } }}
+            />
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: /Link/i }))
+
+        expect(deleteRun).toHaveBeenCalled()
+        expect(onClose).toHaveBeenCalled()
+        expect(openLinkPopover).toHaveBeenCalled()
+
+        raf.mockRestore()
+    })
 })

@@ -25,7 +25,7 @@ export function useMarkdownEditorControlledAndFormEffects({
 }: UseMarkdownEditorControlledAndFormEffectsParams): void {
     useEffect(() => {
         lastSyncedMarkdownRef.current = value || ''
-    }, [value, lastSyncedMarkdownRef.current])
+    }, [value, lastSyncedMarkdownRef])
 
     useEffect(() => {
         if (!editor) {

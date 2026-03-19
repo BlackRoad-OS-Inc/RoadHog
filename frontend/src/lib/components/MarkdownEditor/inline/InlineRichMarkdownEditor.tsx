@@ -16,6 +16,7 @@ import {
     INLINE_MARKDOWN_SLASH_COMMANDS_PLUGIN_KEY,
     type InlineMarkdownSlashCommandItem,
     type InlineMarkdownSlashImageHostRef,
+    type InlineMarkdownSlashLinkHostRef,
 } from './inlineMarkdownSlashCommands'
 import { RichMarkdownEditorBubbleMenu } from './RichMarkdownEditorBubbleMenu'
 
@@ -100,11 +101,22 @@ export function InlineRichMarkdownEditor({
 }: InlineRichMarkdownEditorProps): JSX.Element {
     const [linkUrl, setLinkUrl] = useState('')
     const [showLinkPopover, setShowLinkPopover] = useState(false)
+    const [linkPopoverReferenceElement, setLinkPopoverReferenceElement] = useState<HTMLElement | null>(null)
     const lastSyncedMarkdownRef = useRef(value || '')
     const dropRef = useRef<HTMLDivElement>(null)
     const slashImageFileInputRef = useRef<HTMLInputElement>(null)
     const slashImageHostRef = useRef<InlineMarkdownSlashImageHostRef | null>(null)
+    const slashLinkHostRef = useRef<InlineMarkdownSlashLinkHostRef | null>(null)
     const setSlashImageFilesRef = useRef<(files: File[]) => void>(() => {})
+
+    const clearLinkPopoverReference = useCallback(() => setLinkPopoverReferenceElement(null), [])
+
+    const setShowLinkPopoverTracked = useCallback((visible: boolean): void => {
+        setShowLinkPopover(visible)
+        if (!visible) {
+            setLinkPopoverReferenceElement(null)
+        }
+    }, [])
 
     const syncMarkdownFromEditor = useCallback(
         (nextMarkdown: string, options?: { force?: boolean }): void => {
@@ -132,7 +144,7 @@ export function InlineRichMarkdownEditor({
             createInlineMarkdownSlashCommandsExtension(
                 INLINE_MARKDOWN_SLASH_COMMANDS_PLUGIN_KEY,
                 slashCommands ?? DEFAULT_INLINE_MARKDOWN_SLASH_COMMANDS,
-                { slashImageHostRef }
+                { slashImageHostRef, slashLinkHostRef }
             ),
         ]
     }, [extensions, showSlashCommands, slashCommands])
@@ -169,6 +181,17 @@ export function InlineRichMarkdownEditor({
         },
         showSlashImageUpload: showBubbleImageUpload,
     }
+    slashLinkHostRef.current = {
+        openLinkPopover: () => {
+            if (!editor) {
+                return
+            }
+            const previousUrl = editor.getAttributes('link').href || ''
+            setLinkUrl(String(previousUrl ?? ''))
+            setLinkPopoverReferenceElement(getTiptapEditorDom(editor) ?? null)
+            setShowLinkPopover(true)
+        },
+    }
 
     const currentMarkdown = editor ? docToMarkdown(editor.getJSON()) : value || ''
 
@@ -190,7 +213,9 @@ export function InlineRichMarkdownEditor({
                     linkUrl={linkUrl}
                     setLinkUrl={setLinkUrl}
                     showLinkPopover={showLinkPopover}
-                    setShowLinkPopover={setShowLinkPopover}
+                    setShowLinkPopover={setShowLinkPopoverTracked}
+                    linkPopoverReferenceElement={linkPopoverReferenceElement}
+                    clearLinkPopoverReference={clearLinkPopoverReference}
                     alternativeDropTargetRef={dropRef}
                     showImageUpload={showBubbleImageUpload}
                     showEmoji={showBubbleEmoji}
