@@ -9,7 +9,6 @@ import { createTestTeam } from '../../../../tests/helpers/team'
 import { InternalPerson, PropertyUpdateOperation } from '../../../types'
 import { parseJSON } from '../../../utils/json-parse'
 import { AI_EVENTS_OUTPUT, EVENTS_OUTPUT, IngestionOutputs } from '../../event-processing/ingestion-outputs'
-import { BatchStores } from '../../event-processing/flush-batch-stores-step'
 import { newPipelineBuilder } from '../../pipelines/builders'
 import { createContext } from '../../pipelines/helpers'
 import { PipelineResultType, ok } from '../../pipelines/results'
@@ -106,6 +105,9 @@ function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) 
         hogTransformer: {
             transformEventAndProduceMessages: (event: PluginEvent) => Promise.resolve({ event, invocationResults: [] }),
         } as any,
+        personsStore: mockPersonsStore,
+        groupStore: mockGroupStore,
+        kafkaProducer: mockKafkaProducer,
         splitAiEventsConfig: { enabled: false, enabledTeams: '*' },
         groupId: 'test-group',
         topHog: (step) => step,
@@ -113,24 +115,18 @@ function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) 
     }
 
     return {
-        pipeline: createAiEventSubpipeline(
-            newPipelineBuilder<AiEventSubpipelineInput & BatchStores>(),
-            config
-        ).build(),
+        pipeline: createAiEventSubpipeline(newPipelineBuilder<AiEventSubpipelineInput>(), config).build(),
         mockProduce,
         config,
     }
 }
 
-function createInput(event: PluginEvent): AiEventSubpipelineInput & BatchStores {
+function createInput(event: PluginEvent): AiEventSubpipelineInput {
     return {
         message,
         event,
         team,
         headers,
-        personsStore: mockPersonsStore,
-        groupStore: mockGroupStore,
-        kafkaProducer: mockKafkaProducer,
     }
 }
 

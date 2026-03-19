@@ -14,20 +14,20 @@ export interface TestingHeatmapSubpipelineInput {
     event: PluginEvent
     team: Team
     headers: EventHeaders
-    kafkaProducer: KafkaProducerWrapper
 }
 
 export interface TestingHeatmapSubpipelineConfig {
     options: {
         CLICKHOUSE_HEATMAPS_KAFKA_TOPIC: string
     }
+    kafkaProducer: KafkaProducerWrapper
 }
 
 export function createTestingHeatmapSubpipeline<TInput extends TestingHeatmapSubpipelineInput, TContext>(
     builder: StartPipelineBuilder<TInput, TContext>,
     config: TestingHeatmapSubpipelineConfig
 ): PipelineBuilder<TInput, void, TContext> {
-    const { options } = config
+    const { options, kafkaProducer } = config
 
     // Compared to heatmap-subpipeline.ts:
     // REMOVED: createProcessGroupsStep (creates/updates group records, enriches with group properties)
@@ -38,6 +38,7 @@ export function createTestingHeatmapSubpipeline<TInput extends TestingHeatmapSub
         .pipe(createPrepareEventStep())
         .pipe(
             createExtractHeatmapDataStep({
+                kafkaProducer,
                 CLICKHOUSE_HEATMAPS_KAFKA_TOPIC: options.CLICKHOUSE_HEATMAPS_KAFKA_TOPIC,
             })
         )

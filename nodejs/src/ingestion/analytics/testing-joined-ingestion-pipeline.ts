@@ -63,21 +63,18 @@ function getTokenAndDistinctId(input: TestingPerDistinctIdPipelineInput): string
     return `${token}:${distinctId}`
 }
 
-function createMapToPerEventInput(kafkaProducer: KafkaProducerWrapper) {
-    return function mapToPerEventInput<C>(
-        element: OkResultWithContext<PreprocessingOutput, C>
-    ): OkResultWithContext<TestingPerDistinctIdPipelineInput, C> {
-        const input = element.result.value
-        return {
-            result: ok({
-                message: input.message,
-                event: input.event,
-                team: input.team,
-                headers: input.headers,
-                kafkaProducer,
-            }),
-            context: element.context,
-        }
+function mapToPerEventInput<C>(
+    element: OkResultWithContext<PreprocessingOutput, C>
+): OkResultWithContext<TestingPerDistinctIdPipelineInput, C> {
+    const input = element.result.value
+    return {
+        result: ok({
+            message: input.message,
+            event: input.event,
+            team: input.team,
+            headers: input.headers,
+        }),
+        context: element.context,
     }
 }
 
@@ -102,6 +99,7 @@ export function createTestingJoinedIngestionPipeline<
     const perEventConfig: TestingPerDistinctIdPipelineConfig = {
         options: perDistinctIdOptions,
         outputs,
+        kafkaProducer,
         groupId,
     }
 
@@ -122,7 +120,7 @@ export function createTestingJoinedIngestionPipeline<
                     b
                         .teamAware((b) =>
                             createTestingPostTeamPreprocessingSubpipeline(b)
-                                .filterMap(createMapToPerEventInput(kafkaProducer), (b) =>
+                                .filterMap(mapToPerEventInput, (b) =>
                                     b
                                         .groupBy(getTokenAndDistinctId)
                                         .concurrently((eventsForDistinctId) =>

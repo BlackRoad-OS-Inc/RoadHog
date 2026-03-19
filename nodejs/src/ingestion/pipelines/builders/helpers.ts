@@ -19,7 +19,7 @@ export function newPipelineBuilder<T, C = Record<string, never>>(): StartPipelin
     return new StartPipelineBuilder<T, C>()
 }
 
-export function newBatchingPipeline<TInput, TOutput, CInput, CBatch = Record<string, never>, COutput = CInput>(
+export function newBatchingPipeline<TInput, TOutput, CInput, CBatch = NonNullable<unknown>, COutput = CInput>(
     beforeBatch: (
         builder: StartPipelineBuilder<BeforeBatchInput<TInput, CInput>, Record<string, never>>
     ) => PipelineBuilder<

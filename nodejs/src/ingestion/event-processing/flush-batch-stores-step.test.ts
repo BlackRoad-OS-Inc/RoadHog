@@ -4,8 +4,8 @@ import { BatchWritingGroupStore } from '../../worker/ingestion/groups/batch-writ
 import { FlushResult, PersonsStore } from '../../worker/ingestion/persons/persons-store'
 import { captureIngestionWarning } from '../../worker/ingestion/utils'
 import { AfterBatchInput } from '../pipelines/batching-pipeline'
-import { isOkResult, ok } from '../pipelines/results'
-import { BatchStores, createFlushBatchStoresStep, createSetBatchStoresStep } from './flush-batch-stores-step'
+import { isOkResult } from '../pipelines/results'
+import { FlushBatchStoresStepConfig, createFlushBatchStoresStep } from './flush-batch-stores-step'
 
 jest.mock('../../worker/ingestion/utils', () => ({
     captureIngestionWarning: jest.fn(),
@@ -15,7 +15,7 @@ describe('flush-batch-stores-step', () => {
     let mockPersonsStore: jest.Mocked<PersonsStore>
     let mockGroupStore: jest.Mocked<BatchWritingGroupStore>
     let mockKafkaProducer: jest.Mocked<KafkaProducerWrapper>
-    let storesConfig: BatchStores
+    let storesConfig: FlushBatchStoresStepConfig
 
     beforeEach(() => {
         mockPersonsStore = {
@@ -43,47 +43,19 @@ describe('flush-batch-stores-step', () => {
         jest.clearAllMocks()
     })
 
-    describe('createSetBatchStoresStep', () => {
-        it('should store config in batchContext and add stores to element values', async () => {
-            const elements = [
-                { result: ok({ value: 'el-1' }), context: { sideEffects: [], warnings: [] } },
-                { result: ok({ value: 'el-2' }), context: { sideEffects: [], warnings: [] } },
-            ]
-            const step = createSetBatchStoresStep<{ value: string }, any>(storesConfig)
-            const result = await step({ elements: elements as any, batchId: 0 })
-
-            expect(isOkResult(result)).toBe(true)
-            if (isOkResult(result)) {
-                expect(result.value.batchContext).toBe(storesConfig)
-                expect(result.value.elements).toHaveLength(2)
-
-                const el0 = result.value.elements[0].result
-                const el1 = result.value.elements[1].result
-                expect(isOkResult(el0)).toBe(true)
-                expect(isOkResult(el1)).toBe(true)
-                if (isOkResult(el0) && isOkResult(el1)) {
-                    expect(el0.value.value).toBe('el-1')
-                    expect(el0.value.personsStore).toBe(mockPersonsStore)
-                    expect(el1.value.value).toBe('el-2')
-                    expect(el1.value.groupStore).toBe(mockGroupStore)
-                }
-            }
-        })
-    })
-
     describe('createFlushBatchStoresStep', () => {
         let step: ReturnType<typeof createFlushBatchStoresStep>
 
-        function makeInput(): AfterBatchInput<void, any, BatchStores> {
+        function makeInput(): AfterBatchInput<void, any, NonNullable<unknown>> {
             return {
                 elements: [],
-                batchContext: storesConfig,
+                batchContext: {},
                 batchId: 0,
             }
         }
 
         beforeEach(() => {
-            step = createFlushBatchStoresStep()
+            step = createFlushBatchStoresStep(storesConfig)
         })
 
         it('should flush both stores in parallel', async () => {

@@ -3,14 +3,16 @@ import { Message } from 'node-rdkafka'
 import { PluginEvent } from '~/plugin-scaffold'
 
 import { HogTransformerService } from '../../cdp/hog-transformations/hog-transformer.service'
+import { KafkaProducerWrapper } from '../../kafka/producer'
 import { EventHeaders, Team } from '../../types'
 import { TeamManager } from '../../utils/team-manager'
 import { GroupTypeManager } from '../../worker/ingestion/group-type-manager'
+import { BatchWritingGroupStore } from '../../worker/ingestion/groups/batch-writing-group-store'
+import { PersonsStore } from '../../worker/ingestion/persons/persons-store'
 import { createCreateEventStep } from '../event-processing/create-event-step'
 import { createEmitEventStep } from '../event-processing/emit-event-step'
 import { EventPipelineRunnerOptions } from '../event-processing/event-pipeline-options'
 import { createExtractHeatmapDataStep } from '../event-processing/extract-heatmap-data-step'
-import { BatchStores } from '../event-processing/flush-batch-stores-step'
 import { createHogTransformEventStep } from '../event-processing/hog-transform-event-step'
 import { EVENTS_OUTPUT, EventOutput, IngestionOutputs } from '../event-processing/ingestion-outputs'
 import { createNormalizeEventStep } from '../event-processing/normalize-event-step'
@@ -38,15 +40,29 @@ export interface EventSubpipelineConfig {
     teamManager: TeamManager
     groupTypeManager: GroupTypeManager
     hogTransformer: HogTransformerService
+    personsStore: PersonsStore
+    groupStore: BatchWritingGroupStore
+    kafkaProducer: KafkaProducerWrapper
     groupId: string
     topHog: TopHogWrapper
 }
 
-export function createEventSubpipeline<TInput extends EventSubpipelineInput & BatchStores, TContext>(
+export function createEventSubpipeline<TInput extends EventSubpipelineInput, TContext>(
     builder: StartPipelineBuilder<TInput, TContext>,
     config: EventSubpipelineConfig
 ): PipelineBuilder<TInput, void, TContext> {
-    const { options, outputs, teamManager, groupTypeManager, hogTransformer, groupId, topHog } = config
+    const {
+        options,
+        outputs,
+        teamManager,
+        groupTypeManager,
+        hogTransformer,
+        personsStore,
+        groupStore,
+        kafkaProducer,
+        groupId,
+        topHog,
+    } = config
 
     return builder
         .pipe(createNormalizeProcessPersonFlagStep())
@@ -81,9 +97,9 @@ export function createEventSubpipeline<TInput extends EventSubpipelineInput & Ba
             ])
         )
         .pipe(createNormalizeEventStep())
-        .pipe(createProcessPersonlessStep())
+        .pipe(createProcessPersonlessStep(personsStore))
         .pipe(
-            topHog(createProcessPersonsStep(options), [
+            topHog(createProcessPersonsStep(options, kafkaProducer, personsStore), [
                 timer('process_persons_time', (input) => ({
                     team_id: String(input.team.id),
                     distinct_id: input.normalizedEvent.distinct_id,
@@ -91,9 +107,10 @@ export function createEventSubpipeline<TInput extends EventSubpipelineInput & Ba
             ])
         )
         .pipe(createPrepareEventStep())
-        .pipe(createProcessGroupsStep(teamManager, groupTypeManager, options))
+        .pipe(createProcessGroupsStep(teamManager, groupTypeManager, groupStore, options))
         .pipe(
             createExtractHeatmapDataStep({
+                kafkaProducer,
                 CLICKHOUSE_HEATMAPS_KAFKA_TOPIC: options.CLICKHOUSE_HEATMAPS_KAFKA_TOPIC,
             })
         )

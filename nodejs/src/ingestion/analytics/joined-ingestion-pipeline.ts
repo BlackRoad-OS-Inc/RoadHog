@@ -12,17 +12,14 @@ import { BatchWritingGroupStore } from '../../worker/ingestion/groups/batch-writ
 import { PersonsStore } from '../../worker/ingestion/persons/persons-store'
 import { CookielessManager } from '../cookieless/cookieless-manager'
 import { EventPipelineRunnerOptions } from '../event-processing/event-pipeline-options'
-import {
-    BatchStores,
-    createFlushBatchStoresStep,
-    createSetBatchStoresStep,
-} from '../event-processing/flush-batch-stores-step'
+import { createFlushBatchStoresStep } from '../event-processing/flush-batch-stores-step'
 import { AiEventOutput, EventOutput, IngestionOutputs } from '../event-processing/ingestion-outputs'
 import { SplitAiEventsStepConfig } from '../event-processing/split-ai-events-step'
 import { newBatchingPipeline } from '../pipelines/builders'
 import { TopHogRegistry, createTopHogWrapper } from '../pipelines/extensions/tophog'
 import { OkResultWithContext } from '../pipelines/filter-map-batch-pipeline'
 import { PipelineConfig } from '../pipelines/result-handling-pipeline'
+import { ok } from '../pipelines/results'
 import { OverflowRedirectService } from '../utils/overflow-redirect/overflow-redirect-service'
 import {
     PerDistinctIdPipelineConfig,
@@ -144,6 +141,7 @@ export function createJoinedIngestionPipeline<
         preservePartitionLocality,
         overflowRedirectService,
         overflowLaneTTLRefreshService,
+        personsStore,
         personsPrefetchEnabled,
         hogTransformer,
         cdpHogWatcherSampleRate,
@@ -156,12 +154,15 @@ export function createJoinedIngestionPipeline<
         teamManager,
         groupTypeManager,
         hogTransformer,
+        personsStore,
+        groupStore,
+        kafkaProducer,
         groupId,
         topHog: topHogWrapper,
     }
 
-    return newBatchingPipeline<TInput, void, TContext, BatchStores>(
-        (beforeBatch) => beforeBatch.pipe(createSetBatchStoresStep({ personsStore, groupStore, kafkaProducer })),
+    return newBatchingPipeline<TInput, void, TContext>(
+        (beforeBatch) => beforeBatch.pipe(({ elements }) => Promise.resolve(ok({ elements, batchContext: {} }))),
         (batch) =>
             batch
                 .messageAware((b) =>
@@ -193,7 +194,7 @@ export function createJoinedIngestionPipeline<
                 )
                 .handleResults(pipelineConfig)
                 .handleSideEffects(promiseScheduler, { await: false }),
-        (afterBatch) => afterBatch.pipe(createFlushBatchStoresStep()),
+        (afterBatch) => afterBatch.pipe(createFlushBatchStoresStep({ personsStore, groupStore, kafkaProducer })),
         // Batch stores (personsStore, groupStore) are singletons that don't support
         // concurrent batches yet — they accumulate state across events and flush once.
         { concurrentBatches: 1 }

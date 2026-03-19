@@ -7,7 +7,7 @@ import { PipelineEvent, Team } from '~/types'
 import { ONE_HOUR } from '../../../config/constants'
 import { PersonsStore } from '../persons/persons-store'
 
-type ProcessPersonlessDistinctIdsBatchStepInput = { event: PipelineEvent; team: Team; personsStore: PersonsStore }
+type ProcessPersonlessDistinctIdsBatchStepInput = { event: PipelineEvent; team: Team }
 
 export const personlessDistinctIdCacheOperationsCounter = new Counter({
     name: 'personless_distinct_id_cache_operations_total',
@@ -32,15 +32,15 @@ const PERSONLESS_DISTINCT_ID_INSERTED_CACHE = new LRUCache<string, boolean>({
  * and consumed by processPersonlessStep to determine force_upgrade.
  */
 export function processPersonlessDistinctIdsBatchStep<T extends ProcessPersonlessDistinctIdsBatchStepInput>(
+    personsStore: PersonsStore,
     enabled: boolean
 ) {
     return async function processPersonlessDistinctIdsBatchStep(events: T[]): Promise<PipelineResult<T>[]> {
-        if (enabled && events.length > 0) {
-            // Group personless entries by store instance — events in the same batch
-            // may reference different stores
+        if (enabled) {
+            // Deduplicate personless events within the batch first, then check cache
             const seenInBatch = new Set<string>()
             let cacheHits = 0
-            const storeEntries = new Map<PersonsStore, { teamId: number; distinctId: string }[]>()
+            const personlessEntries: { teamId: number; distinctId: string }[] = []
 
             for (const e of events) {
                 if (e.event.properties?.$process_person_profile !== false) {
@@ -48,6 +48,7 @@ export function processPersonlessDistinctIdsBatchStep<T extends ProcessPersonles
                 }
                 const cacheKey = `${e.team.id}|${e.event.distinct_id}`
 
+                // Skip if already seen in this batch
                 if (seenInBatch.has(cacheKey)) {
                     continue
                 }
@@ -56,12 +57,7 @@ export function processPersonlessDistinctIdsBatchStep<T extends ProcessPersonles
                 if (PERSONLESS_DISTINCT_ID_INSERTED_CACHE.get(cacheKey)) {
                     cacheHits++
                 } else {
-                    let entries = storeEntries.get(e.personsStore)
-                    if (!entries) {
-                        entries = []
-                        storeEntries.set(e.personsStore, entries)
-                    }
-                    entries.push({
+                    personlessEntries.push({
                         teamId: e.team.id,
                         distinctId: e.event.distinct_id,
                     })
@@ -72,20 +68,14 @@ export function processPersonlessDistinctIdsBatchStep<T extends ProcessPersonles
                 personlessDistinctIdCacheOperationsCounter.inc({ operation: 'hit' }, cacheHits)
             }
 
-            const promises: Promise<void>[] = []
-            for (const [store, entries] of storeEntries) {
-                personlessDistinctIdCacheOperationsCounter.inc({ operation: 'miss' }, entries.length)
-                promises.push(store.processPersonlessDistinctIdsBatch(entries))
-            }
+            if (personlessEntries.length > 0) {
+                personlessDistinctIdCacheOperationsCounter.inc({ operation: 'miss' }, personlessEntries.length)
 
-            if (promises.length > 0) {
-                await Promise.all(promises)
+                await personsStore.processPersonlessDistinctIdsBatch(personlessEntries)
 
                 // Update LRU cache for all entries we just inserted
-                for (const entries of storeEntries.values()) {
-                    for (const entry of entries) {
-                        PERSONLESS_DISTINCT_ID_INSERTED_CACHE.set(`${entry.teamId}|${entry.distinctId}`, true)
-                    }
+                for (const entry of personlessEntries) {
+                    PERSONLESS_DISTINCT_ID_INSERTED_CACHE.set(`${entry.teamId}|${entry.distinctId}`, true)
                 }
             }
         }

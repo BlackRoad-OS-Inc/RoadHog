@@ -1,13 +1,15 @@
 import { Message } from 'node-rdkafka'
 
 import { HogTransformerService } from '../../cdp/hog-transformations/hog-transformer.service'
+import { KafkaProducerWrapper } from '../../kafka/producer'
 import { Team } from '../../types'
 import { TeamManager } from '../../utils/team-manager'
 import { GroupTypeManager } from '../../worker/ingestion/group-type-manager'
+import { BatchWritingGroupStore } from '../../worker/ingestion/groups/batch-writing-group-store'
+import { PersonsStore } from '../../worker/ingestion/persons/persons-store'
 import { AI_EVENT_TYPES } from '../ai'
 import { AiEventSubpipelineInput, createAiEventSubpipeline } from '../ai/pipelines/ai-event-subpipeline'
 import { EventPipelineRunnerOptions } from '../event-processing/event-pipeline-options'
-import { BatchStores } from '../event-processing/flush-batch-stores-step'
 import { AiEventOutput, EventOutput, IngestionOutputs } from '../event-processing/ingestion-outputs'
 import { SplitAiEventsStepConfig } from '../event-processing/split-ai-events-step'
 import { PipelineBuilder, StartPipelineBuilder } from '../pipelines/builders/pipeline-builders'
@@ -33,6 +35,9 @@ export interface PerDistinctIdPipelineConfig {
     teamManager: TeamManager
     groupTypeManager: GroupTypeManager
     hogTransformer: HogTransformerService
+    personsStore: PersonsStore
+    groupStore: BatchWritingGroupStore
+    kafkaProducer: KafkaProducerWrapper
     groupId: string
     topHog: TopHogWrapper
 }
@@ -54,12 +59,23 @@ function classifyEvent(input: PerDistinctIdPipelineInput): EventBranch {
     return EVENT_BRANCH_MAP.get(input.event.event) ?? 'event'
 }
 
-export function createPerDistinctIdPipeline<TInput extends PerDistinctIdPipelineInput & BatchStores, TContext>(
+export function createPerDistinctIdPipeline<TInput extends PerDistinctIdPipelineInput, TContext>(
     builder: StartPipelineBuilder<TInput, TContext>,
     config: PerDistinctIdPipelineConfig
 ): PipelineBuilder<TInput, void, TContext> {
-    const { options, outputs, splitAiEventsConfig, teamManager, groupTypeManager, hogTransformer, groupId, topHog } =
-        config
+    const {
+        options,
+        outputs,
+        splitAiEventsConfig,
+        teamManager,
+        groupTypeManager,
+        hogTransformer,
+        personsStore,
+        groupStore,
+        kafkaProducer,
+        groupId,
+        topHog,
+    } = config
 
     return builder.retry(
         (e) =>
@@ -71,6 +87,8 @@ export function createPerDistinctIdPipeline<TInput extends PerDistinctIdPipeline
                             options,
                             teamManager,
                             groupTypeManager,
+                            groupStore,
+                            kafkaProducer,
                         })
                     )
                     .branch('ai', (b) =>
@@ -80,6 +98,9 @@ export function createPerDistinctIdPipeline<TInput extends PerDistinctIdPipeline
                             teamManager,
                             groupTypeManager,
                             hogTransformer,
+                            personsStore,
+                            groupStore,
+                            kafkaProducer,
                             splitAiEventsConfig,
                             groupId,
                             topHog,
@@ -92,6 +113,9 @@ export function createPerDistinctIdPipeline<TInput extends PerDistinctIdPipeline
                             teamManager,
                             groupTypeManager,
                             hogTransformer,
+                            personsStore,
+                            groupStore,
+                            kafkaProducer,
                             groupId,
                             topHog,
                         })

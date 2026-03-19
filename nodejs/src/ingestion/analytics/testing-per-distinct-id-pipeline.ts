@@ -1,5 +1,6 @@
 import { Message } from 'node-rdkafka'
 
+import { KafkaProducerWrapper } from '../../kafka/producer'
 import { Team } from '../../types'
 import { AI_EVENT_TYPES } from '../ai'
 import { EventOutput, IngestionOutputs } from '../event-processing/ingestion-outputs'
@@ -22,6 +23,7 @@ export interface TestingPerDistinctIdPipelineConfig {
         CLICKHOUSE_HEATMAPS_KAFKA_TOPIC: string
     }
     outputs: IngestionOutputs<EventOutput>
+    kafkaProducer: KafkaProducerWrapper
     groupId: string
 }
 
@@ -46,7 +48,7 @@ export function createTestingPerDistinctIdPipeline<TInput extends TestingPerDist
     builder: StartPipelineBuilder<TInput, TContext>,
     config: TestingPerDistinctIdPipelineConfig
 ): PipelineBuilder<TInput, void, TContext> {
-    const { options, outputs, groupId } = config
+    const { options, outputs, kafkaProducer, groupId } = config
 
     return builder.retry(
         (e) =>
@@ -56,6 +58,7 @@ export function createTestingPerDistinctIdPipeline<TInput extends TestingPerDist
                     .branch('heatmap', (b) =>
                         createTestingHeatmapSubpipeline(b, {
                             options,
+                            kafkaProducer,
                         })
                     )
                     .branch('ai', (b) =>
@@ -68,6 +71,7 @@ export function createTestingPerDistinctIdPipeline<TInput extends TestingPerDist
                         createTestingEventSubpipeline(b, {
                             options,
                             outputs,
+                            kafkaProducer,
                             groupId,
                         })
                     )
