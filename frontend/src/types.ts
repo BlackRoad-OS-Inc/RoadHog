@@ -269,6 +269,7 @@ export enum AccessControlResourceType {
     Project = 'project',
     Organization = 'organization',
     Action = 'action',
+    CustomerAnalytics = 'customer_analytics',
     FeatureFlag = 'feature_flag',
     Insight = 'insight',
     Dashboard = 'dashboard',
@@ -5046,6 +5047,8 @@ export type APIScopeObject =
     | 'annotation'
     | 'batch_export'
     | 'cohort'
+    | 'customer_analytics'
+    | 'customer_journey'
     | 'customer_profile_config'
     | 'dashboard'
     | 'dashboard_template'

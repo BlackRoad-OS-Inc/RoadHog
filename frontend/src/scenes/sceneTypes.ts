@@ -339,6 +339,12 @@ export const sceneToAccessControlResourceType: Partial<Record<Scene, AccessContr
     [Scene.Experiment]: AccessControlResourceType.Experiment,
     [Scene.Experiments]: AccessControlResourceType.Experiment,
 
+    // Customer analytics
+    [Scene.CustomerAnalytics]: AccessControlResourceType.CustomerAnalytics,
+    [Scene.CustomerAnalyticsConfiguration]: AccessControlResourceType.CustomerAnalytics,
+    [Scene.CustomerJourneyBuilder]: AccessControlResourceType.CustomerAnalytics,
+    [Scene.CustomerJourneyTemplates]: AccessControlResourceType.CustomerAnalytics,
+
     // LLM Analytics
     [Scene.LLMAnalytics]: AccessControlResourceType.LlmAnalytics,
     [Scene.LLMAnalyticsDataset]: AccessControlResourceType.LlmAnalytics,

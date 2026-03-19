@@ -53,6 +53,7 @@ ACCESS_CONTROL_LEVELS_RESOURCE: tuple[AccessControlLevelResource, ...] = get_arg
 
 ACCESS_CONTROL_RESOURCES: tuple[APIScopeObject, ...] = (
     "action",
+    "customer_analytics",
     "dashboard",
     "experiment",
     "experiment_saved_metric",
@@ -78,6 +79,8 @@ RESOURCE_INHERITANCE_MAP: dict[APIScopeObject, APIScopeObject] = {
     "dataset": "llm_analytics",
     "llm_provider_key": "llm_analytics",
     "llm_prompt": "llm_analytics",
+    "customer_journey": "customer_analytics",
+    "customer_profile_config": "customer_analytics",
 }
 
 
@@ -270,6 +273,10 @@ def model_to_resource(model: Model) -> Optional[APIScopeObject]:
         return "external_data_source"
     if name == "externaldataschema":
         return "external_data_schema"
+    if name == "customerjourney":
+        return "customer_journey"
+    if name == "customerprofileconfig":
+        return "customer_profile_config"
 
     if name not in API_SCOPE_OBJECTS:
         return None
