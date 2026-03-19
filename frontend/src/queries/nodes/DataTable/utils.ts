@@ -64,6 +64,9 @@ export function getDataNodeDefaultColumns(source: DataNode): HogQLExpression[] {
 }
 
 export function getColumnsForQuery(query: DataTableNode): HogQLExpression[] {
+    if (!query.source) {
+        return query.columns ?? []
+    }
     return query.columns ?? getDataNodeDefaultColumns(query.source)
 }
 
