@@ -7,6 +7,7 @@ from django.db.models import QuerySet
 
 import structlog
 import posthoganalytics
+from dateutil.parser import isoparse
 from django_filters import BaseInFilter, CharFilter, FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
@@ -242,22 +243,23 @@ def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
     schedule_config = trigger.get("schedule")
     scheduled_at_str = trigger.get("scheduled_at")
 
-    existing_schedules = HogFlowSchedule.objects.filter(hog_flow=hog_flow, team_id=team_id)
+    existing_schedule = (
+        HogFlowSchedule.objects.filter(hog_flow=hog_flow, team_id=team_id)
+        .exclude(status=HogFlowSchedule.Status.COMPLETED)
+        .first()
+    )
 
     if not schedule_config and not scheduled_at_str:
-        # No schedule: mark existing schedules as completed and cancel pending runs
-        for sched in existing_schedules:
-            sched.status = HogFlowSchedule.Status.COMPLETED
-            sched.save(update_fields=["status", "updated_at"])
-            HogFlowScheduledRun.objects.filter(schedule=sched, status=HogFlowScheduledRun.Status.PENDING).update(
-                status=HogFlowScheduledRun.Status.CANCELLED
-            )
+        # No schedule: mark existing as completed and cancel pending runs
+        if existing_schedule:
+            existing_schedule.status = HogFlowSchedule.Status.COMPLETED
+            existing_schedule.save(update_fields=["status", "updated_at"])
+            HogFlowScheduledRun.objects.filter(
+                schedule=existing_schedule, status=HogFlowScheduledRun.Status.PENDING
+            ).update(status=HogFlowScheduledRun.Status.CANCELLED)
         return
 
-    from dateutil.parser import isoparse
-
     if schedule_config:
-        # Recurring schedule
         rrule_str = schedule_config["rrule"]
         starts_at = isoparse(schedule_config["starts_at"])
         tz = schedule_config.get("timezone", "UTC")
@@ -267,36 +269,31 @@ def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
         starts_at = isoparse(scheduled_at_str)
         tz = "UTC"
 
-    # Create or update the schedule
-    if existing_schedules.exists():
-        schedule = existing_schedules.first()
-        assert schedule is not None
-        schedule.rrule = rrule_str
-        schedule.starts_at = starts_at
-        schedule.timezone = tz
-        if hog_flow.status == HogFlow.State.ACTIVE:
-            schedule.status = HogFlowSchedule.Status.ACTIVE
-        else:
-            schedule.status = HogFlowSchedule.Status.PAUSED
-        schedule.save(update_fields=["rrule", "starts_at", "timezone", "status", "updated_at"])
-        # Cancel old pending runs - they'll be regenerated
-        HogFlowScheduledRun.objects.filter(schedule=schedule, status=HogFlowScheduledRun.Status.PENDING).update(
-            status=HogFlowScheduledRun.Status.CANCELLED
-        )
+    schedule_status = (
+        HogFlowSchedule.Status.ACTIVE if hog_flow.status == HogFlow.State.ACTIVE else HogFlowSchedule.Status.PAUSED
+    )
+
+    if existing_schedule:
+        existing_schedule.rrule = rrule_str
+        existing_schedule.starts_at = starts_at
+        existing_schedule.timezone = tz
+        existing_schedule.status = schedule_status
+        existing_schedule.save(update_fields=["rrule", "starts_at", "timezone", "status", "updated_at"])
+        # Cancel old pending runs, they'll be regenerated below
+        HogFlowScheduledRun.objects.filter(
+            schedule=existing_schedule, status=HogFlowScheduledRun.Status.PENDING
+        ).update(status=HogFlowScheduledRun.Status.CANCELLED)
+        schedule = existing_schedule
     else:
-        status = (
-            HogFlowSchedule.Status.ACTIVE if hog_flow.status == HogFlow.State.ACTIVE else HogFlowSchedule.Status.PAUSED
-        )
         schedule = HogFlowSchedule.objects.create(
             team_id=team_id,
             hog_flow=hog_flow,
             rrule=rrule_str,
             starts_at=starts_at,
             timezone=tz,
-            status=status,
+            status=schedule_status,
         )
 
-    # Generate initial window of pending runs
     if schedule.status == HogFlowSchedule.Status.ACTIVE:
         _replenish_scheduled_runs(schedule, team_id)
 
@@ -516,6 +513,13 @@ class HogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, vie
         serializer.save()
         log_activity_from_viewset(self, serializer.instance, name=serializer.instance.name, detail_type="standard")
 
+        # Sync recurring schedule if present in trigger config
+        try:
+            with transaction.atomic():
+                _sync_schedule_for_hog_flow(serializer.instance, self.team_id)
+        except Exception as e:
+            logger.warning("Failed to sync schedule on create", error=str(e))
+
         try:
             # Count edges and actions
             edges_count = len(serializer.instance.edges) if serializer.instance.edges else 0
@@ -550,6 +554,13 @@ class HogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, vie
         serializer.save()
 
         log_activity_from_viewset(self, serializer.instance, name=serializer.instance.name, previous=before_update)
+
+        # Sync recurring schedule: handle activation, deactivation, and config changes
+        try:
+            with transaction.atomic():
+                _sync_schedule_for_hog_flow(serializer.instance, self.team_id)
+        except Exception as e:
+            logger.warning("Failed to sync schedule on update", error=str(e))
 
         # PostHog capture for hog_flow activated (draft -> active)
         if (
@@ -667,12 +678,15 @@ class HogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, vie
         hog_flow = self.get_object()
         try:
             schedule = HogFlowSchedule.objects.get(id=schedule_id, hog_flow=hog_flow, team=self.team)
-        except HogFlowSchedule.DoesNotExist:
+        except (HogFlowSchedule.DoesNotExist, ValueError):
             raise exceptions.NotFound("Schedule not found")
 
         new_status = request.data.get("status")
         if new_status not in (HogFlowSchedule.Status.ACTIVE, HogFlowSchedule.Status.PAUSED):
             raise exceptions.ValidationError({"status": "Status must be 'active' or 'paused'"})
+
+        if new_status == HogFlowSchedule.Status.ACTIVE and hog_flow.status != HogFlow.State.ACTIVE:
+            raise exceptions.ValidationError({"status": "Cannot activate schedule on an inactive workflow"})
 
         with transaction.atomic():
             schedule.status = new_status
@@ -703,7 +717,7 @@ class HogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, vie
         hog_flow = self.get_object()
         try:
             run = HogFlowScheduledRun.objects.get(id=run_id, schedule__hog_flow=hog_flow, team=self.team)
-        except HogFlowScheduledRun.DoesNotExist:
+        except (HogFlowScheduledRun.DoesNotExist, ValueError):
             raise exceptions.NotFound("Scheduled run not found")
 
         if run.status != HogFlowScheduledRun.Status.PENDING:

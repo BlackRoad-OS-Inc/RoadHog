@@ -55,6 +55,7 @@
         "fuse.js": "catalog:",
         "husky": "catalog:",
         "lint-staged": "catalog:",
+        "rrule": "^2.8.1",
         "uuid": "^10.0.0"
     },
     "devDependencies": {
