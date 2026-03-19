@@ -13,7 +13,7 @@ from posthog.models import ActivityLog, Comment, Organization, User
 from posthog.models.person import Person
 
 from products.conversations.backend.models import Ticket, TicketAssignment
-from products.conversations.backend.models.constants import Channel, Priority, Status
+from products.conversations.backend.models.constants import Channel, ChannelDetail, Priority, Status
 
 from ee.models.rbac.role import Role
 
@@ -255,7 +255,14 @@ class TestTicketAPI(APIBaseTest):
                 Channel.WIDGET,
                 {"channel_source": Channel.EMAIL},
             ),
-            ("distinct_id=user-123", "user-123", "distinct_id", "user-123", {}),
+            (
+                f"channel_detail={ChannelDetail.WIDGET_EMBEDDED}",
+                ChannelDetail.WIDGET_EMBEDDED,
+                "channel_detail",
+                ChannelDetail.WIDGET_EMBEDDED,
+                {"channel_detail": ChannelDetail.WIDGET_API},
+            ),
+            ("distinct_ids=user-123", "user-123", "distinct_id", "user-123", {}),
         ]
     )
     def test_filter_tickets(
@@ -630,9 +637,9 @@ class TestTicketAPI(APIBaseTest):
         # Query count should be constant regardless of number of tickets
         # Includes: session, user, org, team, permissions, feature flag permission org lookup,
         # count query, tickets query, person distinct_id query (batch), person prefetch,
-        # all distinct_ids query (batch)
+        # all distinct_ids query (batch), tagged_items prefetch
         # Note: message stats are denormalized, no subqueries needed
-        with self.assertNumQueries(14):
+        with self.assertNumQueries(15):
             response = self.client.get(f"/api/projects/{self.team.id}/conversations/tickets/")
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             # Should have original ticket + 10 new tickets = 11 total

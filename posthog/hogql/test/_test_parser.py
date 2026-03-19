@@ -3,6 +3,8 @@ from typing import Optional, cast
 
 from posthog.test.base import BaseTest, MemoryLeakTestMixin
 
+from parameterized import parameterized
+
 from posthog.hogql import ast
 from posthog.hogql.ast import (
     ArithmeticOperation,
@@ -1515,6 +1517,65 @@ def parser_test_factory(backend: HogQLParserBackend):
                         for query in (
                             ast.SelectQuery(select=[ast.Constant(value=2)]),
                             ast.SelectQuery(select=[ast.Constant(value=3)]),
+                        )
+                    ],
+                ),
+            )
+
+        def test_select_intersect_all(self):
+            self.assertEqual(
+                self._select("select 1 intersect all select 2"),
+                ast.SelectSetQuery(
+                    initial_select_query=ast.SelectQuery(select=[ast.Constant(value=1)]),
+                    subsequent_select_queries=[
+                        SelectSetNode(
+                            set_operator="INTERSECT ALL",
+                            select_query=ast.SelectQuery(select=[ast.Constant(value=2)]),
+                        )
+                    ],
+                ),
+            )
+
+        def test_select_except_all(self):
+            self.assertEqual(
+                self._select("select 1 except all select 2"),
+                ast.SelectSetQuery(
+                    initial_select_query=ast.SelectQuery(select=[ast.Constant(value=1)]),
+                    subsequent_select_queries=[
+                        SelectSetNode(
+                            set_operator="EXCEPT ALL",
+                            select_query=ast.SelectQuery(select=[ast.Constant(value=2)]),
+                        )
+                    ],
+                ),
+            )
+
+        @parameterized.expand(
+            [
+                ("union by name", "UNION DISTINCT BY NAME"),
+                ("union all by name", "UNION ALL BY NAME"),
+                ("union distinct by name", "UNION DISTINCT BY NAME"),
+            ]
+        )
+        def test_select_union_by_name(self, sql_operator, expected_operator):
+            self.assertEqual(
+                self._select(f"select 1 as a, 2 as b {sql_operator} select 3 as b, 4 as a"),
+                ast.SelectSetQuery(
+                    initial_select_query=ast.SelectQuery(
+                        select=[
+                            ast.Alias(alias="a", expr=ast.Constant(value=1)),
+                            ast.Alias(alias="b", expr=ast.Constant(value=2)),
+                        ]
+                    ),
+                    subsequent_select_queries=[
+                        SelectSetNode(
+                            set_operator=expected_operator,
+                            select_query=ast.SelectQuery(
+                                select=[
+                                    ast.Alias(alias="b", expr=ast.Constant(value=3)),
+                                    ast.Alias(alias="a", expr=ast.Constant(value=4)),
+                                ]
+                            ),
                         )
                     ],
                 ),
@@ -3111,5 +3172,40 @@ def parser_test_factory(backend: HogQLParserBackend):
             assert cte is not None
             assert cte.using_key == ["a"]
             assert cte.columns is None
+
+        def test_select_from_values(self):
+            self.assertEqual(
+                self._select("SELECT * FROM (VALUES (1, 'a'), (2, 'b')) AS v(id, name)"),
+                ast.SelectQuery(
+                    select=[ast.Field(chain=["*"])],
+                    select_from=ast.JoinExpr(
+                        table=ast.ValuesQuery(
+                            rows=[
+                                [ast.Constant(value=1), ast.Constant(value="a")],
+                                [ast.Constant(value=2), ast.Constant(value="b")],
+                            ]
+                        ),
+                        alias="v",
+                        alias_columns=["id", "name"],
+                    ),
+                ),
+            )
+
+        def test_select_from_values_no_alias_columns(self):
+            self.assertEqual(
+                self._select("SELECT * FROM (VALUES (1), (2)) AS v"),
+                ast.SelectQuery(
+                    select=[ast.Field(chain=["*"])],
+                    select_from=ast.JoinExpr(
+                        table=ast.ValuesQuery(
+                            rows=[
+                                [ast.Constant(value=1)],
+                                [ast.Constant(value=2)],
+                            ]
+                        ),
+                        alias="v",
+                    ),
+                ),
+            )
 
     return TestParser

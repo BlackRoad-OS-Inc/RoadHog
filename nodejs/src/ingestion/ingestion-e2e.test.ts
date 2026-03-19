@@ -138,6 +138,7 @@ const DEFAULT_TEAM: Team = {
     name: '2',
     anonymize_ips: true,
     api_token: 'api_token',
+    secret_api_token: null,
     slack_incoming_webhook: 'slack_incoming_webhook',
     session_recording_opt_in: true,
     person_processing_opt_out: null,
@@ -149,6 +150,7 @@ const DEFAULT_TEAM: Team = {
     timezone: 'UTC',
     available_features: [],
     drop_events_older_than_seconds: null,
+    extra_settings: null,
 }
 
 let offsetIncrementer = 0
@@ -247,6 +249,7 @@ const createTestWithTeamIngester = (baseConfig: Partial<PluginsServerConfig> = {
 
             const ingester = new IngestionConsumer(hub, {
                 ...hub,
+                kafkaMetricsProducer: hub.kafkaProducer,
                 hogTransformer: createHogTransformerService(hub, hub),
             })
             // NOTE: We don't actually use kafka so we skip instantiation for faster tests

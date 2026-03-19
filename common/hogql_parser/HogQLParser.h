@@ -21,30 +21,31 @@ public:
     HAVING = 39, HOUR = 40, ID = 41, IF = 42, ILIKE = 43, IN = 44, INF = 45, 
     INNER = 46, INTERSECT = 47, INTERVAL = 48, IS = 49, JOIN = 50, KEY = 51, 
     LAST = 52, LEADING = 53, LEFT = 54, LET = 55, LIKE = 56, LIMIT = 57, 
-    MATERIALIZED = 58, MINUTE = 59, MONTH = 60, NAN_SQL = 61, NOT = 62, 
-    NULL_SQL = 63, NULLS = 64, OFFSET = 65, ON = 66, OR = 67, ORDER = 68, 
-    OUTER = 69, OVER = 70, PARTITION = 71, PRECEDING = 72, PREWHERE = 73, 
-    QUARTER = 74, RANGE = 75, RECURSIVE = 76, RETURN = 77, RIGHT = 78, ROLLUP = 79, 
-    ROW = 80, ROWS = 81, SAMPLE = 82, SECOND = 83, SELECT = 84, SEMI = 85, 
-    SETTINGS = 86, SUBSTRING = 87, THEN = 88, THROW = 89, TIES = 90, TIMESTAMP = 91, 
-    TO = 92, TOP = 93, TOTALS = 94, TRAILING = 95, TRIM = 96, TRUNCATE = 97, 
-    TRY = 98, UNBOUNDED = 99, UNION = 100, USING = 101, WEEK = 102, WHEN = 103, 
-    WHERE = 104, WHILE = 105, WINDOW = 106, WITH = 107, YEAR = 108, ESCAPE_CHAR_COMMON = 109, 
-    IDENTIFIER = 110, FLOATING_LITERAL = 111, OCTAL_LITERAL = 112, DECIMAL_LITERAL = 113, 
-    HEXADECIMAL_LITERAL = 114, STRING_LITERAL = 115, ARROW = 116, ASTERISK = 117, 
-    BACKQUOTE = 118, BACKSLASH = 119, DOUBLECOLON = 120, COLON = 121, COMMA = 122, 
-    CONCAT = 123, DASH = 124, DOLLAR = 125, DOT = 126, EQ_DOUBLE = 127, 
-    EQ_SINGLE = 128, GT_EQ = 129, GT = 130, HASH = 131, IREGEX_SINGLE = 132, 
-    IREGEX_DOUBLE = 133, LBRACE = 134, LBRACKET = 135, LPAREN = 136, LT_EQ = 137, 
-    LT = 138, LT_SLASH = 139, NOT_EQ = 140, NOT_IREGEX = 141, NOT_REGEX = 142, 
-    NULL_PROPERTY = 143, NULLISH = 144, PERCENT = 145, PLUS = 146, QUERY = 147, 
-    QUOTE_DOUBLE = 148, QUOTE_SINGLE_TEMPLATE = 149, QUOTE_SINGLE_TEMPLATE_FULL = 150, 
-    QUOTE_SINGLE = 151, REGEX_SINGLE = 152, REGEX_DOUBLE = 153, RBRACE = 154, 
-    RBRACKET = 155, RPAREN = 156, SEMICOLON = 157, SLASH = 158, SLASH_GT = 159, 
-    UNDERSCORE = 160, MULTI_LINE_COMMENT = 161, SINGLE_LINE_COMMENT = 162, 
-    WHITESPACE = 163, STRING_TEXT = 164, STRING_ESCAPE_TRIGGER = 165, FULL_STRING_TEXT = 166, 
-    FULL_STRING_ESCAPE_TRIGGER = 167, TAG_WS = 168, TAGC_WS = 169, HOGQLX_TEXT_TEXT = 170, 
-    HOGQLX_TEXT_WS = 171
+    MATERIALIZED = 58, MINUTE = 59, MONTH = 60, NAME = 61, NAN_SQL = 62, 
+    NOT = 63, NULL_SQL = 64, NULLS = 65, OFFSET = 66, ON = 67, OR = 68, 
+    ORDER = 69, OUTER = 70, OVER = 71, PARTITION = 72, PRECEDING = 73, PREWHERE = 74, 
+    QUARTER = 75, RANGE = 76, RECURSIVE = 77, RETURN = 78, RIGHT = 79, ROLLUP = 80, 
+    ROW = 81, ROWS = 82, SAMPLE = 83, SECOND = 84, SELECT = 85, SEMI = 86, 
+    SETTINGS = 87, SUBSTRING = 88, THEN = 89, THROW = 90, TIES = 91, TIMESTAMP = 92, 
+    TO = 93, TOP = 94, TOTALS = 95, TRAILING = 96, TRIM = 97, TRUNCATE = 98, 
+    TRY = 99, UNBOUNDED = 100, UNION = 101, USING = 102, VALUES = 103, WEEK = 104, 
+    WHEN = 105, WHERE = 106, WHILE = 107, WINDOW = 108, WITH = 109, YEAR = 110, 
+    ESCAPE_CHAR_COMMON = 111, IDENTIFIER = 112, FLOATING_LITERAL = 113, 
+    OCTAL_LITERAL = 114, DECIMAL_LITERAL = 115, HEXADECIMAL_LITERAL = 116, 
+    STRING_LITERAL = 117, ARROW = 118, ASTERISK = 119, BACKQUOTE = 120, 
+    BACKSLASH = 121, DOUBLECOLON = 122, COLON = 123, COMMA = 124, CONCAT = 125, 
+    DASH = 126, DOLLAR = 127, DOT = 128, EQ_DOUBLE = 129, EQ_SINGLE = 130, 
+    GT_EQ = 131, GT = 132, HASH = 133, IREGEX_SINGLE = 134, IREGEX_DOUBLE = 135, 
+    LBRACE = 136, LBRACKET = 137, LPAREN = 138, LT_EQ = 139, LT = 140, LT_SLASH = 141, 
+    NOT_EQ = 142, NOT_IREGEX = 143, NOT_REGEX = 144, NULL_PROPERTY = 145, 
+    NULLISH = 146, PERCENT = 147, PLUS = 148, QUERY = 149, QUOTE_DOUBLE = 150, 
+    QUOTE_SINGLE_TEMPLATE = 151, QUOTE_SINGLE_TEMPLATE_FULL = 152, QUOTE_SINGLE = 153, 
+    REGEX_SINGLE = 154, REGEX_DOUBLE = 155, RBRACE = 156, RBRACKET = 157, 
+    RPAREN = 158, SEMICOLON = 159, SLASH = 160, SLASH_GT = 161, UNDERSCORE = 162, 
+    MULTI_LINE_COMMENT = 163, SINGLE_LINE_COMMENT = 164, WHITESPACE = 165, 
+    STRING_TEXT = 166, STRING_ESCAPE_TRIGGER = 167, FULL_STRING_TEXT = 168, 
+    FULL_STRING_ESCAPE_TRIGGER = 169, TAG_WS = 170, TAGC_WS = 171, HOGQLX_TEXT_TEXT = 172, 
+    HOGQLX_TEXT_WS = 173
   };
 
   enum {
@@ -59,23 +60,24 @@ public:
     RuleWindowClause = 30, RulePrewhereClause = 31, RuleWhereClause = 32, 
     RuleGroupByClause = 33, RuleHavingClause = 34, RuleOrderByClause = 35, 
     RuleProjectionOrderByClause = 36, RuleLimitByClause = 37, RuleLimitAndOffsetClause = 38, 
-    RuleOffsetOnlyClause = 39, RuleSettingsClause = 40, RuleJoinExpr = 41, 
-    RuleJoinOp = 42, RuleJoinOpCross = 43, RuleJoinConstraintClause = 44, 
-    RuleSampleClause = 45, RuleLimitExpr = 46, RuleOrderExprList = 47, RuleOrderExpr = 48, 
-    RuleRatioExpr = 49, RuleSettingExprList = 50, RuleSettingExpr = 51, 
-    RuleWindowExpr = 52, RuleWinPartitionByClause = 53, RuleWinOrderByClause = 54, 
-    RuleWinFrameClause = 55, RuleWinFrameExtend = 56, RuleWinFrameBound = 57, 
-    RuleExpr = 58, RuleColumnTypeExpr = 59, RuleColumnExprList = 60, RuleSelectColumnExprList = 61, 
-    RuleSelectColumnExpr = 62, RuleColumnExpr = 63, RuleColumnLambdaExpr = 64, 
-    RuleHogqlxChildElement = 65, RuleHogqlxText = 66, RuleHogqlxTagElement = 67, 
-    RuleHogqlxTagAttribute = 68, RuleWithExprList = 69, RuleWithExpr = 70, 
-    RuleWithExprColumnNameList = 71, RuleColumnIdentifier = 72, RuleNestedIdentifier = 73, 
-    RuleTableExpr = 74, RuleTableFunctionExpr = 75, RuleTableIdentifier = 76, 
-    RuleTableArgList = 77, RuleDatabaseIdentifier = 78, RuleFloatingLiteral = 79, 
-    RuleNumberLiteral = 80, RuleLiteral = 81, RuleInterval = 82, RuleKeyword = 83, 
-    RuleKeywordForAlias = 84, RuleAlias = 85, RuleIdentifier = 86, RuleEnumValue = 87, 
-    RulePlaceholder = 88, RuleString = 89, RuleTemplateString = 90, RuleStringContents = 91, 
-    RuleFullTemplateString = 92, RuleStringContentsFull = 93
+    RuleOffsetOnlyClause = 39, RuleSettingsClause = 40, RuleValuesClause = 41, 
+    RuleValuesRow = 42, RuleJoinExpr = 43, RuleJoinOp = 44, RuleJoinOpCross = 45, 
+    RuleJoinConstraintClause = 46, RuleSampleClause = 47, RuleLimitExpr = 48, 
+    RuleOrderExprList = 49, RuleOrderExpr = 50, RuleRatioExpr = 51, RuleSettingExprList = 52, 
+    RuleSettingExpr = 53, RuleWindowExpr = 54, RuleWinPartitionByClause = 55, 
+    RuleWinOrderByClause = 56, RuleWinFrameClause = 57, RuleWinFrameExtend = 58, 
+    RuleWinFrameBound = 59, RuleExpr = 60, RuleColumnTypeExpr = 61, RuleColumnExprList = 62, 
+    RuleSelectColumnExprList = 63, RuleSelectColumnExpr = 64, RuleColumnExpr = 65, 
+    RuleColumnLambdaExpr = 66, RuleHogqlxChildElement = 67, RuleHogqlxText = 68, 
+    RuleHogqlxTagElement = 69, RuleHogqlxTagAttribute = 70, RuleWithExprList = 71, 
+    RuleWithExpr = 72, RuleWithExprColumnNameList = 73, RuleColumnIdentifier = 74, 
+    RuleNestedIdentifier = 75, RuleTableExpr = 76, RuleTableAliasColumnNameList = 77, 
+    RuleTableFunctionExpr = 78, RuleTableIdentifier = 79, RuleTableArgList = 80, 
+    RuleDatabaseIdentifier = 81, RuleFloatingLiteral = 82, RuleNumberLiteral = 83, 
+    RuleLiteral = 84, RuleInterval = 85, RuleKeyword = 86, RuleKeywordForAlias = 87, 
+    RuleAlias = 88, RuleIdentifier = 89, RuleEnumValue = 90, RulePlaceholder = 91, 
+    RuleString = 92, RuleTemplateString = 93, RuleStringContents = 94, RuleFullTemplateString = 95, 
+    RuleStringContentsFull = 96
   };
 
   explicit HogQLParser(antlr4::TokenStream *input);
@@ -136,6 +138,8 @@ public:
   class LimitAndOffsetClauseContext;
   class OffsetOnlyClauseContext;
   class SettingsClauseContext;
+  class ValuesClauseContext;
+  class ValuesRowContext;
   class JoinExprContext;
   class JoinOpContext;
   class JoinOpCrossContext;
@@ -170,6 +174,7 @@ public:
   class ColumnIdentifierContext;
   class NestedIdentifierContext;
   class TableExprContext;
+  class TableAliasColumnNameListContext;
   class TableFunctionExprContext;
   class TableIdentifierContext;
   class TableArgListContext;
@@ -601,10 +606,12 @@ public:
     virtual size_t getRuleIndex() const override;
     SelectStmtWithParensContext *selectStmtWithParens();
     antlr4::tree::TerminalNode *EXCEPT();
-    antlr4::tree::TerminalNode *UNION();
     antlr4::tree::TerminalNode *ALL();
+    antlr4::tree::TerminalNode *UNION();
     antlr4::tree::TerminalNode *DISTINCT();
     antlr4::tree::TerminalNode *INTERSECT();
+    antlr4::tree::TerminalNode *BY();
+    antlr4::tree::TerminalNode *NAME();
 
 
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -906,6 +913,41 @@ public:
   };
 
   SettingsClauseContext* settingsClause();
+
+  class  ValuesClauseContext : public antlr4::ParserRuleContext {
+  public:
+    ValuesClauseContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *VALUES();
+    std::vector<ValuesRowContext *> valuesRow();
+    ValuesRowContext* valuesRow(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  ValuesClauseContext* valuesClause();
+
+  class  ValuesRowContext : public antlr4::ParserRuleContext {
+  public:
+    ValuesRowContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *LPAREN();
+    std::vector<ColumnExprContext *> columnExpr();
+    ColumnExprContext* columnExpr(size_t i);
+    antlr4::tree::TerminalNode *RPAREN();
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  ValuesRowContext* valuesRow();
 
   class  JoinExprContext : public antlr4::ParserRuleContext {
   public:
@@ -2286,6 +2328,17 @@ public:
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
   };
 
+  class  TableExprValuesContext : public TableExprContext {
+  public:
+    TableExprValuesContext(TableExprContext *ctx);
+
+    antlr4::tree::TerminalNode *LPAREN();
+    ValuesClauseContext *valuesClause();
+    antlr4::tree::TerminalNode *RPAREN();
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
   class  TableExprAliasContext : public TableExprContext {
   public:
     TableExprAliasContext(TableExprContext *ctx);
@@ -2294,6 +2347,7 @@ public:
     AliasContext *alias();
     antlr4::tree::TerminalNode *AS();
     IdentifierContext *identifier();
+    TableAliasColumnNameListContext *tableAliasColumnNameList();
 
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
   };
@@ -2309,6 +2363,24 @@ public:
 
   TableExprContext* tableExpr();
   TableExprContext* tableExpr(int precedence);
+  class  TableAliasColumnNameListContext : public antlr4::ParserRuleContext {
+  public:
+    TableAliasColumnNameListContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *LPAREN();
+    std::vector<IdentifierContext *> identifier();
+    IdentifierContext* identifier(size_t i);
+    antlr4::tree::TerminalNode *RPAREN();
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  TableAliasColumnNameListContext* tableAliasColumnNameList();
+
   class  TableFunctionExprContext : public antlr4::ParserRuleContext {
   public:
     TableFunctionExprContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -2492,6 +2564,7 @@ public:
     antlr4::tree::TerminalNode *LEFT();
     antlr4::tree::TerminalNode *LIKE();
     antlr4::tree::TerminalNode *LIMIT();
+    antlr4::tree::TerminalNode *NAME();
     antlr4::tree::TerminalNode *NOT();
     antlr4::tree::TerminalNode *NULLS();
     antlr4::tree::TerminalNode *OFFSET();
@@ -2527,6 +2600,7 @@ public:
     antlr4::tree::TerminalNode *UNBOUNDED();
     antlr4::tree::TerminalNode *UNION();
     antlr4::tree::TerminalNode *USING();
+    antlr4::tree::TerminalNode *VALUES();
     antlr4::tree::TerminalNode *WHEN();
     antlr4::tree::TerminalNode *WHERE();
     antlr4::tree::TerminalNode *WINDOW();

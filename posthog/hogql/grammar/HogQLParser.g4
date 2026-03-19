@@ -55,7 +55,7 @@ select: (selectSetStmt | selectStmt | hogqlxTagElement) SEMICOLON? EOF;
 
 selectStmtWithParens: selectStmt | LPAREN selectSetStmt RPAREN | placeholder;
 
-subsequentSelectSetClause: (EXCEPT | UNION ALL | UNION DISTINCT | INTERSECT | INTERSECT DISTINCT) selectStmtWithParens;
+subsequentSelectSetClause: (EXCEPT ALL | EXCEPT | UNION ALL (BY NAME)? | UNION DISTINCT (BY NAME)? | UNION (BY NAME)? | INTERSECT ALL | INTERSECT DISTINCT | INTERSECT) selectStmtWithParens;
 selectSetStmt: selectStmtWithParens (subsequentSelectSetClause)*;
 
 selectStmt:
@@ -93,6 +93,9 @@ limitAndOffsetClause
     ;
 offsetOnlyClause: OFFSET columnExpr;
 settingsClause: SETTINGS settingExprList;
+
+valuesClause: VALUES valuesRow (COMMA valuesRow)*;
+valuesRow: LPAREN columnExpr (COMMA columnExpr)* RPAREN;
 
 joinExpr
     : joinExpr joinOp? JOIN joinExpr joinConstraintClause  # JoinExprOp
@@ -264,13 +267,15 @@ withExprColumnNameList: LPAREN identifier (COMMA identifier)* RPAREN;
 columnIdentifier: placeholder | ((tableIdentifier DOT)? nestedIdentifier);
 nestedIdentifier: identifier (DOT identifier)*;
 tableExpr
-    : tableIdentifier                    # TableExprIdentifier
-    | tableFunctionExpr                  # TableExprFunction
-    | LPAREN selectSetStmt RPAREN      # TableExprSubquery
-    | tableExpr (alias | AS identifier)  # TableExprAlias
-    | hogqlxTagElement                   # TableExprTag
-    | placeholder                        # TableExprPlaceholder
+    : tableIdentifier                                                   # TableExprIdentifier
+    | tableFunctionExpr                                                 # TableExprFunction
+    | LPAREN selectSetStmt RPAREN                                       # TableExprSubquery
+    | LPAREN valuesClause RPAREN                                        # TableExprValues
+    | tableExpr (alias | AS identifier tableAliasColumnNameList?)       # TableExprAlias
+    | hogqlxTagElement                                                  # TableExprTag
+    | placeholder                                                       # TableExprPlaceholder
     ;
+tableAliasColumnNameList: LPAREN identifier (COMMA identifier)* RPAREN;
 tableFunctionExpr: identifier LPAREN tableArgList? RPAREN;
 tableIdentifier: (databaseIdentifier DOT)? nestedIdentifier;
 tableArgList: columnExpr (COMMA columnExpr)* COMMA?;
@@ -301,11 +306,11 @@ keyword
     | FOR | FOLLOWING | FROM | FULL | GROUP | HAVING | ID | IS
     | IF | ILIKE | IN | INNER | INTERVAL | JOIN | KEY
     | LAST | LEADING | LEFT | LIKE | LIMIT
-    | NOT | NULLS | OFFSET | ON | OR | ORDER | OUTER | OVER | PARTITION
+    | NAME | NOT | NULLS | OFFSET | ON | OR | ORDER | OUTER | OVER | PARTITION
     | PRECEDING | PREWHERE | RANGE | RECURSIVE | RETURN | RIGHT | ROLLUP | ROW
     | ROWS | SAMPLE | SELECT | SEMI | SETTINGS | SUBSTRING
     | THEN | TIES | TIMESTAMP | TOTALS | TRAILING | TRIM | TRUNCATE | TO | TOP
-    | UNBOUNDED | UNION | USING | WHEN | WHERE | WINDOW | WITH
+    | UNBOUNDED | UNION | USING | VALUES | WHEN | WHERE | WINDOW | WITH
     ;
 keywordForAlias
     : DATE | FIRST | ID | KEY

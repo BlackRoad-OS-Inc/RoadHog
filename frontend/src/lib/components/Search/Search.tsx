@@ -145,7 +145,7 @@ const getItemTypeDisplayName = (type: string | null | undefined): string | null 
         marketing_analytics: 'Marketing analytics',
         session_replay: 'Session replay',
         error_tracking: 'Error tracking',
-        data_warehouse: 'Data warehouse',
+        data_warehouse: 'Data ops',
         data_pipeline: 'Data pipeline',
         annotation: 'Annotation',
         event_definition: 'Event',
@@ -275,6 +275,13 @@ function SearchRoot({
     const { updateUser } = useActions(userLogic)
 
     const [searchValue, setSearchValue] = useState(defaultSearchValue)
+
+    useEffect(() => {
+        if (defaultSearchValue) {
+            setSearchValue(defaultSearchValue)
+        }
+    }, [defaultSearchValue])
+
     const inputRef = useRef<HTMLInputElement>(null!)
     const actionsRef = useRef<Autocomplete.Root.Actions>(null)
     const highlightedItemRef = useRef<SearchItem | null>(null)
@@ -671,7 +678,12 @@ function SearchResults({
     const isAnyLoading = groupedItems.some((g) => g.isLoading)
 
     return (
-        <ScrollableShadows direction="vertical" styledScrollbars className={cn('flex-1 overflow-y-auto', className)}>
+        <ScrollableShadows
+            direction="vertical"
+            styledScrollbars
+            className={cn('flex-1 overflow-y-auto', className)}
+            innerClassName="scroll-pt-12 scroll-pb-8"
+        >
             {!isAnyLoading && (
                 <Autocomplete.Empty className="px-3 py-8 text-center text-muted empty:p-0">
                     <span>
@@ -745,7 +757,7 @@ function SearchResults({
                                                                         >
                                                                             {icon}
                                                                             <span className="truncate">
-                                                                                {item.displayName || item.name}
+                                                                                {String(item.displayName || item.name)}
                                                                             </span>
                                                                             {(group.category === 'recents' ||
                                                                                 group.category === 'groups') &&
@@ -844,14 +856,14 @@ function SearchFooter({ children }: SearchFooterProps): JSX.Element {
                     <span>
                         <KeyboardShortcut shift enter /> to open in new tab
                     </span>
-                    <span>
-                        <KeyboardShortcut escape /> to close
-                    </span>
                     {searchValue.trim() && (
                         <span>
                             <KeyboardShortcut tab /> to ask AI
                         </span>
                     )}
+                    <span>
+                        <KeyboardShortcut escape /> to close
+                    </span>
                 </>
             )}
         </div>

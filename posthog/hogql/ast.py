@@ -338,6 +338,9 @@ class SelectSetQueryType(Type):
     def resolve_column_constant_type(self, name: str, context: HogQLContext) -> ConstantType:
         return self.types[0].resolve_column_constant_type(name, context)
 
+    def resolve_constant_type(self, context: HogQLContext) -> ConstantType:
+        return self.types[0].resolve_constant_type(context)
+
 
 @dataclass(kw_only=True)
 class SelectViewType(BaseTableType):
@@ -863,9 +866,10 @@ class JoinExpr(Expr):
     type: Optional[TableOrSelectType] = None
 
     join_type: Optional[str] = None
-    table: Optional[Union["SelectQuery", "SelectSetQuery", "Placeholder", "HogQLXTag", "Field"]] = None
+    table: Optional[Union["SelectQuery", "SelectSetQuery", "ValuesQuery", "Placeholder", "HogQLXTag", "Field"]] = None
     table_args: Optional[list[Expr]] = None
     alias: Optional[str] = None
+    alias_columns: Optional[list[str]] = None
     table_final: Optional[bool] = None
     constraint: Optional[JoinConstraint] = None
     next_join: Optional["JoinExpr"] = None
@@ -960,7 +964,23 @@ class SelectQuery(Expr):
         )
 
 
-SetOperator = Literal["UNION ALL", "UNION DISTINCT", "INTERSECT", "INTERSECT DISTINCT", "EXCEPT"]
+@dataclass(kw_only=True)
+class ValuesQuery(Expr):
+    type: Optional[SelectQueryType] = None
+    rows: list[list[Expr]]
+
+
+SetOperator = Literal[
+    "UNION ALL",
+    "UNION DISTINCT",
+    "UNION ALL BY NAME",
+    "UNION DISTINCT BY NAME",
+    "INTERSECT",
+    "INTERSECT ALL",
+    "INTERSECT DISTINCT",
+    "EXCEPT",
+    "EXCEPT ALL",
+]
 
 
 @dataclass(kw_only=True)

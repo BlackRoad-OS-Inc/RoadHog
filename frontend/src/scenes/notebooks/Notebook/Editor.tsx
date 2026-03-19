@@ -23,6 +23,7 @@ import { NotebookMarkComment } from '../Marks/NotebookMarkComment'
 import { NotebookMarkLink } from '../Marks/NotebookMarkLink'
 import { NotebookNodeBacklink } from '../Nodes/NotebookNodeBacklink'
 import { NotebookNodeCohort } from '../Nodes/NotebookNodeCohort'
+import { NotebookNodeCustomerJourney } from '../Nodes/NotebookNodeCustomerJourney/NotebookNodeCustomerJourney'
 import { NotebookNodeDuckSQL } from '../Nodes/NotebookNodeDuckSQL'
 import { NotebookNodeEarlyAccessFeature } from '../Nodes/NotebookNodeEarlyAccessFeature'
 import { NotebookNodeEmbed } from '../Nodes/NotebookNodeEmbed'
@@ -46,6 +47,7 @@ import { NotebookNodeQuery } from '../Nodes/NotebookNodeQuery'
 import { NotebookNodeRecording } from '../Nodes/NotebookNodeRecording'
 import { NotebookNodeRelatedGroups } from '../Nodes/NotebookNodeRelatedGroups'
 import { NotebookNodeReplayTimestamp } from '../Nodes/NotebookNodeReplayTimestamp'
+import { NotebookNodeSupportTickets } from '../Nodes/NotebookNodeSupportTickets'
 import { NotebookNodeSurvey } from '../Nodes/NotebookNodeSurvey'
 import { NotebookNodeTaskCreate } from '../Nodes/NotebookNodeTaskCreate'
 import { NotebookNodeUsageMetrics } from '../Nodes/NotebookNodeUsageMetrics'
@@ -155,7 +157,9 @@ export function Editor(): JSX.Element {
         NotebookNodeIssues,
         NotebookNodeUsageMetrics,
         NotebookNodeZendeskTickets,
+        NotebookNodeSupportTickets,
         NotebookNodeRelatedGroups,
+        NotebookNodeCustomerJourney,
     ]
 
     if (hasCollapsibleSections) {

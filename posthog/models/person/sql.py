@@ -61,6 +61,7 @@ def PERSONS_TABLE_SQL(on_cluster=True):
 
 
 def KAFKA_PERSONS_TABLE_SQL(on_cluster=True):
+    # Kafka tables cannot have DEFAULT expressions
     return PERSONS_TABLE_BASE_SQL.format(
         table_name=KAFKA_PERSONS_TABLE,
         on_cluster_clause=ON_CLUSTER_CLAUSE(on_cluster),

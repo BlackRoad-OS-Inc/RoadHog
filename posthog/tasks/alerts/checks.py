@@ -22,15 +22,17 @@ from posthog.models import AlertConfiguration, User
 from posthog.models.alert import AlertCheck
 from posthog.ph_client import ph_scoped_capture
 from posthog.schema_migrations.upgrade_manager import upgrade_query
-from posthog.tasks.alerts.trends import check_trends_alert
+from posthog.tasks.alerts.trends import check_trends_alert, check_trends_alert_with_detector
 from posthog.tasks.alerts.utils import (
     WRAPPER_NODE_KINDS,
     AlertEvaluationResult,
     calculation_interval_to_order,
     next_check_time,
     send_notifications_for_breaches,
+    send_notifications_for_disabled,
     send_notifications_for_errors,
     skip_because_of_weekend,
+    validate_alert_config,
 )
 from posthog.tasks.utils import CeleryQueue
 from posthog.utils import get_from_dict_or_attr
@@ -251,6 +253,17 @@ def check_alert(alert_id: str, capture_ph_event: Callable = lambda *args, **kwar
             alert.snoozed_until = None
             alert.state = AlertState.NOT_FIRING
 
+    try:
+        insight = alert.insight
+        with upgrade_query(insight):
+            if insight.query is None:
+                raise ValueError("Alert's insight has no valid query")
+            threshold_config = alert.threshold.configuration if alert.threshold else None
+            validate_alert_config(insight.query, alert.condition, alert.config, threshold_config)
+    except ValueError as e:
+        _disable_invalid_alert(alert, str(e))
+        return
+
     # we will attempt to check alert
     logger.info("check_alert", alert_id=alert.id)
     alert.last_checked_at = datetime.now(UTC)
@@ -321,6 +334,7 @@ def check_alert_and_notify_atomically(alert: AlertConfiguration, capture_ph_even
     )
 
     value = breaches = error = None
+    alert_evaluation_result = None
 
     # 1. Evaluate insight and get alert value
     try:
@@ -352,8 +366,14 @@ def check_alert_and_notify_atomically(alert: AlertConfiguration, capture_ph_even
         # we won't retry and set alert to errored state
         error = {"message": str(err), "traceback": traceback.format_exc()}
 
-    # 2. Check alert value against threshold
-    alert_check = add_alert_check(alert, value, breaches, error)
+    # 2. Extract detector fields and create alert check
+    anomaly_scores = getattr(alert_evaluation_result, "anomaly_scores", None) if alert_evaluation_result else None
+    triggered_points = getattr(alert_evaluation_result, "triggered_points", None) if alert_evaluation_result else None
+    triggered_dates = getattr(alert_evaluation_result, "triggered_dates", None) if alert_evaluation_result else None
+    interval = getattr(alert_evaluation_result, "interval", None) if alert_evaluation_result else None
+    alert_check = add_alert_check(
+        alert, value, breaches, error, anomaly_scores, triggered_points, triggered_dates, interval
+    )
 
     # 3. Notify users if needed
     if not alert_check.targets_notified:
@@ -380,9 +400,34 @@ def check_alert_and_notify_atomically(alert: AlertConfiguration, capture_ph_even
         raise
 
 
+def _disable_invalid_alert(alert: AlertConfiguration, reason: str) -> None:
+    logger.warning("check_alert.auto_disabling", alert_id=alert.id, reason=reason)
+    AlertConfiguration.objects.filter(pk=alert.pk).update(
+        enabled=False,
+        state=AlertState.ERRORED,
+        last_checked_at=datetime.now(UTC),
+    )
+    alert.refresh_from_db()
+
+    targets_to_notify = alert.get_subscribed_users_emails()
+    AlertCheck.objects.create(
+        alert_configuration=alert,
+        calculated_value=None,
+        condition=alert.condition,
+        targets_notified={"users": targets_to_notify} if targets_to_notify else {},
+        state=AlertState.ERRORED,
+        error={"message": reason},
+    )
+    if targets_to_notify:
+        send_notifications_for_disabled(alert, reason, targets_to_notify)
+
+
 def check_alert_for_insight(alert: AlertConfiguration) -> AlertEvaluationResult:
     """
-    Matches insight type with alert checking logic
+    Matches insight type with alert checking logic.
+
+    If detector_config is set, uses the detector abstraction.
+    Otherwise falls back to threshold-based checking.
     """
     insight = alert.insight
 
@@ -397,13 +442,23 @@ def check_alert_for_insight(alert: AlertConfiguration) -> AlertEvaluationResult:
         match kind:
             case "TrendsQuery":
                 query = TrendsQuery.model_validate(query)
+                # Use detector-based checking if detector_config is set
+                if alert.detector_config:
+                    return check_trends_alert_with_detector(alert, insight, query, alert.detector_config)
                 return check_trends_alert(alert, insight, query)
             case _:
                 raise NotImplementedError(f"AlertCheckError: Alerts for {query.kind} are not supported yet")
 
 
 def add_alert_check(
-    alert: AlertConfiguration, value: float | None, breaches: list[str] | None, error: dict | None
+    alert: AlertConfiguration,
+    value: float | None,
+    breaches: list[str] | None,
+    error: dict | None,
+    anomaly_scores: list[float | None] | None = None,
+    triggered_points: list[int] | None = None,
+    triggered_dates: list[str] | None = None,
+    interval: str | None = None,
 ) -> AlertCheck:
     notify = False
     targets_notified = {}
@@ -436,6 +491,10 @@ def add_alert_check(
         targets_notified=targets_notified,
         state=alert.state,
         error=error,
+        anomaly_scores=anomaly_scores,
+        triggered_points=triggered_points,
+        triggered_dates=triggered_dates,
+        interval=interval,
     )
 
     alert.save()

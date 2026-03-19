@@ -349,19 +349,28 @@ class HogQLParseTreeConverter(ParseTreeVisitor):
         initial_query = self.visit(ctx.selectStmtWithParens())
 
         for subsequent in ctx.subsequentSelectSetClause():
-            if subsequent.UNION() and subsequent.ALL():
-                union_type = "UNION ALL"
-            elif subsequent.UNION() and subsequent.DISTINCT():
-                union_type = "UNION DISTINCT"
+            if subsequent.UNION():
+                if subsequent.ALL():
+                    union_type = "UNION ALL"
+                elif subsequent.DISTINCT():
+                    union_type = "UNION DISTINCT"
+                else:
+                    union_type = "UNION DISTINCT"
+                if subsequent.BY() and subsequent.NAME():
+                    union_type += " BY NAME"
+            elif subsequent.INTERSECT() and subsequent.ALL():
+                union_type = "INTERSECT ALL"
             elif subsequent.INTERSECT() and subsequent.DISTINCT():
                 union_type = "INTERSECT DISTINCT"
             elif subsequent.INTERSECT():
                 union_type = "INTERSECT"
+            elif subsequent.EXCEPT() and subsequent.ALL():
+                union_type = "EXCEPT ALL"
             elif subsequent.EXCEPT():
                 union_type = "EXCEPT"
             else:
                 raise SyntaxError(
-                    "Set operator must be one of UNION ALL, UNION DISTINCT, INTERSECT, INTERSECT DISTINCT, and EXCEPT"
+                    "Set operator must be one of UNION ALL, UNION DISTINCT, UNION [ALL|DISTINCT] BY NAME, INTERSECT, INTERSECT ALL, INTERSECT DISTINCT, EXCEPT, and EXCEPT ALL"
                 )
             select_query = self.visit(subsequent.selectStmtWithParens())
             select_queries.append(
@@ -1122,6 +1131,16 @@ class HogQLParseTreeConverter(ParseTreeVisitor):
     def visitTableExprSubquery(self, ctx: HogQLParser.TableExprSubqueryContext):
         return self.visit(ctx.selectSetStmt())
 
+    def visitTableExprValues(self, ctx: HogQLParser.TableExprValuesContext):
+        return self.visit(ctx.valuesClause())
+
+    def visitValuesClause(self, ctx: HogQLParser.ValuesClauseContext):
+        rows = [self.visit(row) for row in ctx.valuesRow()]
+        return ast.ValuesQuery(rows=rows)
+
+    def visitValuesRow(self, ctx: HogQLParser.ValuesRowContext):
+        return [self.visit(expr) for expr in ctx.columnExpr()]
+
     def visitTableExprPlaceholder(self, ctx: HogQLParser.TableExprPlaceholderContext):
         return self.visit(ctx.placeholder())
 
@@ -1130,10 +1149,16 @@ class HogQLParseTreeConverter(ParseTreeVisitor):
         if alias.lower() in RESERVED_KEYWORDS:
             raise SyntaxError(f'"{alias}" cannot be an alias or identifier, as it\'s a reserved keyword')
         table = self.visit(ctx.tableExpr())
+
+        alias_columns = None
+        if column_name_list := ctx.tableAliasColumnNameList():
+            alias_columns = [self.visit(ident) for ident in column_name_list.identifier()]
+
         if isinstance(table, ast.JoinExpr):
             table.alias = alias
+            table.alias_columns = alias_columns
             return table
-        return ast.JoinExpr(table=table, alias=alias)
+        return ast.JoinExpr(table=table, alias=alias, alias_columns=alias_columns)
 
     def visitTableExprFunction(self, ctx: HogQLParser.TableExprFunctionContext):
         return self.visit(ctx.tableFunctionExpr())
