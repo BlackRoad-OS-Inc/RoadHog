@@ -27,6 +27,8 @@ from posthog.hogql.query import execute_hogql_query
 from posthog.hogql.timings import HogQLTimings
 
 from posthog.caching.insights_api import BASE_MINIMUM_INSIGHT_REFRESH_INTERVAL, REDUCED_MINIMUM_INSIGHT_REFRESH_INTERVAL
+from posthog.clickhouse import query_tagging
+from posthog.clickhouse.query_tagging import QueryTags
 from posthog.hogql_queries.insights.funnels import FunnelTrendsUDF, FunnelUDF
 from posthog.hogql_queries.insights.funnels.funnel_query_context import FunnelQueryContext
 from posthog.hogql_queries.insights.funnels.funnel_time_to_convert import FunnelTimeToConvertUDF
@@ -101,8 +103,8 @@ class FunnelsQueryRunner(AnalyticsQueryRunner[FunnelsQueryResponse]):
         return None
 
     def _calculate(self):
-        funnelVizType = self.context.funnelsFilter.funnelVizType
-        if self._single_cohort_id is not None and funnelVizType != FunnelVizType.TIME_TO_CONVERT:
+        funnel_viz_type = self.context.funnelsFilter.funnelVizType
+        if self._single_cohort_id is not None and funnel_viz_type != FunnelVizType.TIME_TO_CONVERT:
             return self._calculate_single_cohort_breakdown()
 
         return self._calculate_single_query()
@@ -177,9 +179,18 @@ class FunnelsQueryRunner(AnalyticsQueryRunner[FunnelsQueryResponse]):
         return sub_query
 
     def _run_sub_query(
-        self, sub_query: FunnelsQuery, series_index: int, is_parallel: bool, results: list, errors: list
+        self,
+        sub_query: FunnelsQuery,
+        series_index: int,
+        is_parallel: bool,
+        responses: list,
+        errors: list,
+        query_tags: QueryTags | None = None,
     ) -> None:
         try:
+            if query_tags:
+                query_tagging.update_tags(query_tags)
+
             runner = FunnelsQueryRunner(
                 query=sub_query,
                 team=self.team,
@@ -188,7 +199,7 @@ class FunnelsQueryRunner(AnalyticsQueryRunner[FunnelsQueryResponse]):
                 limit_context=self.limit_context,
                 just_summarize=self.just_summarize,
             )
-            results[series_index] = runner._calculate_single_query()
+            responses[series_index] = runner._calculate_single_query()
         except Exception as e:
             errors.append(e)
         finally:
@@ -219,37 +230,38 @@ class FunnelsQueryRunner(AnalyticsQueryRunner[FunnelsQueryResponse]):
         in_query = self._create_cohort_sub_query(cohort_id, negate=False)
         not_in_query = self._create_cohort_sub_query(cohort_id, negate=True)
 
-        results: list[FunnelsQueryResponse | None] = [None, None]
+        responses: list[FunnelsQueryResponse | None] = [None, None]
         errors: list[Exception] = []
         is_parallel = not settings.IN_UNIT_TESTING
 
         if is_parallel:
+            tags = query_tagging.get_query_tags().model_copy(deep=True)
             jobs = [
-                threading.Thread(target=self._run_sub_query, args=(in_query, 0, True, results, errors)),
-                threading.Thread(target=self._run_sub_query, args=(not_in_query, 1, True, results, errors)),
+                threading.Thread(target=self._run_sub_query, args=(in_query, 0, True, responses, errors, tags)),
+                threading.Thread(target=self._run_sub_query, args=(not_in_query, 1, True, responses, errors, tags)),
             ]
             for j in jobs:
                 j.start()
             for j in jobs:
                 j.join()
         else:
-            self._run_sub_query(in_query, 0, False, results, errors)
-            self._run_sub_query(not_in_query, 1, False, results, errors)
+            self._run_sub_query(in_query, 0, False, responses, errors)
+            self._run_sub_query(not_in_query, 1, False, responses, errors)
 
         if errors:
             raise errors[0]
 
-        in_response = results[0]
-        not_in_response = results[1]
+        in_response = responses[0]
+        not_in_response = responses[1]
         assert in_response is not None and not_in_response is not None
 
         timings = [*(in_response.timings or []), *(not_in_response.timings or [])]
         hogql = in_response.hogql or ""
 
-        funnelVizType = self.context.funnelsFilter.funnelVizType
+        funnel_viz_type = self.context.funnelsFilter.funnelVizType
 
         results: list[dict[str, Any]] | list[list[dict[str, Any]]]
-        if funnelVizType == FunnelVizType.TRENDS:
+        if funnel_viz_type == FunnelVizType.TRENDS:
             results = self._merge_trends_results(in_response.results, not_in_response.results, cohort_id, cohort_name)
         else:
             results = self._merge_steps_results(in_response.results, not_in_response.results, cohort_id, cohort_name)
