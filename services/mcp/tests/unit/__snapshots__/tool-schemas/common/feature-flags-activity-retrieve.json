@@ -1,0 +1,18 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+        "limit": {
+            "default": 10,
+            "description": "Number of items per page",
+            "minimum": 1,
+            "type": "number"
+        },
+        "page": {
+            "default": 1,
+            "description": "Page number",
+            "minimum": 1,
+            "type": "number"
+        }
+    },
+    "type": "object"
+}
