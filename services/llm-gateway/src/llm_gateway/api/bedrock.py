@@ -22,28 +22,6 @@ bedrock_router = APIRouter()
 
 COUNT_TOKENS_ENDPOINT_NAME = "bedrock_count_tokens"
 
-# Fields that the Bedrock Claude invoke API accepts (via litellm.anthropic_messages)
-_BEDROCK_ALLOWED_BODY_FIELDS = frozenset(
-    {
-        "model",  # required by litellm for routing (stripped by Bedrock transform)
-        "messages",  # required
-        "max_tokens",  # required
-        "stream",  # used by litellm (stripped by Bedrock transform)
-        "system",
-        "stop_sequences",
-        "temperature",
-        "top_p",
-        "top_k",
-        "tools",
-        "tool_choice",
-        "thinking",
-        "metadata",
-        "cache_control",
-        "output_config",  # stripped by Bedrock transform
-        "output_format",  # converted by Bedrock transform
-    }
-)
-
 
 def ensure_bedrock_configured(settings: Any) -> None:
     logger.info(f"inside ensure_bedrock_configured: {settings.bedrock_region_name}")
@@ -88,12 +66,9 @@ async def _handle_bedrock_messages(
     settings = get_settings()
     ensure_bedrock_configured(settings)
 
-    raw_data = body.model_dump(exclude_none=True)
-
-    dropped_keys = set(raw_data.keys()) - _BEDROCK_ALLOWED_BODY_FIELDS
-    if dropped_keys:
-        logger.warning("bedrock_dropped_fields", dropped_keys=sorted(dropped_keys))
-    data = {k: v for k, v in raw_data.items() if k in _BEDROCK_ALLOWED_BODY_FIELDS}
+    # If a field is unsupported, Bedrock will reject it with a ValidationException
+    # (e.g. "Extra inputs are not permitted"), which surfaces clearly to the caller.
+    data = body.model_dump(exclude_none=True)
 
     # Bedrock supports Anthropic beta features via the anthropic-beta property
     anthropic_beta = request.headers.get("anthropic-beta")
