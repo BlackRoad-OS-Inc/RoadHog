@@ -74,9 +74,13 @@ def add_domain(domain: str) -> dict[str, Any]:
             "receiving_dns_records": data.get("receiving_dns_records", []),
         }
 
-    # Mailgun returns 400 when domain already exists — fetch its records instead
     if resp.status_code == 400:
-        return get_domain_dns_records(domain)
+        try:
+            error_msg = resp.json().get("message", "")
+            if "already exists" in error_msg.lower():
+                return get_domain_dns_records(domain)
+        except Exception:
+            pass
 
     resp.raise_for_status()
     return {}
