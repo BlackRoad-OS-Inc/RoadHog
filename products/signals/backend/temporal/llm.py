@@ -12,7 +12,11 @@ from posthoganalytics.ai.anthropic import AsyncAnthropic
 
 logger = structlog.get_logger(__name__)
 
+# Haiku for grouping tasks (query gen, matching, specificity, safety filter) -
+# these are structured classification/generation that Haiku handles well at higher speed (and lower cost)
 JUDGING_MODEL = os.getenv("SIGNAL_JUDGING_LLM_MODEL", "claude-sonnet-4-6")
+# Sonnet for judging tasks (safety judge, actionability judge, summarization) -
+# these need deeper reasoning
 GROUPING_MODEL = os.getenv("SIGNAL_GROUPING_LLM_MODEL", "claude-haiku-4-5")
 
 # Models that support Anthropic extended thinking. Keep in sync with the models we actually use.

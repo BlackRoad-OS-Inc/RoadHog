@@ -28,6 +28,7 @@ Run:
 """
 
 import sys
+import json
 import uuid
 import random
 import asyncio
@@ -190,8 +191,10 @@ class TestGroupingPipeline:
         ready = [r for r in pre_match_results if r is not None]
 
         # Phase 2 (concurrent matching in BATCH_SIZE sub-batches + pipelined judging)
-        # Within each sub-batch, `_match()` calls fire concurrently. Between sub-batches,
-        # results are persisted so later signals can find earlier ones' reports.
+        # Mirrors production's concurrent matching: within each sub-batch, `_match()` calls fire concurrently.
+        # Between sub-batches, results are persisted so later signals can find earlier ones' reports.
+        # Sub-batching is needed here because the eval processes all signals in one test run,
+        # which is NOT reflective of real-world batch behavior.
         judging_tasks: list[asyncio.Task] = []
         judged_report_ids: set[str] = set()
 
@@ -219,7 +222,7 @@ class TestGroupingPipeline:
                     judged_report_ids.add(rid)
                     judging_tasks.append(asyncio.create_task(self._judge_single_report(report)))
 
-        # ── Wait for remaining judging ──
+        # Wait for remaining judging
         reports = self.report_store.all_reports()
         self.progress.start_judging(len(reports))
         if judging_tasks:
@@ -748,14 +751,10 @@ class TestGroupingPipeline:
         """Write match failures to a JSON file for debugging by a human or coding agent.
         This is context to diagnose results.
         """
-        if not self._match_failures:
-            return
-        import json as json_mod
-
-        path = "/tmp/signals_eval_match_failures.json"
-        with open(path, "w") as f:
-            json_mod.dump(self._match_failures, f, indent=2)
-        tqdm.write(f"\n{len(self._match_failures)} match failures written to {path}", file=sys.stderr)
+        failures_path = "/tmp/signals_eval_match_failures.json"
+        with open(failures_path, "w") as f:
+            json.dump(self._match_failures, f, indent=2)
+        tqdm.write(f"\nMatch failures ({len(self._match_failures)}) written to {failures_path}", file=sys.stderr)
 
     def _capture(
         self,

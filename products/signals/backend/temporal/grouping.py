@@ -1123,11 +1123,14 @@ async def _process_signal_batch(
 ) -> tuple[int, FetchSignalTypeExamplesOutput]:
     """
     Process a batch of signals with parallel preparation (steps 1-5) and concurrent
-    matching (step 6). Returns (dropped_count, type_examples) — the caller can
+    matching (steps 6-7). Returns (dropped_count, type_examples) — the caller can
     cache the type_examples for subsequent batches.
 
     All match + specificity LLM calls within the batch run concurrently against
-    the same search snapshot from ClickHouse.
+    the same search snapshot from ClickHouse. This trades a small risk of
+    undergrouping (two concurrent signals for the same issue might not see each
+    other) for much lower latency — important for onboarding experience.
+    In practice, concurrent signals on the same issue are rare in the wild.
     """
     team_id = batch[0].team_id
     # Purely defensive
