@@ -383,7 +383,6 @@ describe('createExtractHeatmapDataStep', () => {
             const event = createTestEvent()
             const input = {
                 preparedEvent: event,
-                kafkaProducer: mockProducer,
                 customField: 'test-value',
                 anotherField: 123,
             }

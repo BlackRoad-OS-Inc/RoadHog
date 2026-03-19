@@ -71,7 +71,7 @@ describe('createProcessPersonsStep', () => {
         await closeHub(hub)
     })
 
-    const createInput = (overrides: Partial<ProcessPersonsInput> = {}) => ({
+    const createInput = (overrides: Partial<ProcessPersonsInput> = {}): ProcessPersonsInput => ({
         normalizedEvent: pluginEvent,
         team,
         timestamp,

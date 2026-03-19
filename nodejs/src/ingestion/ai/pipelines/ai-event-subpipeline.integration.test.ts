@@ -60,19 +60,6 @@ function createAiEvent(overrides: Partial<PluginEvent> = {}): PluginEvent {
     })
 }
 
-const mockPersonsStore = {
-    fetchForChecking: jest.fn().mockResolvedValue(null),
-    getPersonlessBatchResult: jest.fn().mockReturnValue(false),
-    fetchForUpdate: jest.fn().mockResolvedValue(existingPerson),
-    updatePersonWithPropertiesDiffForUpdate: jest.fn().mockResolvedValue([existingPerson, [], false]),
-} as any
-
-const mockGroupStore = {} as any
-
-const mockKafkaProducer = {
-    queueMessages: jest.fn().mockResolvedValue(undefined),
-} as any
-
 function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) {
     const mockProduce = jest.fn().mockResolvedValue(undefined)
 
@@ -105,9 +92,16 @@ function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) 
         hogTransformer: {
             transformEventAndProduceMessages: (event: PluginEvent) => Promise.resolve({ event, invocationResults: [] }),
         } as any,
-        personsStore: mockPersonsStore,
-        groupStore: mockGroupStore,
-        kafkaProducer: mockKafkaProducer,
+        personsStore: {
+            fetchForChecking: jest.fn().mockResolvedValue(null),
+            getPersonlessBatchResult: jest.fn().mockReturnValue(false),
+            fetchForUpdate: jest.fn().mockResolvedValue(existingPerson),
+            updatePersonWithPropertiesDiffForUpdate: jest.fn().mockResolvedValue([existingPerson, [], false]),
+        } as any,
+        groupStore: {} as any,
+        kafkaProducer: {
+            queueMessages: jest.fn().mockResolvedValue(undefined),
+        } as any,
         splitAiEventsConfig: { enabled: false, enabledTeams: '*' },
         groupId: 'test-group',
         topHog: (step) => step,
@@ -122,12 +116,7 @@ function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) 
 }
 
 function createInput(event: PluginEvent): AiEventSubpipelineInput {
-    return {
-        message,
-        event,
-        team,
-        headers,
-    }
+    return { message, event, team, headers }
 }
 
 function getProduceCall(mockProduce: jest.Mock) {

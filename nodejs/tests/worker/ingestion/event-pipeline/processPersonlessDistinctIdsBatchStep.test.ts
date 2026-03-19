@@ -1,4 +1,5 @@
 import { PipelineResultType } from '~/ingestion/pipelines/results'
+import { PluginEvent } from '~/plugin-scaffold'
 import { Team } from '~/types'
 
 import { PersonsStore } from '../../../../src/worker/ingestion/persons/persons-store'
@@ -10,13 +11,6 @@ describe('processPersonlessDistinctIdsBatchStep', () => {
     let team: Team
     let processPersonlessDistinctIdsBatchStep: typeof import('../../../../src/worker/ingestion/event-pipeline/processPersonlessDistinctIdsBatchStep').processPersonlessDistinctIdsBatchStep
 
-    function createMockPersonsStore(): jest.Mocked<PersonsStore> {
-        return {
-            processPersonlessDistinctIdsBatch: jest.fn().mockResolvedValue(undefined),
-            getPersonlessBatchResult: jest.fn().mockReturnValue(undefined),
-        } as unknown as jest.Mocked<PersonsStore>
-    }
-
     beforeEach(async () => {
         // Reset modules to get a fresh LRU cache for each test
         jest.resetModules()
@@ -26,10 +20,17 @@ describe('processPersonlessDistinctIdsBatchStep', () => {
         processPersonlessDistinctIdsBatchStep = module.processPersonlessDistinctIdsBatchStep
 
         team = createTestTeam()
-        mockPersonsStore = createMockPersonsStore()
+
+        mockPersonsStore = {
+            processPersonlessDistinctIdsBatch: jest.fn().mockResolvedValue(undefined),
+            getPersonlessBatchResult: jest.fn().mockReturnValue(undefined),
+        } as unknown as jest.Mocked<PersonsStore>
     })
 
-    const createInput = (distinctId: string, processPerson: boolean | undefined = undefined) => ({
+    const createInput = (
+        distinctId: string,
+        processPerson: boolean | undefined = undefined
+    ): { event: PluginEvent; team: Team } => ({
         event: createTestPluginEvent({
             distinct_id: distinctId,
             team_id: team.id,
