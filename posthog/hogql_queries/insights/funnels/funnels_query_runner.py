@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime, timedelta
 from math import ceil
 from typing import Any, Optional
@@ -175,21 +176,29 @@ class FunnelsQueryRunner(AnalyticsQueryRunner[FunnelsQueryResponse]):
 
         return sub_query
 
-    def _run_sub_query(self, sub_query: FunnelsQuery, series_index: int = 0) -> FunnelsQueryResponse:
-        runner = FunnelsQueryRunner(
-            query=sub_query,
-            team=self.team,
-            timings=self.timings.clone_for_subquery(series_index),
-            modifiers=self.modifiers,
-            limit_context=self.limit_context,
-            just_summarize=self.just_summarize,
-        )
-        return runner._calculate_single_query()
+    def _run_sub_query(
+        self, sub_query: FunnelsQuery, series_index: int, is_parallel: bool, results: list, errors: list
+    ) -> None:
+        try:
+            runner = FunnelsQueryRunner(
+                query=sub_query,
+                team=self.team,
+                timings=self.timings.clone_for_subquery(series_index),
+                modifiers=self.modifiers,
+                limit_context=self.limit_context,
+                just_summarize=self.just_summarize,
+            )
+            results[series_index] = runner._calculate_single_query()
+        except Exception as e:
+            errors.append(e)
+        finally:
+            if is_parallel:
+                from django.db import connection
+
+                connection.close()
 
     def _calculate_single_cohort_breakdown(self) -> FunnelsQueryResponse:
-        from concurrent.futures import ThreadPoolExecutor
-
-        from django.db import connection
+        from django.conf import settings
 
         cohort_id = self._single_cohort_id
         assert cohort_id is not None
@@ -210,16 +219,29 @@ class FunnelsQueryRunner(AnalyticsQueryRunner[FunnelsQueryResponse]):
         in_query = self._create_cohort_sub_query(cohort_id, negate=False)
         not_in_query = self._create_cohort_sub_query(cohort_id, negate=True)
 
-        if connection.in_atomic_block:
-            # Inside a transaction (e.g. tests) — threads can't see uncommitted data
-            in_response = self._run_sub_query(in_query, series_index=0)
-            not_in_response = self._run_sub_query(not_in_query, series_index=1)
+        results: list[FunnelsQueryResponse | None] = [None, None]
+        errors: list[Exception] = []
+        is_parallel = not settings.IN_UNIT_TESTING
+
+        if is_parallel:
+            jobs = [
+                threading.Thread(target=self._run_sub_query, args=(in_query, 0, True, results, errors)),
+                threading.Thread(target=self._run_sub_query, args=(not_in_query, 1, True, results, errors)),
+            ]
+            for j in jobs:
+                j.start()
+            for j in jobs:
+                j.join()
         else:
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                in_future = executor.submit(self._run_sub_query, in_query, 0)
-                not_in_future = executor.submit(self._run_sub_query, not_in_query, 1)
-                in_response = in_future.result()
-                not_in_response = not_in_future.result()
+            self._run_sub_query(in_query, 0, False, results, errors)
+            self._run_sub_query(not_in_query, 1, False, results, errors)
+
+        if errors:
+            raise errors[0]
+
+        in_response = results[0]
+        not_in_response = results[1]
+        assert in_response is not None and not_in_response is not None
 
         timings = [*(in_response.timings or []), *(not_in_response.timings or [])]
         hogql = in_response.hogql or ""
