@@ -33,7 +33,7 @@ import { GroupTypeManager } from '../worker/ingestion/group-type-manager'
 import { ClickhouseGroupRepository } from '../worker/ingestion/groups/repositories/clickhouse-group-repository'
 import { PostgresGroupRepository } from '../worker/ingestion/groups/repositories/postgres-group-repository'
 import { PostgresPersonRepository } from '../worker/ingestion/persons/repositories/postgres-person-repository'
-import { BaseServer, CleanupResources } from './base-server'
+import { BaseServer, BaseServerConfig, CleanupResources } from './base-server'
 
 /**
  * Complete config type for an ingestion-v2 deployment.
@@ -45,20 +45,11 @@ import { BaseServer, CleanupResources } from './base-server'
  *
  * This type is the source of truth for which env vars ingestion-events-* deployments need.
  */
-export type IngestionGeneralServerConfig = IngestionConsumerConfig &
+export type IngestionGeneralServerConfig = BaseServerConfig &
+    IngestionConsumerConfig &
     HogTransformerServiceConfig &
     Pick<
         CommonConfig,
-        // Server lifecycle
-        | 'HTTP_SERVER_PORT'
-        | 'INTERNAL_API_SECRET'
-        | 'INSTRUMENT_THREAD_PERFORMANCE'
-        | 'CONTINUOUS_PROFILING_ENABLED'
-        | 'PYROSCOPE_SERVER_ADDRESS'
-        | 'PYROSCOPE_APPLICATION_NAME'
-        | 'POD_TERMINATION_ENABLED'
-        | 'POD_TERMINATION_BASE_TIMEOUT_MINUTES'
-        | 'POD_TERMINATION_JITTER_MINUTES'
         | 'LOG_LEVEL'
         // Kafka
         | 'KAFKA_HOSTS'
@@ -192,18 +183,6 @@ export class IngestionGeneralServer extends BaseServer {
         const groupTypeManager = new GroupTypeManager(groupRepository, teamManager)
         const clickhouseGroupRepository = new ClickhouseGroupRepository(this.kafkaProducer)
 
-        // 4. Hog transformer
-        const hogTransformerDeps: HogTransformerServiceDeps = {
-            geoipService,
-            postgres: this.postgres,
-            pubSub: this.pubsub,
-            encryptedFields,
-            integrationManager,
-            kafkaProducer: this.kafkaMetricsProducer,
-            teamManager,
-            internalCaptureService,
-        }
-
         const serviceLoaders: (() => Promise<PluginServerService>)[] = []
 
         const isTestingMode = this.config.PLUGIN_SERVER_MODE === PluginServerMode.ingestion_v2_testing
@@ -224,6 +203,17 @@ export class IngestionGeneralServer extends BaseServer {
                 return consumer.service
             })
         } else {
+            const hogTransformerDeps: HogTransformerServiceDeps = {
+                geoipService,
+                postgres: this.postgres,
+                pubSub: this.pubsub,
+                encryptedFields,
+                integrationManager,
+                kafkaProducer: this.kafkaMetricsProducer,
+                teamManager,
+                internalCaptureService,
+            }
+
             const ingestionDeps: IngestionConsumerDeps = {
                 postgres: this.postgres,
                 redisPool: this.redisPool,

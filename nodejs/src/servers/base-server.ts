@@ -5,7 +5,6 @@ import { Counter } from 'prom-client'
 import express from 'ultimate-express'
 
 import { setupCommonRoutes, setupExpressApp } from '../api/router'
-import { CommonConfig } from '../common/config'
 import { CookielessManager } from '../ingestion/cookieless/cookieless-manager'
 import { KafkaProducerWrapper } from '../kafka/producer'
 import { onShutdown } from '../lifecycle'
@@ -18,18 +17,17 @@ import { captureException, shutdown as posthogShutdown } from '../utils/posthog'
 import { PubSub } from '../utils/pubsub'
 import { delay } from '../utils/utils'
 
-export type BaseServerConfig = Pick<
-    CommonConfig,
-    | 'INTERNAL_API_SECRET'
-    | 'INSTRUMENT_THREAD_PERFORMANCE'
-    | 'HTTP_SERVER_PORT'
-    | 'POD_TERMINATION_ENABLED'
-    | 'POD_TERMINATION_BASE_TIMEOUT_MINUTES'
-    | 'POD_TERMINATION_JITTER_MINUTES'
-    | 'CONTINUOUS_PROFILING_ENABLED'
-    | 'PYROSCOPE_SERVER_ADDRESS'
-    | 'PYROSCOPE_APPLICATION_NAME'
->
+export type BaseServerConfig = {
+    INTERNAL_API_SECRET: string
+    INSTRUMENT_THREAD_PERFORMANCE: boolean
+    HTTP_SERVER_PORT: number
+    POD_TERMINATION_ENABLED: boolean
+    POD_TERMINATION_BASE_TIMEOUT_MINUTES: number
+    POD_TERMINATION_JITTER_MINUTES: number
+    CONTINUOUS_PROFILING_ENABLED: boolean
+    PYROSCOPE_SERVER_ADDRESS: string
+    PYROSCOPE_APPLICATION_NAME: string
+}
 
 export interface CleanupResources {
     kafkaProducers: KafkaProducerWrapper[]
@@ -133,10 +131,9 @@ export abstract class BaseServer {
             onShutdown(),
         ])
 
-        const primaryProducer = resources.kafkaProducers[0]
-        if (primaryProducer) {
-            logger.info('💤', ' Shutting down kafka producer...')
-            await Promise.all([primaryProducer.flush(), delay(2000)])
+        if (resources.kafkaProducers.length > 0) {
+            logger.info('💤', ' Flushing kafka producers...')
+            await Promise.all([...resources.kafkaProducers.map((p) => p.flush()), delay(2000)])
         }
 
         logger.info('💤', ' Shutting down infrastructure...')

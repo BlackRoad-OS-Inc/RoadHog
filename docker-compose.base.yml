@@ -409,7 +409,7 @@ services:
             SESSION_RECORDING_API_REDIS_HOST: redis7
             SESSION_RECORDING_API_REDIS_PORT: 6379
 
-    ingestion:
+    ingestion-general:
         command: node nodejs/dist/index.js
         restart: on-failure
         environment:

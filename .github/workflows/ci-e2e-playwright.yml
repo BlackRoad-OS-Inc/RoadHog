@@ -43,7 +43,6 @@ env:
     # Database names passed to the plugins Docker service via env var substitution
     POSTHOG_DB_NAME: posthog_e2e_test
     POSTHOG_PERSONS_DB_NAME: posthog_persons_e2e_test
-    PLUGIN_SERVER_MODE: ingestion-v2
     PGHOST: localhost
     PGUSER: posthog
     PGPASSWORD: posthog

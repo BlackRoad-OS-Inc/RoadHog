@@ -141,10 +141,10 @@ services:
         profiles:
             - ingestion
 
-    ingestion:
+    ingestion-general:
         extends:
             file: docker-compose.base.yml
-            service: ingestion
+            service: ingestion-general
         image: ghcr.io/posthog/posthog-node:master
         ports:
             - '6739:6738'
