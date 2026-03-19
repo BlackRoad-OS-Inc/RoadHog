@@ -513,13 +513,6 @@ class HogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, vie
         serializer.save()
         log_activity_from_viewset(self, serializer.instance, name=serializer.instance.name, detail_type="standard")
 
-        # Sync recurring schedule if present in trigger config
-        try:
-            with transaction.atomic():
-                _sync_schedule_for_hog_flow(serializer.instance, self.team_id)
-        except Exception as e:
-            logger.warning("Failed to sync schedule on create", error=str(e))
-
         try:
             # Count edges and actions
             edges_count = len(serializer.instance.edges) if serializer.instance.edges else 0
@@ -554,13 +547,6 @@ class HogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, vie
         serializer.save()
 
         log_activity_from_viewset(self, serializer.instance, name=serializer.instance.name, previous=before_update)
-
-        # Sync recurring schedule: handle activation, deactivation, and config changes
-        try:
-            with transaction.atomic():
-                _sync_schedule_for_hog_flow(serializer.instance, self.team_id)
-        except Exception as e:
-            logger.warning("Failed to sync schedule on update", error=str(e))
 
         # PostHog capture for hog_flow activated (draft -> active)
         if (

@@ -93,9 +93,7 @@ def hog_flow_saved(sender, instance: HogFlow, created, **kwargs):
 
         _sync_schedule_for_hog_flow(instance, instance.team_id)
     except Exception:
-        import structlog
-
-        structlog.get_logger().warning(
+        logger.warning(
             "Failed to sync schedule for HogFlow",
             hog_flow_id=str(instance.id),
             exc_info=True,
