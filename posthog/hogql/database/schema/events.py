@@ -141,3 +141,8 @@ class EventsTable(Table):
 
     def avoid_asterisk_fields(self) -> list[str]:
         return ["$session_id_uuid"]
+
+
+# All table types that represent the events table (including virtual subtables like poe/goe).
+# Use in isinstance() checks when you need to match any events-family table.
+EVENTS_TABLE_TYPES = (EventsTable, EventsPersonSubTable, EventsGroupSubTable)

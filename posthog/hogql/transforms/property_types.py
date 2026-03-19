@@ -9,7 +9,12 @@ from posthog.hogql import ast
 from posthog.hogql.context import HogQLContext
 from posthog.hogql.database.models import BooleanDatabaseField, DateTimeDatabaseField
 from posthog.hogql.database.s3_table import S3Table
-from posthog.hogql.database.schema.events import EventsTable
+from posthog.hogql.database.schema.events import (
+    EVENTS_TABLE_TYPES,
+    EventsGroupSubTable,
+    EventsPersonSubTable,
+    EventsTable,
+)
 from posthog.hogql.database.schema.groups import GroupsTable
 from posthog.hogql.database.schema.persons import PersonsTable, RawPersonsTable
 from posthog.hogql.escape_sql import escape_hogql_identifier
@@ -171,14 +176,12 @@ class PropertyFinder(TraversingVisitor):
                             if self.group_properties.get(global_group_id) is None:
                                 self.group_properties[global_group_id] = set()
                             self.group_properties[global_group_id].add(property_name)
-                if isinstance(resolved_table, EventsTable):
-                    if (
-                        isinstance(node.field_type.table_type, ast.VirtualTableType)
-                        and node.field_type.table_type.field == "poe"
-                    ):
-                        self.person_properties.add(property_name)
-                    else:
-                        self.event_properties.add(property_name)
+                if isinstance(resolved_table, EventsPersonSubTable):
+                    self.person_properties.add(property_name)
+                elif isinstance(resolved_table, EventsGroupSubTable):
+                    pass  # group properties are handled above via GroupsTable
+                elif isinstance(resolved_table, EventsTable):
+                    self.event_properties.add(property_name)
 
     def visit_field(self, node: ast.Field):
         super().visit_field(node)
@@ -266,14 +269,17 @@ class PropertySwapper(CloningVisitor):
                                 return self._convert_string_property_to_type(
                                     node, "group", f"{global_group_id}_{property_name}"
                                 )
-                if isinstance(resolved_table, EventsTable):
+                if isinstance(resolved_table, EventsPersonSubTable):
+                    if property_name in self.person_properties:
+                        return self._convert_string_property_to_type(node, "person", property_name)
+                elif isinstance(resolved_table, EventsTable):
                     if property_name in self.event_properties:
                         return self._convert_string_property_to_type(node, "event", property_name)
         if isinstance(type, ast.PropertyType) and type.field_type.name == "person_properties" and len(type.chain) == 1:
             property_name = str(type.chain[0])
             if isinstance(type.field_type.table_type, ast.BaseTableType):
                 resolved_table = type.field_type.table_type.resolve_database_table(self.context)
-                if isinstance(resolved_table, EventsTable):
+                if isinstance(resolved_table, EVENTS_TABLE_TYPES):
                     if property_name in self.person_properties:
                         return self._convert_string_property_to_type(node, "person", property_name)
 

@@ -33,7 +33,7 @@ from posthog.hogql.database.models import (
     Table,
     VirtualTable,
 )
-from posthog.hogql.database.schema.events import EventsTable
+from posthog.hogql.database.schema.events import EventsGroupSubTable, EventsPersonSubTable, EventsTable
 from posthog.hogql.database.schema.groups import GroupsTable
 from posthog.hogql.database.schema.persons import PersonsTable
 from posthog.hogql.filters import replace_filters
@@ -590,7 +590,11 @@ def get_hogql_autocomplete(
                             field = last_table.fields[str(chain_part)]
 
                             if isinstance(field, StringJSONDatabaseField):
-                                if isinstance(last_table, EventsTable):
+                                if isinstance(last_table, EventsPersonSubTable):
+                                    property_type = PropertyDefinition.Type.PERSON
+                                elif isinstance(last_table, EventsGroupSubTable):
+                                    property_type = PropertyDefinition.Type.GROUP
+                                elif isinstance(last_table, EventsTable):
                                     if field.name == "person_properties":
                                         property_type = PropertyDefinition.Type.PERSON
                                     else:
