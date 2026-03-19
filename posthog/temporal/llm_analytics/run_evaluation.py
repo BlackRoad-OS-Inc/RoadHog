@@ -198,7 +198,6 @@ async def update_key_state_activity(key_id: str, state: str, error_message: str 
 @temporalio.activity.defn
 async def increment_trial_eval_count_activity(team_id: int) -> None:
     """Increment trial eval counter after successful execution with PostHog key"""
-    from django.db.models import F
 
     def _increment():
         EvaluationConfig.objects.filter(team_id=team_id).update(trial_evals_used=F("trial_evals_used") + 1)

@@ -333,10 +333,8 @@ export const llmProviderKeysLogic = kea<llmProviderKeysLogicType>([
                         ? `/api/environments/${teamId}/llm_analytics/provider_keys/${id}/?replacement_key_id=${encodeURIComponent(replacementKeyId)}`
                         : `/api/environments/${teamId}/llm_analytics/provider_keys/${id}/`
                     await api.delete(url)
-                    // If deleted key was active, reload config to reflect change
-                    if (values.evaluationConfig?.active_provider_key?.id === id) {
-                        actions.loadEvaluationConfig()
-                    }
+                    // Reload config to reflect trial_providers and active_provider_key changes
+                    actions.loadEvaluationConfig()
                     return values.providerKeys.filter((key: LLMProviderKey) => key.id !== id)
                 },
                 validateProviderKey: async ({ id }: { id: string }): Promise<LLMProviderKey[]> => {
