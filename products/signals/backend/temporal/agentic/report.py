@@ -10,8 +10,14 @@ from posthog.models.organization import OrganizationMembership
 from posthog.models.team.team import Team
 from posthog.sync import database_sync_to_async
 
-from products.signals.backend.models import SignalReportArtefact
-from products.signals.backend.report_generation.research import ReportResearchOutput, run_multi_turn_research
+from products.signals.backend.models import SignalReport, SignalReportArtefact
+from products.signals.backend.report_generation.research import (
+    ActionabilityAssessment,
+    PriorityAssessment,
+    ReportResearchOutput,
+    SignalFinding,
+    run_multi_turn_research,
+)
 from products.signals.backend.report_generation.select_repo import RepoSelectionResult
 from products.signals.backend.temporal.actionability_judge import ActionabilityChoice, Priority
 from products.signals.backend.temporal.types import SignalData
@@ -100,6 +106,55 @@ def _resolve_user_id(team_id: int) -> int:
     return membership.user_id
 
 
+def _load_previous_research(report_id: str) -> ReportResearchOutput | None:
+    """Reconstruct the previous report state."""
+    report = SignalReport.objects.filter(id=report_id).only("title", "summary").first()
+    if report is None or not report.title or not report.summary:
+        logger.info(
+            "load previous research: no report or missing title/summary, treating as first run",
+            report_id=report_id,
+            has_report=report is not None,
+        )
+        return None
+    artefacts = list(
+        SignalReportArtefact.objects.filter(
+            report_id=report_id,
+            # Only types we care about for the agentic report generation
+            type__in=[
+                SignalReportArtefact.ArtefactType.SIGNAL_FINDING,
+                SignalReportArtefact.ArtefactType.ACTIONABILITY_JUDGMENT,
+                SignalReportArtefact.ArtefactType.PRIORITY_JUDGMENT,
+            ],
+        ).order_by("created_at")
+    )
+    findings: list[SignalFinding] = []
+    actionability: ActionabilityAssessment | None = None
+    priority: PriorityAssessment | None = None
+    for artefact in artefacts:
+        match artefact.type:
+            case SignalReportArtefact.ArtefactType.SIGNAL_FINDING:
+                findings.append(SignalFinding.model_validate_json(artefact.content))
+            case SignalReportArtefact.ArtefactType.ACTIONABILITY_JUDGMENT:
+                actionability = ActionabilityAssessment.model_validate_json(artefact.content)
+            case SignalReportArtefact.ArtefactType.PRIORITY_JUDGMENT:
+                priority = PriorityAssessment.model_validate_json(artefact.content)
+    if not findings or actionability is None:
+        logger.info(
+            "load previous research: missing artefacts, treating as first run",
+            report_id=report_id,
+            finding_count=len(findings),
+            has_actionability=actionability is not None,
+        )
+        return None
+    return ReportResearchOutput(
+        title=report.title,
+        summary=report.summary,
+        findings=findings,
+        actionability=actionability,
+        priority=priority,
+    )
+
+
 _AGENTIC_ARTEFACT_TYPES = [
     SignalReportArtefact.ArtefactType.REPO_SELECTION,
     SignalReportArtefact.ArtefactType.SIGNAL_FINDING,
@@ -170,13 +225,19 @@ async def run_agentic_report_activity(input: RunAgenticReportInput) -> RunAgenti
             user_id=user_id,
             repository=repository,
         )
-        # 2. Run the agentic research in the sandbox
+        # 2. Load previous research if this is a re-promoted report
+        previous_research = await database_sync_to_async(_load_previous_research, thread_sensitive=False)(
+            input.report_id
+        )
+        # 3. Run the agentic research in the sandbox
         result = await run_multi_turn_research(
             input.signals,
             context,
+            previous_report_id=input.report_id if previous_research else None,
+            previous_report_research=previous_research,
             branch="master",
         )
-        # 3. Persist artefacts, avoid partial data from failed runs
+        # 4. Persist artefacts, avoid partial data from failed runs
         await database_sync_to_async(_persist_agentic_report_artefacts, thread_sensitive=False)(
             input.team_id,
             input.report_id,
