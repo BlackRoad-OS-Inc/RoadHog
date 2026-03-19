@@ -800,7 +800,11 @@ export interface ActionsNode extends EntityNode {
     id: integer
 }
 
-export type AnyEntityNode<WarehouseNode = DataWarehouseNode> = EventsNode | ActionsNode | WarehouseNode | SystemTableNode
+export type AnyEntityNode<WarehouseNode = DataWarehouseNode> =
+    | EventsNode
+    | ActionsNode
+    | WarehouseNode
+    | SystemTableNode
 
 export type AnyDataWarehouseNode = DataWarehouseNode | FunnelsDataWarehouseNode | LifecycleDataWarehouseNode
 

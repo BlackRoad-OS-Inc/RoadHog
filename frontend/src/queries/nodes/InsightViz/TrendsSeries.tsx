@@ -35,7 +35,7 @@ export function TrendsSeries(): JSX.Element | null {
     const { updateQuerySource } = useActions(insightVizDataLogic(insightProps))
     const { featureFlags } = useValues(featureFlagLogic)
 
-    const { showGroupsOptions: showGroupsOptionsFromModel, groupsTaxonomicTypes } = useValues(groupsModel)
+    const { groupsTaxonomicTypes } = useValues(groupsModel)
     const { systemTablesEnabled } = useValues(systemTablesSettingsLogic)
 
     const supportsDwhLifecycle = featureFlags[FEATURE_FLAGS.PRODUCT_ANALYTICS_DWH_LIFECYCLE_SUPPORT]

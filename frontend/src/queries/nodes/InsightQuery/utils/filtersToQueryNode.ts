@@ -123,7 +123,13 @@ export const legacyEntityToNode = (
     dataWarehouseNodeKind: DataWarehouseNodeKind = NodeKind.DataWarehouseNode
 ): AnyEntityNode<AnyDataWarehouseNode> | GroupNode<AnyDataWarehouseNode> => {
     let shared: Partial<
-        EventsNode | ActionsNode | DataWarehouseNode | FunnelsDataWarehouseNode | LifecycleDataWarehouseNode | SystemTableNode | GroupNode
+        | EventsNode
+        | ActionsNode
+        | DataWarehouseNode
+        | FunnelsDataWarehouseNode
+        | LifecycleDataWarehouseNode
+        | SystemTableNode
+        | GroupNode
     > = {
         name: entity.name || undefined,
         custom_name: entity.custom_name || undefined,

@@ -12,7 +12,6 @@ import {
     InsightQueryNode,
     LifecycleFilterLegacy,
     NodeKind,
-    SystemTableNode,
     PathsFilterLegacy,
     RetentionFilterLegacy,
     StickinessFilterLegacy,
