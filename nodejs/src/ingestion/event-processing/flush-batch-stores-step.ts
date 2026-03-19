@@ -14,12 +14,12 @@ export interface FlushBatchStoresStepConfig {
 }
 
 /**
- * Flushes person and group stores and returns Kafka produce promises as side effects.
+ * AfterBatch hook that flushes person and group stores and returns
+ * Kafka produce promises as side effects.
  *
- * Used as the afterBatch hook in the joined ingestion pipeline, called once
- * per batch after all events have been processed.
+ * Called once per batch after all events have been processed.
  *
- * The function:
+ * The step:
  * 1. Flushes both person and group stores (blocking DB operations)
  * 2. Creates Kafka produce promises for all store updates
  * 3. Returns those promises as side effects (non-blocking)
@@ -27,6 +27,13 @@ export interface FlushBatchStoresStepConfig {
  * This allows the pipeline to handle Kafka produces the same way it handles
  * event emission - as side effects that can be scheduled and awaited separately
  * from the consumer commit.
+ *
+ * @param config - Configuration containing the stores and Kafka producer
+ * @param config.personsStore - The person store (singleton per consumer)
+ * @param config.groupStore - The group store (singleton per consumer)
+ * @param config.kafkaProducer - Kafka producer for sending store updates
+ *
+ * @returns An afterBatch step that flushes both stores
  */
 export function createFlushBatchStoresStep<TOutput, COutput, CBatch>(
     config: FlushBatchStoresStepConfig
@@ -37,6 +44,11 @@ export function createFlushBatchStoresStep<TOutput, COutput, CBatch>(
         try {
             // Flush both stores in parallel (DB operations, still blocking)
             const [_groupResults, personsStoreMessages] = await Promise.all([groupStore.flush(), personsStore.flush()])
+
+            logger.info('🔄', 'flushBatchStoresStep: Flushed stores', {
+                batchSize: input.elements.length,
+                personStoreMessageCount: personsStoreMessages.length,
+            })
 
             // Create Kafka produce promises for all person/group store updates
             const producePromises = createProducePromises(personsStoreMessages, kafkaProducer)
@@ -51,7 +63,12 @@ export function createFlushBatchStoresStep<TOutput, COutput, CBatch>(
 
             return ok({ elements: input.elements, batchContext: input.batchContext }, producePromises)
         } catch (error) {
-            logger.error('❌', 'flushBatchStoresStep: Failed to flush stores', { error })
+            // If flush fails, the error will bubble up and fail the entire batch
+            // This maintains the existing behavior where flush errors are fatal
+            logger.error('❌', 'flushBatchStoresStep: Failed to flush stores', {
+                error,
+                batchSize: input.elements.length,
+            })
             throw error
         }
     }
