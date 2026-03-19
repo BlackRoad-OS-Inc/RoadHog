@@ -2,12 +2,15 @@
 Fixtures for standalone Rust /flags integration tests.
 
 No Django test framework. Tests use:
-- psycopg2 for person/group inserts (database)
+- Django ORM for bootstrapping the test environment (org, team, user, API key)
+- psycopg2 for person/group inserts (bypassing event ingestion)
 - requests for Django API calls (cohorts, flags)
 - requests for Rust /flags evaluation
 
-The test environment (org, team, user, API key) is bootstrapped via raw SQL
-in a session-scoped fixture — no setup script or JSON file needed.
+Django ORM is used only for the session-scoped bootstrap because models like
+Organization and Team have many required fields that change across migrations.
+Raw SQL for these would break whenever a column is added — which is exactly
+the schema-drift problem this test suite was built to catch.
 """
 
 import os
@@ -44,135 +47,49 @@ class TestEnv:
     personal_api_key: str
 
 
-def _bootstrap_test_env(conn: Any) -> TestEnv:
-    """Create org, project, team, user, and API key via raw SQL."""
-    cur = conn.cursor()
-    api_token = f"phc_test_{uuid.uuid4().hex}"
+def _bootstrap_test_env() -> TestEnv:
+    """Create org, project, team, user, and API key via Django ORM.
 
-    # Organization
-    cur.execute(
-        """
-        INSERT INTO posthog_organization (id, name, created_at, updated_at,
-                                           plugins_access_level, for_internal_metrics,
-                                           is_member_join_email_enabled, enforce_2fa,
-                                           is_hipaa, customer_trust_scores,
-                                           product_subscription)
-        VALUES (%s, 'Rust Integration Test', now(), now(), 3, false, true, NULL, false, '{}', '{}')
-        RETURNING id
-        """,
-        (str(uuid.uuid4()),),
+    Uses the ORM so we don't need to track schema changes in raw SQL.
+    """
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "posthog.settings")
+
+    import django
+
+    django.setup()
+
+    from posthog.models import Organization, Project, Team, User
+    from posthog.models.personal_api_key import PersonalAPIKey
+
+    org = Organization.objects.create(name="Rust Integration Test")
+    project = Project.objects.create(id=Team.objects.increment_id_sequence(), organization=org)
+    team = Team.objects.create(
+        id=project.id,
+        project=project,
+        organization=org,
+        api_token=f"phc_test_{uuid.uuid4().hex}",
     )
-    org_id = cur.fetchone()[0]
+    user = User.objects.create_and_join(org, "rust-integration@test.posthog.com", "testpassword12345")
 
-    # Get next team/project ID from the sequence
-    cur.execute("SELECT nextval('posthog_team_id_seq')")
-    team_id = cur.fetchone()[0]
-
-    # Project
-    cur.execute(
-        """
-        INSERT INTO posthog_project (id, organization_id, name, created_at)
-        VALUES (%s, %s, 'Rust Integration', now())
-        """,
-        (team_id, org_id),
-    )
-
-    # Team
-    cur.execute(
-        """
-        INSERT INTO posthog_team (id, uuid, organization_id, project_id, api_token,
-                                   name, created_at, updated_at, signup_token,
-                                   is_demo, access_control, test_account_filters,
-                                   timezone, data_attributes, person_display_name_properties,
-                                   inject_web_apps, extra_settings, modifiers,
-                                   correlation_config, session_recording_opt_in,
-                                   capture_console_log_opt_in, capture_performance_opt_in,
-                                   surveys_opt_in, heatmaps_opt_in, session_replay_config,
-                                   autocapture_opt_out, autocapture_web_vitals_opt_in,
-                                   autocapture_web_vitals_allowed_metrics,
-                                   autocapture_exceptions_opt_in,
-                                   autocapture_exceptions_errors_to_ignore,
-                                   person_processing_opt_out, live_events_token,
-                                   external_data_workspace_id, external_data_workspace_last_synced_at,
-                                   primary_dashboard_id, default_data_theme)
-        VALUES (%s, %s, %s, %s, %s,
-                'Rust Integration', now(), now(), NULL,
-                false, false, '[]',
-                'UTC', '["data-attr"]', '[]',
-                false, NULL, NULL,
-                NULL, false,
-                false, NULL,
-                false, false, NULL,
-                false, false,
-                NULL,
-                false,
-                NULL,
-                false, NULL,
-                NULL, NULL,
-                NULL, NULL)
-        """,
-        (team_id, str(uuid.uuid4()), org_id, team_id, api_token),
-    )
-
-    # User
-    password_hash = "pbkdf2_sha256$260000$test$test="  # not a real hash, just needs to exist
-    cur.execute(
-        """
-        INSERT INTO posthog_user (uuid, email, password, first_name, last_name,
-                                   is_staff, is_active, date_joined, is_superuser,
-                                   distinct_id, email_opt_in, partial_notification_settings,
-                                   anonymize_data, toolbar_mode, events_column_config,
-                                   theme_mode, requested_password_reset_at,
-                                   has_seen_product_intro_for)
-        VALUES (%s, 'rust-test@posthog.com', %s, 'Rust', 'Test',
-                false, true, now(), false,
-                %s, false, '{}',
-                false, 'toolbar_mode'::text, '{"active": "DEFAULT"}',
-                NULL, NULL, '{}')
-        RETURNING id
-        """,
-        (str(uuid.uuid4()), password_hash, str(uuid.uuid4())),
-    )
-    user_id = cur.fetchone()[0]
-
-    # Organization membership
-    cur.execute(
-        """
-        INSERT INTO posthog_organizationmembership (id, organization_id, user_id,
-                                                      level, joined_at, updated_at)
-        VALUES (%s, %s, %s, 1, now(), now())
-        """,
-        (str(uuid.uuid4()), org_id, user_id),
-    )
-
-    # Personal API key for HTTP authentication
     key_value = f"phx_test_{uuid.uuid4().hex}"
     secure_value = hashlib.sha256(key_value.encode()).hexdigest()
-    cur.execute(
-        """
-        INSERT INTO posthog_personalapikey (id, user_id, label, secure_value, created_at, last_used_at)
-        VALUES (%s, %s, 'rust-integration-test', %s, now(), NULL)
-        """,
-        (str(uuid.uuid4()), user_id, f"sha256${secure_value}"),
+    PersonalAPIKey.objects.create(
+        user=user,
+        label="rust-integration-test",
+        secure_value=f"sha256${secure_value}",
     )
 
-    conn.commit()
     return TestEnv(
-        team_id=team_id,
-        project_id=team_id,
-        api_token=api_token,
+        team_id=team.id,
+        project_id=project.id,
+        api_token=team.api_token,
         personal_api_key=key_value,
     )
 
 
 @pytest.fixture(scope="session")
 def env() -> TestEnv:
-    conn = psycopg2.connect(DATABASE_URL)
-    conn.autocommit = False
-    try:
-        return _bootstrap_test_env(conn)
-    finally:
-        conn.close()
+    return _bootstrap_test_env()
 
 
 @pytest.fixture(scope="session")
@@ -195,6 +112,9 @@ class TestDB:
     Manages two connections matching production topology:
     - persons_conn: persons, distinct IDs, cohort people (persons database)
     - main_conn: groups, group type mappings (main database)
+
+    Raw SQL is appropriate here because these tables have stable, simple schemas
+    and we specifically want to avoid the event ingestion pipeline.
     """
 
     persons_conn: Any  # psycopg2 connection
