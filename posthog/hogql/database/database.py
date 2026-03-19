@@ -1169,13 +1169,13 @@ class Database(BaseModel):
                         )
 
             # TODO: Need to decide how the distinct_id and person_id fields are going to be handled
-            if "distinct_id" not in table.fields.keys():
+            if "distinct_id" not in table.fields.keys() and warehouse_modifier.distinct_id_field:
                 table.fields["distinct_id"] = ExpressionField(
                     name="distinct_id",
                     expr=parse_expr(warehouse_modifier.distinct_id_field),
                 )
 
-            if "person_id" not in table.fields.keys():
+            if "person_id" not in table.fields.keys() and warehouse_modifier.distinct_id_field:
                 events_join = (
                     DataWarehouseJoin.objects.filter(
                         team_id=team.pk,
@@ -1210,38 +1210,38 @@ class Database(BaseModel):
                             table_chain = warehouse_modifier.table_name.split(".")
                             if database.has_table(table_chain):
                                 original = database.get_table(table_chain)
-                                table = original.model_copy()
-                                table.fields = dict(original.fields)
+                                sys_table = original.model_copy()
+                                sys_table.fields = dict(original.fields)
 
                                 # Add id alias if needed
                                 if warehouse_modifier.id_field not in ("id",):
-                                    table.fields["id"] = ExpressionField(
+                                    sys_table.fields["id"] = ExpressionField(
                                         name="id",
                                         expr=parse_expr(warehouse_modifier.id_field),
                                     )
 
                                 # Add timestamp alias — avoid self-referencing ExpressionField
                                 if warehouse_modifier.timestamp_field == "timestamp":
-                                    if "timestamp" not in table.fields:
-                                        table.fields["timestamp"] = DateTimeDatabaseField(name="timestamp")
+                                    if "timestamp" not in sys_table.fields:
+                                        sys_table.fields["timestamp"] = DateTimeDatabaseField(name="timestamp")
                                 else:
-                                    table.fields["timestamp"] = ExpressionField(
+                                    sys_table.fields["timestamp"] = ExpressionField(
                                         name="timestamp",
                                         expr=ast.Field(chain=[warehouse_modifier.timestamp_field]),
                                     )
 
                                 if warehouse_modifier.distinct_id_field:
-                                    table.fields["distinct_id"] = ExpressionField(
+                                    sys_table.fields["distinct_id"] = ExpressionField(
                                         name="distinct_id",
                                         expr=parse_expr(warehouse_modifier.distinct_id_field),
                                     )
-                                    table.fields["person_id"] = ExpressionField(
+                                    sys_table.fields["person_id"] = ExpressionField(
                                         name="person_id",
                                         expr=parse_expr(warehouse_modifier.distinct_id_field),
                                     )
 
                                 # Register the per-request copy back onto the database
-                                database.get_table_node(table_chain).table = table
+                                database.get_table_node(table_chain).table = sys_table
                         elif is_view:
                             views = define_mappings(
                                 views,

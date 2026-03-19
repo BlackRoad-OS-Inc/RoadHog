@@ -476,7 +476,7 @@ function DefinitionView({ group }: { group: TaxonomicFilterGroup }): JSX.Element
         const _definition = definition as DataWarehouseTableForInsight
         const isSystemTable = _definition.name?.startsWith('system.')
         const visiblePopoverFields = isSystemTable
-            ? dataWarehousePopoverFields.filter((f) => f.key !== 'distinct_id_field')
+            ? dataWarehousePopoverFields.filter((f: DataWarehousePopoverField) => f.key !== 'distinct_id_field')
             : dataWarehousePopoverFields
         const columnOptions = Object.values(_definition.fields).map((column) => ({
             label: column.name + ' (' + column.type + ')',

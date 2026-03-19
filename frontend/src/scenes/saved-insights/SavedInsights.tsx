@@ -183,6 +183,12 @@ export const QUERY_TYPES_METADATA: Record<NodeKind, InsightTypeMetadata> = {
         icon: IconTableChart,
         inMenu: true,
     },
+    [NodeKind.SystemTableNode]: {
+        name: 'System table',
+        description: 'Query system tables for internal analytics.',
+        icon: IconTableChart,
+        inMenu: false,
+    },
     [NodeKind.GroupNode]: {
         name: 'Groups',
         description: 'List and explore grouped events.',

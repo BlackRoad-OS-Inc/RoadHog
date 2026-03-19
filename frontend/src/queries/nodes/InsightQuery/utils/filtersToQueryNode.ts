@@ -140,7 +140,7 @@ export const legacyEntityToNode = (
         if (isSystemTable) {
             shared = {
                 ...shared,
-                id_field: entity.id_field || undefined,
+                id_field: (entity as TrendsDataWarehouseFilter).id_field || undefined,
                 timestamp_field: entity.timestamp_field || undefined,
                 table_name: entity.table_name || undefined,
             } as SystemTableNode

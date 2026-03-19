@@ -13,6 +13,7 @@ from posthog.schema import (
     StickinessComputationMode,
     StickinessQuery,
     StickinessQueryResponse,
+    SystemTableNode,
 )
 
 from posthog.hogql import ast
@@ -35,13 +36,13 @@ from posthog.models.filters.mixins.utils import cached_property
 
 
 class SeriesWithExtras:
-    series: EventsNode | ActionsNode | DataWarehouseNode
+    series: EventsNode | ActionsNode | DataWarehouseNode | SystemTableNode
     series_order: int
     is_previous_period_series: Optional[bool]
 
     def __init__(
         self,
-        series: EventsNode | ActionsNode | DataWarehouseNode,
+        series: EventsNode | ActionsNode | DataWarehouseNode | SystemTableNode,
         series_order: int,
         is_previous_period_series: Optional[bool],
     ):
@@ -83,7 +84,9 @@ class StickinessQueryRunner(AnalyticsQueryRunner[StickinessQueryResponse]):
 
         return refresh_frequency
 
-    def _aggregation_expressions(self, series: EventsNode | ActionsNode | DataWarehouseNode) -> ast.Expr:
+    def _aggregation_expressions(
+        self, series: EventsNode | ActionsNode | DataWarehouseNode | SystemTableNode
+    ) -> ast.Expr:
         if series.math == "hogql" and series.math_hogql is not None:
             return parse_expr(series.math_hogql)
         elif series.math == "unique_group" and series.math_group_type_index is not None:
@@ -406,7 +409,7 @@ class StickinessQueryRunner(AnalyticsQueryRunner[StickinessQueryResponse]):
 
         return ast.RatioExpr(left=ast.Constant(value=self.query.samplingFactor))
 
-    def series_event(self, series: EventsNode | ActionsNode | DataWarehouseNode) -> str | None:
+    def series_event(self, series: EventsNode | ActionsNode | DataWarehouseNode | SystemTableNode) -> str | None:
         if isinstance(series, EventsNode):
             return series.event
 

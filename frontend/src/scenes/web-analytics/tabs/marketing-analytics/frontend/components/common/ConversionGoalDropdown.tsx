@@ -107,7 +107,7 @@ export function ConversionGoalDropdown({
 
                     const newFilter: ConversionGoalFilter = {
                         ...value,
-                        ...firstSerie,
+                        ...(firstSerie as EventsNode | ActionsNode | DataWarehouseNode),
                         // Preserve the existing schema to keep UTM mappings
                         schema_map: {
                             ...value.schema_map,

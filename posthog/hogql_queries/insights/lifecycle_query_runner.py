@@ -16,6 +16,7 @@ from posthog.schema import (
     LifecycleQueryResponse,
     ResolvedDateRangeResponse,
     StatusItem,
+    SystemTableNode,
 )
 
 from posthog.hogql import ast
@@ -277,7 +278,7 @@ class LifecycleQueryRunner(AnalyticsQueryRunner[LifecycleQueryResponse]):
         return isinstance(self.first_series, LifecycleDataWarehouseNode)
 
     @property
-    def first_series(self) -> ActionsNode | EventsNode | LifecycleDataWarehouseNode:
+    def first_series(self) -> ActionsNode | EventsNode | LifecycleDataWarehouseNode | SystemTableNode:
         assert self.query.series, "There should be at least one series in the query"
         return self.query.series[0]
 

@@ -36,6 +36,7 @@ from posthog.schema import (
     SessionPropertyFilter,
     StickinessActorsQuery,
     StickinessQuery,
+    SystemTableNode,
     TrendsQuery,
 )
 
@@ -75,7 +76,13 @@ type AnyPropertyFilter = Union[
 ]
 
 type EntityNode = Union[
-    EventsNode, ActionsNode, DataWarehouseNode, LifecycleDataWarehouseNode, FunnelsDataWarehouseNode, GroupNode
+    EventsNode,
+    ActionsNode,
+    DataWarehouseNode,
+    LifecycleDataWarehouseNode,
+    FunnelsDataWarehouseNode,
+    SystemTableNode,
+    GroupNode,
 ]
-type FunnelEntityNode = Union[EventsNode, ActionsNode, FunnelsDataWarehouseNode, GroupNode]
+type FunnelEntityNode = Union[EventsNode, ActionsNode, FunnelsDataWarehouseNode, SystemTableNode, GroupNode]
 type FunnelExclusionEntityNode = Union[FunnelExclusionEventsNode, FunnelExclusionActionsNode]

@@ -312,7 +312,7 @@ class AggregationOperations(DataWarehouseInsightQueryMixin):
             # to avoid ClickHouse errors with dictGetOrDefault expecting non-nullable dates
             timestamp_expr: ast.Expr
             if isinstance(self.series, (DataWarehouseNode, SystemTableNode)):
-                if self.series.dw_source_type == "self-managed":
+                if isinstance(self.series, DataWarehouseNode) and self.series.dw_source_type == "self-managed":
                     # The database's automatic toDateTime wrapping causes parseDateTime64BestEffortOrNull issues
                     # for the timestamp field that are strings for self managed sources.
                     # We use today's date as the timestamp to avoid this issue.
