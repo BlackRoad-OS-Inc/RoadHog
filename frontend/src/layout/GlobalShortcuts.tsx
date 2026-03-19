@@ -174,9 +174,7 @@ export function GlobalShortcuts(): null {
     useAppShortcut({
         name: 'toggle-system-tables',
         keybind: [],
-        intent: systemTablesEnabled
-            ? 'Product analytics: Hide system tables in insights'
-            : 'Product analytics: Show system tables in insights',
+        intent: systemTablesEnabled ? 'Hide system tables in insights' : 'Show system tables in insights',
         interaction: 'function',
         callback: () => toggleSystemTablesEnabled(),
         icon: <IconGear className="w-4 h-4 text-muted" />,
