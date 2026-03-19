@@ -41,8 +41,9 @@ You typically run phrocs via `hogli dev` rather than directly.
 | `r`    | Restart selected process                        |
 | `s`    | Stop selected process                           |
 | `c`    | Enter copy mode                                 |
+| `i`    | Enter info mode (show process stats)            |
 | `/`    | Enter search mode                               |
-| `esc`  | Exit copy and search modes                      |
+| `esc`  | Exit copy, search, and info modes               |
 | `?`    | Toggle full help                                |
 | `q`    | Quit                                            |
 
@@ -59,6 +60,16 @@ Press `esc` to exit without copying.
 Press `/` to enter search mode, type a query, then press `enter` to keep highlights active.
 Use `↵` and `⇧↵` to jump to the next/previous match.
 Press `esc` to clear the active search.
+
+### Info mode
+
+Press `i` to enter info mode, which displays detailed stats about the selected process:
+- Status, PID, ready state, and exit code
+- Timing information (started, uptime, startup duration)
+- Resource usage (memory RSS, peak memory, CPU %, CPU time, threads, child processes, file descriptors)
+- Configuration (command, ready pattern, autorestart, buffered lines)
+
+Press `i` or `esc` to exit info mode.
 
 ## Debug logging
 
