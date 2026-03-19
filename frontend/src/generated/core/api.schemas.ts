@@ -723,41 +723,6 @@ export interface PatchedProjectBackwardCompatApi {
     readonly available_setup_task_ids?: readonly AvailableSetupTaskIdsEnumApi[]
 }
 
-export type RoleApiMembersItem = { [key: string]: unknown }
-
-export interface RoleApi {
-    readonly id: string
-    /** @maxLength 200 */
-    name: string
-    readonly created_at: string
-    readonly created_by: UserBasicApi
-    /** Members assigned to this role */
-    readonly members: readonly RoleApiMembersItem[]
-    readonly is_default: boolean
-}
-
-export interface PaginatedRoleListApi {
-    count: number
-    /** @nullable */
-    next?: string | null
-    /** @nullable */
-    previous?: string | null
-    results: RoleApi[]
-}
-
-export type PatchedRoleApiMembersItem = { [key: string]: unknown }
-
-export interface PatchedRoleApi {
-    readonly id?: string
-    /** @maxLength 200 */
-    name?: string
-    readonly created_at?: string
-    readonly created_by?: UserBasicApi
-    /** Members assigned to this role */
-    readonly members?: readonly PatchedRoleApiMembersItem[]
-    readonly is_default?: boolean
-}
-
 export interface CommentApi {
     readonly id: string
     readonly created_by: UserBasicApi
@@ -1313,168 +1278,6 @@ export interface PatchedScheduledChangeApi {
 }
 
 /**
- * * `email` - Email
- * `slack` - Slack
- * `webhook` - Webhook
- */
-export type TargetTypeEnumApi = (typeof TargetTypeEnumApi)[keyof typeof TargetTypeEnumApi]
-
-export const TargetTypeEnumApi = {
-    Email: 'email',
-    Slack: 'slack',
-    Webhook: 'webhook',
-} as const
-
-/**
- * * `daily` - Daily
- * `weekly` - Weekly
- * `monthly` - Monthly
- * `yearly` - Yearly
- */
-export type FrequencyEnumApi = (typeof FrequencyEnumApi)[keyof typeof FrequencyEnumApi]
-
-export const FrequencyEnumApi = {
-    Daily: 'daily',
-    Weekly: 'weekly',
-    Monthly: 'monthly',
-    Yearly: 'yearly',
-} as const
-
-/**
- * * `monday` - Monday
- * `tuesday` - Tuesday
- * `wednesday` - Wednesday
- * `thursday` - Thursday
- * `friday` - Friday
- * `saturday` - Saturday
- * `sunday` - Sunday
- */
-export type ByweekdayEnumApi = (typeof ByweekdayEnumApi)[keyof typeof ByweekdayEnumApi]
-
-export const ByweekdayEnumApi = {
-    Monday: 'monday',
-    Tuesday: 'tuesday',
-    Wednesday: 'wednesday',
-    Thursday: 'thursday',
-    Friday: 'friday',
-    Saturday: 'saturday',
-    Sunday: 'sunday',
-} as const
-
-/**
- * Standard Subscription serializer.
- */
-export interface SubscriptionApi {
-    readonly id: number
-    /** @nullable */
-    dashboard?: number | null
-    /** @nullable */
-    insight?: number | null
-    dashboard_export_insights?: number[]
-    target_type: TargetTypeEnumApi
-    target_value: string
-    frequency: FrequencyEnumApi
-    /**
-     * @minimum -2147483648
-     * @maximum 2147483647
-     */
-    interval?: number
-    /** @nullable */
-    byweekday?: ByweekdayEnumApi[] | null
-    /**
-     * @minimum -2147483648
-     * @maximum 2147483647
-     * @nullable
-     */
-    bysetpos?: number | null
-    /**
-     * @minimum -2147483648
-     * @maximum 2147483647
-     * @nullable
-     */
-    count?: number | null
-    start_date: string
-    /** @nullable */
-    until_date?: string | null
-    readonly created_at: string
-    readonly created_by: UserBasicApi
-    deleted?: boolean
-    /**
-     * @maxLength 100
-     * @nullable
-     */
-    title?: string | null
-    readonly summary: string
-    /** @nullable */
-    readonly next_delivery_date: string | null
-    /** @nullable */
-    integration_id?: number | null
-    /** @nullable */
-    invite_message?: string | null
-}
-
-export interface PaginatedSubscriptionListApi {
-    count: number
-    /** @nullable */
-    next?: string | null
-    /** @nullable */
-    previous?: string | null
-    results: SubscriptionApi[]
-}
-
-/**
- * Standard Subscription serializer.
- */
-export interface PatchedSubscriptionApi {
-    readonly id?: number
-    /** @nullable */
-    dashboard?: number | null
-    /** @nullable */
-    insight?: number | null
-    dashboard_export_insights?: number[]
-    target_type?: TargetTypeEnumApi
-    target_value?: string
-    frequency?: FrequencyEnumApi
-    /**
-     * @minimum -2147483648
-     * @maximum 2147483647
-     */
-    interval?: number
-    /** @nullable */
-    byweekday?: ByweekdayEnumApi[] | null
-    /**
-     * @minimum -2147483648
-     * @maximum 2147483647
-     * @nullable
-     */
-    bysetpos?: number | null
-    /**
-     * @minimum -2147483648
-     * @maximum 2147483647
-     * @nullable
-     */
-    count?: number | null
-    start_date?: string
-    /** @nullable */
-    until_date?: string | null
-    readonly created_at?: string
-    readonly created_by?: UserBasicApi
-    deleted?: boolean
-    /**
-     * @maxLength 100
-     * @nullable
-     */
-    title?: string | null
-    readonly summary?: string
-    /** @nullable */
-    readonly next_delivery_date?: string | null
-    /** @nullable */
-    integration_id?: number | null
-    /** @nullable */
-    invite_message?: string | null
-}
-
-/**
  * * `disabled` - disabled
  * `toolbar` - toolbar
  */
@@ -1857,17 +1660,6 @@ export type List2Params = {
     search?: string
 }
 
-export type RolesListParams = {
-    /**
-     * Number of results to return per page.
-     */
-    limit?: number
-    /**
-     * The initial index from which to return the results.
-     */
-    offset?: number
-}
-
 export type CommentsListParams = {
     /**
      * The pagination cursor value.
@@ -2025,17 +1817,6 @@ export const PropertyDefinitionsListType = {
 } as const
 
 export type ScheduledChangesListParams = {
-    /**
-     * Number of results to return per page.
-     */
-    limit?: number
-    /**
-     * The initial index from which to return the results.
-     */
-    offset?: number
-}
-
-export type SubscriptionsListParams = {
     /**
      * Number of results to return per page.
      */

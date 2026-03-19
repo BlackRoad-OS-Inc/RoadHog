@@ -44,9 +44,7 @@ import type {
     PaginatedOrganizationMemberListApi,
     PaginatedOrganizationOAuthApplicationListApi,
     PaginatedProjectBackwardCompatBasicListApi,
-    PaginatedRoleListApi,
     PaginatedScheduledChangeListApi,
-    PaginatedSubscriptionListApi,
     PaginatedUserListApi,
     PatchedCommentApi,
     PatchedDashboardTemplateApi,
@@ -56,19 +54,13 @@ import type {
     PatchedOrganizationDomainApi,
     PatchedOrganizationMemberApi,
     PatchedProjectBackwardCompatApi,
-    PatchedRoleApi,
     PatchedScheduledChangeApi,
-    PatchedSubscriptionApi,
     PatchedUserApi,
     ProjectBackwardCompatApi,
     PropertyDefinitionsListParams,
-    RoleApi,
-    RolesListParams,
     ScheduledChangeApi,
     ScheduledChangesListParams,
     SharingConfigurationApi,
-    SubscriptionApi,
-    SubscriptionsListParams,
     UserApi,
     UsersListParams,
 } from './api.schemas'
@@ -737,108 +729,6 @@ export const rotateSecretTokenPartialUpdate = async (
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...options?.headers },
         body: JSON.stringify(patchedProjectBackwardCompatApi),
-    })
-}
-
-export const getRolesListUrl = (organizationId: string, params?: RolesListParams) => {
-    const normalizedParams = new URLSearchParams()
-
-    Object.entries(params || {}).forEach(([key, value]) => {
-        if (value !== undefined) {
-            normalizedParams.append(key, value === null ? 'null' : value.toString())
-        }
-    })
-
-    const stringifiedParams = normalizedParams.toString()
-
-    return stringifiedParams.length > 0
-        ? `/api/organizations/${organizationId}/roles/?${stringifiedParams}`
-        : `/api/organizations/${organizationId}/roles/`
-}
-
-export const rolesList = async (
-    organizationId: string,
-    params?: RolesListParams,
-    options?: RequestInit
-): Promise<PaginatedRoleListApi> => {
-    return apiMutator<PaginatedRoleListApi>(getRolesListUrl(organizationId, params), {
-        ...options,
-        method: 'GET',
-    })
-}
-
-export const getRolesCreateUrl = (organizationId: string) => {
-    return `/api/organizations/${organizationId}/roles/`
-}
-
-export const rolesCreate = async (
-    organizationId: string,
-    roleApi: NonReadonly<RoleApi>,
-    options?: RequestInit
-): Promise<RoleApi> => {
-    return apiMutator<RoleApi>(getRolesCreateUrl(organizationId), {
-        ...options,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...options?.headers },
-        body: JSON.stringify(roleApi),
-    })
-}
-
-export const getRolesRetrieveUrl = (organizationId: string, id: string) => {
-    return `/api/organizations/${organizationId}/roles/${id}/`
-}
-
-export const rolesRetrieve = async (organizationId: string, id: string, options?: RequestInit): Promise<RoleApi> => {
-    return apiMutator<RoleApi>(getRolesRetrieveUrl(organizationId, id), {
-        ...options,
-        method: 'GET',
-    })
-}
-
-export const getRolesUpdateUrl = (organizationId: string, id: string) => {
-    return `/api/organizations/${organizationId}/roles/${id}/`
-}
-
-export const rolesUpdate = async (
-    organizationId: string,
-    id: string,
-    roleApi: NonReadonly<RoleApi>,
-    options?: RequestInit
-): Promise<RoleApi> => {
-    return apiMutator<RoleApi>(getRolesUpdateUrl(organizationId, id), {
-        ...options,
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...options?.headers },
-        body: JSON.stringify(roleApi),
-    })
-}
-
-export const getRolesPartialUpdateUrl = (organizationId: string, id: string) => {
-    return `/api/organizations/${organizationId}/roles/${id}/`
-}
-
-export const rolesPartialUpdate = async (
-    organizationId: string,
-    id: string,
-    patchedRoleApi: NonReadonly<PatchedRoleApi>,
-    options?: RequestInit
-): Promise<RoleApi> => {
-    return apiMutator<RoleApi>(getRolesPartialUpdateUrl(organizationId, id), {
-        ...options,
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...options?.headers },
-        body: JSON.stringify(patchedRoleApi),
-    })
-}
-
-export const getRolesDestroyUrl = (organizationId: string, id: string) => {
-    return `/api/organizations/${organizationId}/roles/${id}/`
-}
-
-export const rolesDestroy = async (organizationId: string, id: string, options?: RequestInit): Promise<void> => {
-    return apiMutator<void>(getRolesDestroyUrl(organizationId, id), {
-        ...options,
-        method: 'DELETE',
     })
 }
 
@@ -2187,115 +2077,6 @@ export const sessionRecordingsSharingRefreshCreate = async (
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...options?.headers },
         body: JSON.stringify(sharingConfigurationApi),
-    })
-}
-
-export const getSubscriptionsListUrl = (projectId: string, params?: SubscriptionsListParams) => {
-    const normalizedParams = new URLSearchParams()
-
-    Object.entries(params || {}).forEach(([key, value]) => {
-        if (value !== undefined) {
-            normalizedParams.append(key, value === null ? 'null' : value.toString())
-        }
-    })
-
-    const stringifiedParams = normalizedParams.toString()
-
-    return stringifiedParams.length > 0
-        ? `/api/projects/${projectId}/subscriptions/?${stringifiedParams}`
-        : `/api/projects/${projectId}/subscriptions/`
-}
-
-export const subscriptionsList = async (
-    projectId: string,
-    params?: SubscriptionsListParams,
-    options?: RequestInit
-): Promise<PaginatedSubscriptionListApi> => {
-    return apiMutator<PaginatedSubscriptionListApi>(getSubscriptionsListUrl(projectId, params), {
-        ...options,
-        method: 'GET',
-    })
-}
-
-export const getSubscriptionsCreateUrl = (projectId: string) => {
-    return `/api/projects/${projectId}/subscriptions/`
-}
-
-export const subscriptionsCreate = async (
-    projectId: string,
-    subscriptionApi: NonReadonly<SubscriptionApi>,
-    options?: RequestInit
-): Promise<SubscriptionApi> => {
-    return apiMutator<SubscriptionApi>(getSubscriptionsCreateUrl(projectId), {
-        ...options,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...options?.headers },
-        body: JSON.stringify(subscriptionApi),
-    })
-}
-
-export const getSubscriptionsRetrieveUrl = (projectId: string, id: number) => {
-    return `/api/projects/${projectId}/subscriptions/${id}/`
-}
-
-export const subscriptionsRetrieve = async (
-    projectId: string,
-    id: number,
-    options?: RequestInit
-): Promise<SubscriptionApi> => {
-    return apiMutator<SubscriptionApi>(getSubscriptionsRetrieveUrl(projectId, id), {
-        ...options,
-        method: 'GET',
-    })
-}
-
-export const getSubscriptionsUpdateUrl = (projectId: string, id: number) => {
-    return `/api/projects/${projectId}/subscriptions/${id}/`
-}
-
-export const subscriptionsUpdate = async (
-    projectId: string,
-    id: number,
-    subscriptionApi: NonReadonly<SubscriptionApi>,
-    options?: RequestInit
-): Promise<SubscriptionApi> => {
-    return apiMutator<SubscriptionApi>(getSubscriptionsUpdateUrl(projectId, id), {
-        ...options,
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...options?.headers },
-        body: JSON.stringify(subscriptionApi),
-    })
-}
-
-export const getSubscriptionsPartialUpdateUrl = (projectId: string, id: number) => {
-    return `/api/projects/${projectId}/subscriptions/${id}/`
-}
-
-export const subscriptionsPartialUpdate = async (
-    projectId: string,
-    id: number,
-    patchedSubscriptionApi: NonReadonly<PatchedSubscriptionApi>,
-    options?: RequestInit
-): Promise<SubscriptionApi> => {
-    return apiMutator<SubscriptionApi>(getSubscriptionsPartialUpdateUrl(projectId, id), {
-        ...options,
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...options?.headers },
-        body: JSON.stringify(patchedSubscriptionApi),
-    })
-}
-
-/**
- * Hard delete of this model is not allowed. Use a patch API call to set "deleted" to true
- */
-export const getSubscriptionsDestroyUrl = (projectId: string, id: number) => {
-    return `/api/projects/${projectId}/subscriptions/${id}/`
-}
-
-export const subscriptionsDestroy = async (projectId: string, id: number, options?: RequestInit): Promise<unknown> => {
-    return apiMutator<unknown>(getSubscriptionsDestroyUrl(projectId, id), {
-        ...options,
-        method: 'DELETE',
     })
 }
 
