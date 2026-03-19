@@ -68,16 +68,34 @@ capabilities:
         requires: [temporal_workflows]
         docker_profiles: []
 
-    # Dagster code location groups - control which dagster locations are loaded
-    # Base locations (shared, analytics_platform, growth, ingestion) are in dagster_pipelines
+    # Dagster code location groups control which dagster locations are loaded
+    # Only shared (monitoring sensors) is in the base capability
     dagster_pipelines:
         description: 'Dagster data pipeline orchestration'
         requires: [core_infra]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.shared
+
+    dagster_analytics_platform:
+        description: 'Dagster sessions backfill and cleanup jobs'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations:
             - posthog.dags.locations.analytics_platform
+
+    dagster_growth:
+        description: 'Dagster growth jobs (OAuth, SDK versions, user product list)'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations:
             - posthog.dags.locations.growth
+
+    dagster_ingestion:
+        description: 'Dagster person/identity management jobs'
+        requires: [dagster_pipelines]
+        docker_profiles: []
+        dagster_locations:
             - posthog.dags.locations.ingestion
 
     dagster_web_analytics:
@@ -233,7 +251,7 @@ capabilities:
 intents:
     product_analytics:
         description: 'Core product analytics - insights, funnels, trends'
-        capabilities: [event_ingestion, property_definitions, celery_workers, nodejs_cdp]
+        capabilities: [event_ingestion, property_definitions, celery_workers, nodejs_cdp, dagster_analytics_platform]
 
     error_tracking:
         description: 'Track and analyze application errors'
@@ -259,6 +277,7 @@ intents:
                 temporal_workflows,
                 nodejs_session_replay,
                 recording_rasterizer,
+                dagster_analytics_platform,
             ]
 
     feature_flags:
@@ -275,7 +294,7 @@ intents:
                 celery_workers,
                 nodejs_feature_flags,
                 nodejs_cdp,
-                dagster_pipelines,
+                dagster_analytics_platform,
                 temporal_workflows,
             ]
 
@@ -353,7 +372,19 @@ intents:
 
     dagster:
         description: 'Dagster for clickhouse maintenance, system workflows'
-        capabilities: [dagster_pipelines]
+        capabilities:
+            [
+                dagster_pipelines,
+                dagster_analytics_platform,
+                dagster_growth,
+                dagster_ingestion,
+                dagster_web_analytics,
+                dagster_llm_analytics,
+                dagster_error_tracking,
+                dagster_ai,
+                dagster_logs,
+                dagster_data_warehouse,
+            ]
 
 # Always-required processes regardless of intent
 # This is the core stack needed for any development
