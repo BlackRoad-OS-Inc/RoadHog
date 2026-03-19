@@ -45,6 +45,7 @@ class Survey(FileSystemSyncMixin, RootTeamMixin, UUIDTModel):
         ALWAYS = "always", "always"
 
     class Meta:
+        db_table = "posthog_survey"
         constraints = [models.UniqueConstraint(fields=["team", "name"], name="unique survey name for team")]
 
     team = models.ForeignKey(

@@ -31,10 +31,10 @@ from posthog.constants import AvailableFeature
 from posthog.models import Action, FeatureFlag, Person, Team
 from posthog.models.cohort.cohort import Cohort
 from posthog.models.organization import Organization
-from posthog.models.surveys.survey import MAX_ITERATION_COUNT, Survey, surveys_hypercache
-from posthog.models.surveys.survey_response_archive import SurveyResponseArchive
 
 from products.product_tours.backend.models import ProductTour
+from products.surveys.backend.survey import MAX_ITERATION_COUNT, Survey, surveys_hypercache
+from products.surveys.backend.survey_response_archive import SurveyResponseArchive
 
 
 class TestSurvey(APIBaseTest):

@@ -16,7 +16,7 @@ class SurveyResponseArchive(UUIDModel):
         related_query_name="survey_response_archive",
     )
     survey = models.ForeignKey(
-        "posthog.Survey",
+        "surveys.Survey",
         on_delete=models.CASCADE,
         related_name="response_archives",
         related_query_name="response_archive",
@@ -25,6 +25,7 @@ class SurveyResponseArchive(UUIDModel):
     archived_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "posthog_surveyresponsearchive"
         constraints = [
             models.UniqueConstraint(
                 fields=["team", "response_uuid"],

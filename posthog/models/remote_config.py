@@ -21,7 +21,6 @@ from posthog.models.hog_functions.hog_function import HogFunction
 from posthog.models.organization import OrganizationMembership
 from posthog.models.personal_api_key import PersonalAPIKey
 from posthog.models.plugin import PluginConfig
-from posthog.models.surveys.survey import Survey
 from posthog.models.team.team import Team
 from posthog.models.user import User
 from posthog.models.utils import UUIDTModel, execute_with_timeout
@@ -29,6 +28,7 @@ from posthog.storage.hypercache import HyperCache, HyperCacheStoreMissing
 
 from products.error_tracking.backend.models import ErrorTrackingSuppressionRule
 from products.product_tours.backend.models import ProductTour
+from products.surveys.backend.survey import Survey
 
 tracer = trace.get_tracer(__name__)
 
