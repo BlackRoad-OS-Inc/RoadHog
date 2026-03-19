@@ -59,11 +59,6 @@ test.describe('SQL Editor', () => {
         await expect(page.locator('.scene-name h1 span').getByText(uniqueViewName, { exact: true })).toBeVisible()
     })
 
-    test('Materialize view pane', async ({ page }) => {
-        await page.getByText('Materialization').click()
-        await expect(page.locator('[data-attr=sql-editor-sidebar-query-info-pane]')).toBeVisible()
-    })
-
     test('Query variables pane', async ({ page }) => {
         await page.getByText('Variables').click()
         await expect(page.locator('[data-attr=sql-editor-variables-button]')).toBeVisible()

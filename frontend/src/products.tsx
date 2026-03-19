@@ -56,8 +56,8 @@ export const productScenes: Record<string, () => Promise<any>> = {
     CustomerJourneyTemplates: () =>
         import('../../products/customer_analytics/frontend/scenes/CustomerJourneyTemplatesScene/CustomerJourneyTemplatesScene'),
     DataOps: () => import('../../products/data_warehouse/DataWarehouseScene'),
-    Models: () => import('../../frontend/src/scenes/models/ModelsScene'),
-    NodeDetail: () => import('../../frontend/src/scenes/models/NodeDetailScene'),
+    Views: () => import('../../frontend/src/scenes/views/ViewsScene'),
+    NodeDetail: () => import('../../frontend/src/scenes/views/NodeDetailScene'),
     EarlyAccessFeatures: () => import('../../products/early_access_features/frontend/EarlyAccessFeatures'),
     EarlyAccessFeature: () => import('../../products/early_access_features/frontend/EarlyAccessFeature'),
     EndpointsScene: () => import('../../products/endpoints/frontend/EndpointsScene'),
@@ -128,8 +128,8 @@ export const productRoutes: Record<string, [string, string]> = {
     '/customer_analytics/journeys': ['CustomerAnalytics', 'customerAnalyticsJourneys'],
     '/customer_analytics/configuration': ['CustomerAnalyticsConfiguration', 'customerAnalyticsConfiguration'],
     '/data-ops': ['DataOps', 'dataOps'],
-    '/models': ['Models', 'models'],
-    '/models/:id': ['NodeDetail', 'nodeDetail'],
+    '/views': ['Views', 'views'],
+    '/views/:id': ['NodeDetail', 'view'],
     '/early_access_features': ['EarlyAccessFeatures', 'earlyAccessFeatures'],
     '/early_access_features/:id': ['EarlyAccessFeature', 'earlyAccessFeature'],
     '/endpoints': ['EndpointsScene', 'endpoints'],
@@ -208,6 +208,8 @@ export const productRedirects: Record<
     '/support': '/support/tickets',
     '/customer_analytics': (_params, searchParams, hashParams) =>
         combineUrl('/customer_analytics/dashboard', searchParams, hashParams).url,
+    '/models': '/views',
+    '/models/:id': ({ id }) => `/views/${id}`,
     '/llm-analytics': (_params, searchParams, hashParams) =>
         combineUrl(`/llm-analytics/dashboard`, searchParams, hashParams).url,
     '/llm-analytics/settings': (_params, searchParams) =>
@@ -292,14 +294,14 @@ export const productConfiguration: Record<string, any> = {
             'Manage your data warehouse sources and queries. New source syncs are always free for the first 7 days',
         iconType: 'data_warehouse',
     },
-    Models: {
-        name: 'Models',
+    Views: {
+        name: 'Views',
         projectBased: true,
         defaultDocsPath: '/docs/data-warehouse',
         description: 'Create and manage views and materialized views for transforming and organizing your data.',
         iconType: 'sql_editor',
     },
-    NodeDetail: { name: 'Model detail', projectBased: true, defaultDocsPath: '/docs/data-warehouse' },
+    NodeDetail: { name: 'View detail', projectBased: true, defaultDocsPath: '/docs/data-warehouse' },
     SQLEditor: {
         projectBased: true,
         name: 'SQL editor',
@@ -581,8 +583,8 @@ export const productUrls = {
         `/dashboard/${id}/subscriptions/${subscriptionId}`,
     sharedDashboard: (shareToken: string): string => `/shared_dashboard/${shareToken}`,
     dataOps: (tab?: string): string => (tab ? `/data-warehouse?tab=${tab}` : '/data-ops'),
-    models: (): string => '/models',
-    nodeDetail: (id: string): string => `/models/${id}`,
+    views: (): string => '/views',
+    view: (id: string): string => `/views/${id}`,
     earlyAccessFeatures: (): string => '/early_access_features',
     earlyAccessFeature: (id: string): string => `/early_access_features/${id}`,
     endpoints: (): string => '/endpoints',
@@ -1253,7 +1255,7 @@ export const getTreeItemsProducts = (): FileSystemImport[] => [
         iconType: 'data_warehouse',
         iconColor: ['var(--color-product-data-warehouse-light)'],
         sceneKey: 'DataOps',
-        sceneKeys: ['DataOps', 'Models', 'NodeDetail', 'SQLEditor'],
+        sceneKeys: ['DataOps', 'Views', 'NodeDetail', 'SQLEditor'],
     },
     {
         path: 'Datasets',
@@ -1796,17 +1798,7 @@ export const getTreeItemsMetadata = (): FileSystemImport[] => [
         iconType: 'managed_viewsets',
         href: urls.dataWarehouseManagedViewsets(),
         flag: FEATURE_FLAGS.MANAGED_VIEWSETS,
-        sceneKeys: ['DataOps', 'Models', 'NodeDetail', 'SQLEditor'],
-    },
-    {
-        path: 'Models',
-        category: 'Tools',
-        type: 'sql',
-        iconType: 'sql_editor',
-        iconColor: ['var(--color-product-data-warehouse-light)'],
-        href: urls.models(),
-        sceneKey: 'Models',
-        sceneKeys: ['Models'],
+        sceneKeys: ['DataOps', 'Views', 'NodeDetail', 'SQLEditor'],
     },
     {
         path: 'Property definitions',
@@ -1850,5 +1842,15 @@ export const getTreeItemsMetadata = (): FileSystemImport[] => [
         href: urls.transformations(),
         sceneKey: 'Transformations',
         sceneKeys: ['Transformations'],
+    },
+    {
+        path: 'Views',
+        category: 'Tools',
+        type: 'sql',
+        iconType: 'sql_editor',
+        iconColor: ['var(--color-product-data-warehouse-light)'],
+        href: urls.views(),
+        sceneKey: 'Views',
+        sceneKeys: ['Views'],
     },
 ]

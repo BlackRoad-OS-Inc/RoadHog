@@ -9,6 +9,7 @@ import { teamLogic } from 'scenes/teamLogic'
 import { urls } from 'scenes/urls'
 
 import { useMocks } from '~/mocks/jest'
+import { dataNodeLogic } from '~/queries/nodes/DataNode/dataNodeLogic'
 import * as queryRunner from '~/queries/query'
 import { DataVisualizationNode, NodeKind } from '~/queries/schema/schema-general'
 import { initKeaTests } from '~/test/init'
@@ -77,6 +78,12 @@ const MOCK_VIEW = {
     latest_error: null,
 } as any
 
+const CREATED_VIEW = {
+    ...MOCK_VIEW,
+    id: 'created-view',
+    name: 'Created view',
+} as any
+
 function createMockMonaco(): any {
     const mockModel = {
         getValue: () => '',
@@ -133,6 +140,7 @@ describe('sqlEditorLogic', () => {
             },
             post: {
                 '/api/environments/:team_id/query/': queryEndpointMock,
+                '/api/environments/:team_id/warehouse_saved_queries/': CREATED_VIEW,
             },
             patch: {
                 '/api/user_home_settings/@me/': [200],
@@ -277,7 +285,7 @@ describe('sqlEditorLogic', () => {
     })
 
     describe('open_view behavior', () => {
-        it('switches to the materialization tab when opening a view from the URL', async () => {
+        it('respects the requested output tab when opening a view from the URL', async () => {
             logic = sqlEditorLogic({
                 tabId: TAB_ID,
                 monaco: createMockMonaco(),
@@ -293,11 +301,11 @@ describe('sqlEditorLogic', () => {
                     editingView: partial({
                         id: MOCK_VIEW.id,
                     }),
-                    outputActiveTab: OutputTab.Materialization,
+                    outputActiveTab: OutputTab.Results,
                 })
         })
 
-        it('switches to the materialization tab when opening a view directly', async () => {
+        it('keeps the default output tab when opening a view directly', async () => {
             logic = sqlEditorLogic({
                 tabId: TAB_ID,
                 monaco: createMockMonaco(),
@@ -308,13 +316,46 @@ describe('sqlEditorLogic', () => {
             logic.actions.editView(MOCK_VIEW.query.query, MOCK_VIEW)
 
             await expectLogic(logic)
-                .toDispatchActions(['setActiveTab', 'createTab', 'updateTab'])
+                .toDispatchActions(['createTab', 'updateTab'])
                 .toMatchValues({
                     editingView: partial({
                         id: MOCK_VIEW.id,
                     }),
-                    outputActiveTab: OutputTab.Materialization,
+                    outputActiveTab: OutputTab.Results,
                 })
+        })
+    })
+
+    describe('save view behavior', () => {
+        it('redirects to the saved view page instead of keeping the view open in SQL editor', async () => {
+            logic = sqlEditorLogic({
+                tabId: TAB_ID,
+                monaco: createMockMonaco(),
+                editor: createMockEditor(),
+            })
+            logic.mount()
+
+            logic.actions.setSourceQuery({
+                kind: NodeKind.DataVisualizationNode,
+                source: {
+                    kind: NodeKind.HogQLQuery,
+                    query: 'SELECT 1',
+                },
+                display: ChartDisplayType.ActionsLineGraph,
+            })
+            logic.actions.setQueryInput('SELECT 1')
+
+            const dataNode = dataNodeLogic({
+                key: logic.values.dataLogicKey,
+                query: logic.values.sourceQuery.source,
+            })
+            dataNode.mount()
+
+            await logic.asyncActions.saveAsViewSubmit(CREATED_VIEW.name)
+
+            expect(router.values.location.pathname).toEqual(expect.stringContaining(urls.view(CREATED_VIEW.id)))
+
+            dataNode.unmount()
         })
     })
 

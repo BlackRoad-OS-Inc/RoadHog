@@ -17,17 +17,17 @@ export const manifest: ProductManifest = {
                 'Manage your data warehouse sources and queries. New source syncs are always free for the first 7 days',
             iconType: 'data_warehouse',
         },
-        Models: {
-            name: 'Models',
-            import: () => import('../../frontend/src/scenes/models/ModelsScene'),
+        Views: {
+            name: 'Views',
+            import: () => import('../../frontend/src/scenes/views/ViewsScene'),
             projectBased: true,
             defaultDocsPath: '/docs/data-warehouse',
             description: 'Create and manage views and materialized views for transforming and organizing your data.',
             iconType: 'sql_editor',
         },
         NodeDetail: {
-            name: 'Model detail',
-            import: () => import('../../frontend/src/scenes/models/NodeDetailScene'),
+            name: 'View detail',
+            import: () => import('../../frontend/src/scenes/views/NodeDetailScene'),
             projectBased: true,
             defaultDocsPath: '/docs/data-warehouse',
         },
@@ -42,13 +42,17 @@ export const manifest: ProductManifest = {
     },
     routes: {
         '/data-ops': ['DataOps', 'dataOps'],
-        '/models': ['Models', 'models'],
-        '/models/:id': ['NodeDetail', 'nodeDetail'],
+        '/views': ['Views', 'views'],
+        '/views/:id': ['NodeDetail', 'view'],
+    },
+    redirects: {
+        '/models': '/views',
+        '/models/:id': ({ id }) => `/views/${id}`,
     },
     urls: {
         dataOps: (tab?: string): string => (tab ? `/data-warehouse?tab=${tab}` : '/data-ops'),
-        models: (): string => '/models',
-        nodeDetail: (id: string): string => `/models/${id}`,
+        views: (): string => '/views',
+        view: (id: string): string => `/views/${id}`,
     },
     treeItemsProducts: [
         {
@@ -85,14 +89,14 @@ export const manifest: ProductManifest = {
             sceneKeys: ['Sources'],
         },
         {
-            path: 'Models',
+            path: 'Views',
             category: 'Tools',
             type: 'sql',
             iconType: 'sql_editor',
             iconColor: ['var(--color-product-data-warehouse-light)'],
-            href: urls.models(),
-            sceneKey: 'Models',
-            sceneKeys: ['Models'],
+            href: urls.views(),
+            sceneKey: 'Views',
+            sceneKeys: ['Views'],
         },
         {
             path: 'Managed viewsets',

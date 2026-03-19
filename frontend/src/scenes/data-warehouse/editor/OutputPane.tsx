@@ -7,7 +7,6 @@ import { useCallback, useMemo, useState } from 'react'
 import DataGrid, { DataGridProps, RenderHeaderCellProps, SortColumn } from 'react-data-grid'
 
 import {
-    IconBolt,
     IconCode,
     IconCopy,
     IconDownload,
@@ -18,7 +17,7 @@ import {
     IconPlus,
     IconShare,
 } from '@posthog/icons'
-import { LemonButton, LemonDivider, LemonMenu, LemonModal, LemonTable, Spinner, Tooltip } from '@posthog/lemon-ui'
+import { LemonButton, LemonDivider, LemonMenu, LemonModal, LemonTable, Tooltip } from '@posthog/lemon-ui'
 
 import { ExportButton } from 'lib/components/ExportButton/ExportButton'
 import { JSONViewer } from 'lib/components/JSONViewer'
@@ -53,7 +52,6 @@ import { ChartDisplayType, ExporterFormat } from '~/types'
 
 import { copyTableToCsv, copyTableToExcel, copyTableToJson } from '../../../queries/nodes/DataTable/clipboardUtils'
 import { FixErrorButton } from './components/FixErrorButton'
-import { QueryInfo } from './output-pane-tabs/QueryInfo'
 import { OutputTab, outputPaneLogic } from './outputPaneLogic'
 import { sqlEditorLogic } from './sqlEditorLogic'
 import TabScroller from './TabScroller'
@@ -288,19 +286,12 @@ function RowDetailsModal({ isOpen, onClose, row, columns, columnKeys }: RowDetai
     )
 }
 
-export function OutputPane({ tabId }: { tabId: string }): JSX.Element {
+export function OutputPane(): JSX.Element {
     const { activeTab } = useValues(outputPaneLogic)
     const { setActiveTab } = useActions(outputPaneLogic)
 
-    const {
-        sourceQuery,
-        exportContext,
-        insightLoading,
-        viewLoading,
-        showLegacyFilters,
-        hasQueryInput,
-        isEmbeddedMode,
-    } = useValues(sqlEditorLogic)
+    const { sourceQuery, exportContext, insightLoading, showLegacyFilters, hasQueryInput, isEmbeddedMode } =
+        useValues(sqlEditorLogic)
     const { setSourceQuery, runQuery, shareTab } = useActions(sqlEditorLogic)
     const { isDarkModeOn } = useValues(themeLogic)
     const {
@@ -484,11 +475,6 @@ export function OutputPane({ tabId }: { tabId: string }): JSX.Element {
                                   label: 'Visualization',
                                   icon: <IconGraph />,
                               },
-                              {
-                                  key: OutputTab.Materialization,
-                                  label: 'Materialization',
-                                  icon: <IconBolt />,
-                              },
                           ]
                         : [
                               {
@@ -633,10 +619,8 @@ export function OutputPane({ tabId }: { tabId: string }): JSX.Element {
                     exportContext={exportContext}
                     queryId={queryId}
                     pollResponse={pollResponse}
-                    tabId={tabId}
                     setProgress={setProgress}
                     progress={queryId ? progressCache[queryId] : undefined}
-                    viewLoading={viewLoading}
                 />
             </div>
             <div className="flex justify-between px-2 border-t">
@@ -775,7 +759,6 @@ const Content = ({
     rows,
     isDarkModeOn,
     vizKey,
-    tabId,
     setSourceQuery,
     exportContext,
     queryId,
@@ -783,7 +766,6 @@ const Content = ({
     setProgress,
     progress,
     insightLoading,
-    viewLoading,
 }: any): JSX.Element | null => {
     const [sortColumns, setSortColumns] = useState<SortColumn[]>([])
 
@@ -813,27 +795,6 @@ const Content = ({
             return 0
         })
     }, [rows, sortColumns])
-    if (activeTab === OutputTab.Materialization) {
-        if (viewLoading) {
-            return (
-                <div className="flex flex-1 items-center justify-center border-t">
-                    <div className="flex flex-col items-center gap-3 text-secondary">
-                        <Spinner className="text-6xl" />
-                        <span className="text-sm font-medium">Loading view...</span>
-                    </div>
-                </div>
-            )
-        }
-
-        return (
-            <TabScroller>
-                <div className="px-6 py-4 border-t">
-                    <QueryInfo tabId={tabId} />
-                </div>
-            </TabScroller>
-        )
-    }
-
     if (responseLoading || insightLoading) {
         return (
             <div className="flex flex-1 p-2 w-full justify-center items-center border-t">

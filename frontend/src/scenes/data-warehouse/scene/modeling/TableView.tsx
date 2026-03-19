@@ -4,8 +4,8 @@ import { IconFilter } from '@posthog/icons'
 import { LemonButton, LemonCheckbox, LemonDivider, LemonTable, LemonTag, Link, Spinner } from '@posthog/lemon-ui'
 
 import { TZLabel } from 'lib/components/TZLabel'
-import { NODE_TYPE_TAG_SETTINGS } from 'scenes/models/nodeDetailConstants'
 import { urls } from 'scenes/urls'
+import { NODE_TYPE_TAG_SETTINGS } from 'scenes/views/nodeDetailConstants'
 
 import { DataModelingNode, DataModelingNodeType } from '~/types'
 
@@ -37,11 +37,11 @@ export function TableView(): JSX.Element {
     if (!nodesLoading && viewNodes.length === 0) {
         return (
             <div className="text-center py-12">
-                <h3 className="text-xl font-semibold mb-2">No models found</h3>
+                <h3 className="text-xl font-semibold mb-2">No views found</h3>
                 {debouncedSearchTerm ? (
-                    <p className="text-muted">No models match your search. Try adjusting your search term.</p>
+                    <p className="text-muted">No views match your search. Try adjusting your search term.</p>
                 ) : (
-                    <p className="text-muted">Models will appear here when views or materialized views are created.</p>
+                    <p className="text-muted">Views will appear here when views or materialized views are created.</p>
                 )}
             </div>
         )
@@ -56,7 +56,7 @@ export function TableView(): JSX.Element {
                     title: 'Name',
                     key: 'name',
                     render: (_, node: DataModelingNode) => (
-                        <Link to={node.type === 'endpoint' ? urls.endpoint(node.name) : urls.nodeDetail(node.id)}>
+                        <Link to={node.type === 'endpoint' ? urls.endpoint(node.name) : urls.view(node.id)}>
                             <span className="font-bold text-primary">{node.name}</span>
                         </Link>
                     ),

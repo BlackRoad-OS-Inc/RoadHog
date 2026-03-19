@@ -90,6 +90,7 @@ export interface SqlEditorLogicProps {
 }
 
 export const NEW_QUERY = 'Untitled'
+const VALID_OUTPUT_TABS = new Set<string>(Object.values(OutputTab))
 
 export interface QueryTab {
     uri: Uri
@@ -653,7 +654,6 @@ export const sqlEditorLogic = kea<sqlEditorLogicType>([
             actions._setSuggestionPayload(null)
         },
         editView: ({ query, view }) => {
-            actions.setActiveTab(OutputTab.Materialization)
             actions.createTab(query, view)
         },
         editInsight: ({ query, insight }) => {
@@ -852,6 +852,10 @@ export const sqlEditorLogic = kea<sqlEditorLogicType>([
                 if (fromDraft) {
                     actions.deleteDraft(fromDraft, savedQuery?.name)
                 }
+
+                if (savedQuery) {
+                    router.actions.push(urls.view(savedQuery.id))
+                }
             } catch {
                 lemonToast.error('Failed to save view')
             }
@@ -1028,17 +1032,6 @@ export const sqlEditorLogic = kea<sqlEditorLogicType>([
         deleteDataWarehouseSavedQuerySuccess: ({ payload: viewId }) => {
             if (values.activeTab?.view?.id === viewId && !values.activeTab?.draft) {
                 actions.createTab()
-            }
-        },
-        createDataWarehouseSavedQuerySuccess: ({ dataWarehouseSavedQueries, payload: view }) => {
-            const newView = view && dataWarehouseSavedQueries.find((v) => v.name === view.name)
-            if (newView) {
-                const oldTab = values.activeTab
-                // Only update the tab if it doesn't have a view (new query being saved)
-                // or if it's the same view being recreated (edge case)
-                if (oldTab && (!oldTab.view || oldTab.view.id === newView.id)) {
-                    actions.updateTab({ ...oldTab, view: newView })
-                }
             }
         },
         updateView: async ({ view, draftId }) => {
@@ -1504,7 +1497,7 @@ export const sqlEditorLogic = kea<sqlEditorLogicType>([
             let tabAdded = false
 
             const createQueryTab = async (): Promise<void> => {
-                if (searchParams.output_tab) {
+                if (searchParams.output_tab && VALID_OUTPUT_TABS.has(searchParams.output_tab)) {
                     actions.setActiveTab(searchParams.output_tab as OutputTab)
                 }
                 if (searchParams.open_draft || (hashParams.draft && values.queryInput === null)) {
@@ -1532,7 +1525,6 @@ export const sqlEditorLogic = kea<sqlEditorLogicType>([
                     // Open view
                     const viewId = searchParams.open_view || hashParams.view
 
-                    actions.setActiveTab(OutputTab.Materialization)
                     actions.setViewLoading(true)
 
                     if (values.dataWarehouseSavedQueries.length === 0) {

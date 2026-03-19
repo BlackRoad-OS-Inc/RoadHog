@@ -89,7 +89,7 @@ export enum Scene {
     EmailMFAVerify = 'EmailMFAVerify',
     MaterializedColumns = 'MaterializedColumns',
     Max = 'Max',
-    Models = 'Models',
+    Views = 'Views',
     NodeDetail = 'NodeDetail',
     MoveToPostHogCloud = 'MoveToPostHogCloud',
     NewTab = 'NewTab',

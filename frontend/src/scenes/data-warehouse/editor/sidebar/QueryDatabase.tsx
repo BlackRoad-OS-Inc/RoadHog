@@ -397,7 +397,7 @@ export const QueryDatabase = (): JSX.Element => {
                                 asChild
                                 onClick={(e) => {
                                     e.stopPropagation()
-                                    newInternalTab(urls.models())
+                                    newInternalTab(urls.views())
                                 }}
                             >
                                 <ButtonPrimitive menuItem>Manage views</ButtonPrimitive>
@@ -420,11 +420,8 @@ export const QueryDatabase = (): JSX.Element => {
                     item.record?.type === 'view' ||
                     item.record?.type === 'managed-view'
                 ) {
-                    // const viewUrl = getViewUrl(item) ||
                     const url =
-                        item.record?.type === 'endpoint'
-                            ? getEndpointUrl(item)
-                            : urls.sqlEditor({ view_id: item.record?.view.id })
+                        item.record?.type === 'endpoint' ? getEndpointUrl(item) : urls.view(item.record?.view.id)
                     const table = item.record?.tableName || item.name
                     const selectAllQuery = `SELECT * FROM ${escapePropertyAsHogQLIdentifier(table)} LIMIT 100`
                     const nextConnectionId =
@@ -460,17 +457,6 @@ export const QueryDatabase = (): JSX.Element => {
                             >
                                 <ButtonPrimitive menuItem>Select all</ButtonPrimitive>
                             </DropdownMenuItem>
-                            {!isEmbeddedMode && item.record.type !== 'endpoint' ? (
-                                <DropdownMenuItem
-                                    asChild
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        router.actions.push(url)
-                                    }}
-                                >
-                                    <ButtonPrimitive menuItem>Edit view definition</ButtonPrimitive>
-                                </DropdownMenuItem>
-                            ) : null}
                             <DropdownMenuItem
                                 asChild
                                 onClick={(e) => {

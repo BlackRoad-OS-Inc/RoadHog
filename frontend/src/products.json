@@ -247,7 +247,7 @@
             "type": "hog_function/source",
             "intents": []
         },
-        { "path": "Models", "category": "Tools", "iconType": "sql_editor", "type": "sql", "intents": [] },
+        { "path": "Views", "category": "Tools", "iconType": "sql_editor", "type": "sql", "intents": [] },
         {
             "path": "Managed viewsets",
             "category": "Unreleased",

@@ -352,7 +352,7 @@ const NodeComponent = React.memo(function NodeComponent(props: { id: string; dat
                 newTab(urls.endpoint(name))
             }
         } else {
-            newTab(urls.nodeDetail(id))
+            newTab(urls.view(id))
         }
     }, [type, id, newTab, props.data.name, name])
 

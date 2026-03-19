@@ -341,9 +341,9 @@ export const sceneConfigurations: Record<Scene | string, SceneConfig> = {
     [Scene.EmailMFAVerify]: { onlyUnauthenticated: true },
     [Scene.Login]: { onlyUnauthenticated: true },
     [Scene.Max]: { projectBased: true, name: 'Max', layout: 'app-raw-no-header', hideProjectNotice: true },
-    [Scene.Models]: {
+    [Scene.Views]: {
         projectBased: true,
-        name: 'Models',
+        name: 'Views',
         description: 'Create and manage views and materialized views for transforming and organizing your data.',
         defaultDocsPath: '/docs/data-warehouse/views/materialize',
         iconType: 'sql_editor',
@@ -896,7 +896,7 @@ export const routes: Record<string, [Scene | string, string]> = {
     [urls.deadLetterQueue()]: [Scene.DeadLetterQueue, 'deadLetterQueue'],
     [urls.destinations()]: [Scene.Destinations, 'destinations'],
     [urls.materializedColumns()]: [Scene.MaterializedColumns, 'materializedColumns'],
-    [urls.models()]: [Scene.Models, 'models'],
+    [urls.views()]: [Scene.Views, 'views'],
     [urls.sources()]: [Scene.Sources, 'sources'],
     [urls.transformations()]: [Scene.Transformations, 'transformations'],
     [urls.toolbarLaunch()]: [Scene.ToolbarLaunch, 'toolbarLaunch'],
