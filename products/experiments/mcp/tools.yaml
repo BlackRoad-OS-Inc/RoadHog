@@ -7,6 +7,17 @@
 category: Experiments
 feature: experiments
 url_prefix: /experiments
+ui_apps:
+    experiment:
+        type: detail
+        view_prop: experiment
+    experiment-list:
+        type: list
+        detail_tool: experiment-get
+        detail_args: '{ experimentId: item.id }'
+    experiment-results:
+        type: detail
+        view_prop: data
 tools:
     experiment-holdouts-list:
         operation: experiment_holdouts_list

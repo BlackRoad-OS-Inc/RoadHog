@@ -7,6 +7,22 @@
 category: Surveys
 feature: surveys
 url_prefix: /surveys
+ui_apps:
+    survey:
+        type: detail
+        view_prop: survey
+    survey-list:
+        type: list
+        detail_tool: survey-get
+        detail_args: '{ surveyId: item.id }'
+    survey-stats:
+        type: detail
+        view_prop: data
+    survey-global-stats:
+        type: detail
+        view_prop: data
+        data_type: SurveyStatsData
+        view_component: SurveyStatsView
 tools:
     surveys-list:
         operation: surveys_list

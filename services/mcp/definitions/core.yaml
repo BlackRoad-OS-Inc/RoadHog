@@ -7,6 +7,15 @@
 category: Core
 feature: core
 url_prefix: /
+ui_apps:
+    debug:
+        type: custom
+        app_name: MCP Apps Debug
+        description: Debug app for testing MCP Apps SDK integration
+    query-results:
+        type: custom
+        app_name: Query Results
+        description: Interactive visualization for PostHog query results
 tools:
     domains-list:
         operation: domains_list

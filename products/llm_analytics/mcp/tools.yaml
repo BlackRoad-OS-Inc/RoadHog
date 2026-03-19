@@ -7,6 +7,12 @@
 category: LLM analytics
 feature: llm_analytics
 url_prefix: /llm-analytics
+ui_apps:
+    llm-costs:
+        type: detail
+        view_prop: data
+        data_type: LLMCostsData
+        view_component: LLMCostsView
 tools:
     evaluation-runs-create:
         operation: evaluation_runs_create
