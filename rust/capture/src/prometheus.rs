@@ -24,7 +24,7 @@ pub fn report_internal_error_metrics(err_type: &'static str, stage_tag: &'static
 }
 
 pub fn report_clock_skew(skew: chrono::Duration) {
-    let skew_seconds = skew.num_milliseconds().abs() as f64 / 1000.0;
+    let skew_seconds = skew.num_milliseconds().saturating_abs() as f64 / 1000.0;
     metrics::histogram!("capture_client_clock_skew_seconds").record(skew_seconds);
 }
 
