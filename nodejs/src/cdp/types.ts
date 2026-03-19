@@ -233,6 +233,8 @@ export type MinimalAppMetric = {
         | 'email_blocked'
         | 'email_spam'
         | 'email_unsubscribed'
+        | 'push_sent'
+        | 'push_failed'
         | 'quota_limited'
     count: number
 }
@@ -333,6 +335,7 @@ export type HogFunctionInputSchemaType = {
         | 'integration_field'
         | 'email'
         | 'native_email'
+        | 'push_subscription'
         | 'posthog_assignee'
         | 'posthog_ticket_tags'
     key: string
@@ -347,6 +350,7 @@ export type HogFunctionInputSchemaType = {
     integration_key?: string
     requires_field?: string
     integration_field?: string
+    platform?: 'android' | 'ios'
     requiredScopes?: string
     /**
      * templating: true indicates the field supports templating. Alternatively
