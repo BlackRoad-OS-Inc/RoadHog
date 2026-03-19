@@ -50,6 +50,7 @@ from posthog.temporal.data_imports.workflow_activities.emit_signals import (
 
 from products.signals.backend.temporal.actionability_judge import ActionabilityChoice, judge_report_actionability
 from products.signals.backend.temporal.grouping import (
+    BATCH_SIZE,
     generate_search_queries,
     match_signal_to_report,
     verify_match_specificity,
@@ -80,32 +81,21 @@ class EvalProgress:
     def __init__(self, n_signals: int, n_groups: int):
         self.n_signals = n_signals
         self.n_groups = n_groups
-        self.active = 0
         self.dropped = 0
         self._bar = tqdm(total=n_signals, desc="Matching", unit="sig", file=sys.stderr)
 
-    def signal_started(self):
-        self.active += 1
-        self._update_postfix()
-
     def signal_done(self):
-        self.active -= 1
         self._bar.update(1)
         self._update_postfix()
 
     def signal_dropped(self):
-        self.active -= 1
         self.dropped += 1
         self._bar.update(1)
         self._update_postfix()
 
     def _update_postfix(self):
-        parts: dict[str, int] = {}
-        if self.active:
-            parts["processing"] = self.active
         if self.dropped:
-            parts["filtered"] = self.dropped
-        self._bar.set_postfix(parts)
+            self._bar.set_postfix(filtered=self.dropped)
 
     def start_judging(self, n_reports: int):
         self._bar.close()
@@ -172,7 +162,6 @@ class TestGroupingPipeline:
         self.limit = limit
         self.no_capture = no_capture
         self.online = online
-        self._match_lock = asyncio.Lock()
         self.start_time = time()
 
         # Suppress structlog noise from downstream modules during the eval
@@ -192,62 +181,79 @@ class TestGroupingPipeline:
         n_groups = len({case.group_index for case in stream})
         self.progress = EvalProgress(n_signals=len(stream), n_groups=n_groups)
 
+        # Phase 1 (concurrent): pre-emit + safety filter
         sem = asyncio.Semaphore(MAX_CONCURRENT_RUNS)
-        await asyncio.gather(
-            *[self.run_signal_pipeline_concurrently(sem, record_id=i, case=case) for i, case in enumerate(stream)]
+        pre_match_results: list[tuple[int, EvalSignalCase, str] | None] = list(
+            await asyncio.gather(*[self._pre_match(sem, record_id=i, case=case) for i, case in enumerate(stream)])
         )
+        ready = [r for r in pre_match_results if r is not None]
 
+        # Phase 2 (concurrent matching in BATCH_SIZE sub-batches + pipelined judging)
+        # Within each sub-batch, `_match()` calls fire concurrently. Between sub-batches,
+        # results are persisted so later signals can find earlier ones' reports.
+        judging_tasks: list[asyncio.Task] = []
+        judged_report_ids: set[str] = set()
+
+        for batch_start in range(0, len(ready), BATCH_SIZE):
+            batch = ready[batch_start : batch_start + BATCH_SIZE]
+            results = await asyncio.gather(
+                *[self._match(description, case) for _record_id, case, description in batch],
+                return_exceptions=True,
+            )
+            for (record_id, case, description), result in zip(batch, results):
+                if isinstance(result, BaseException):
+                    self.progress.signal_dropped()
+                    continue
+                match_result, specificity_result, queries, query_embeddings, candidates = result
+                self._capture_match_quality(
+                    case, match_result, specificity_result, queries, query_embeddings, candidates
+                )
+                await self._persist_signal(record_id, description, case, specificity_result)
+                self.progress.signal_done()
+
+            # Pipeline judging: fire tasks for new reports while next batch runs
+            for report in self.report_store.all_reports():
+                rid = report.context.report_id
+                if rid not in judged_report_ids:
+                    judged_report_ids.add(rid)
+                    judging_tasks.append(asyncio.create_task(self._judge_single_report(report)))
+
+        # ── Wait for remaining judging ──
         reports = self.report_store.all_reports()
         self.progress.start_judging(len(reports))
-        await self._judge_reports()
+        if judging_tasks:
+            await asyncio.gather(*judging_tasks, return_exceptions=True)
         self.progress.done()
 
         self._capture_grouping_quality()
         self._capture_aggregate_metrics(stream)
 
-    async def run_signal_pipeline_concurrently(self, sem: asyncio.Semaphore, record_id: int, case: EvalSignalCase):
+    async def _pre_match(
+        self, sem: asyncio.Semaphore, record_id: int, case: EvalSignalCase
+    ) -> tuple[int, EvalSignalCase, str] | None:
+        """Run pre-emit + safety filter concurrently. Returns (record_id, case, description) or None if dropped."""
         async with sem:
-            await self.run_signal_pipeline(record_id, case)
+            try:
+                description = await self.pre_emit(case)
+                if not description:
+                    self.progress.signal_dropped()
+                    return None
 
-    async def run_signal_pipeline(self, record_id: int, case: EvalSignalCase):
-        """Run a single signal through the pre-emit pipeline."""
+                safety_result = await safety_filter(description)
+                await self._capture_safety_filter(case, safety_result)
+                if not safety_result.safe:
+                    self.progress.signal_dropped()
+                    return None
 
-        self.progress.signal_started()
-        try:
-            description = await self.pre_emit(record_id, case)
-
-            if not description:
+                return record_id, case, description
+            except Exception:
                 self.progress.signal_dropped()
-                return
+                return None
 
-            safety_result = await safety_filter(description)
-            await self._capture_safety_filter(case, safety_result)
-
-            if not safety_result.safe:
-                self.progress.signal_dropped()
-                return
-
-            # Prepare queries and embeddings outside the lock — these are
-            # store-independent and can run concurrently across signals.
-            queries, query_embeddings, signal_embedding = await self._prepare(description, case)
-
-            async with self._match_lock:
-                match_result, specificity_result, candidates = await self._match(
-                    description, case, queries, query_embeddings
-                )
-                self._capture_match_quality(
-                    case, match_result, specificity_result, queries, query_embeddings, candidates
-                )
-                self._persist_signal(record_id, description, case, specificity_result, signal_embedding)
-
-            self.progress.signal_done()
-        except Exception:
-            self.progress.signal_dropped()
-
-    async def _prepare(
+    async def _match(
         self, description: str, case: EvalSignalCase
-    ) -> tuple[list[str], list[list[float]], list[float]]:
-        """Generate search queries and compute all embeddings. No store mutations."""
+    ) -> tuple[MatchResult, MatchResult, list[str], list[list[float]], list[list[SignalCandidate]]]:
+        """Generate queries, embed, search, LLM-match, and verify specificity. No side effects."""
 
         queries = await generate_search_queries(
             description=description,
@@ -256,24 +262,7 @@ class TestGroupingPipeline:
             signal_type_examples=self.store.get_type_examples(),
         )
 
-        all_embeddings = await asyncio.gather(
-            *[self.store.embed(q) for q in queries],
-            self.store.embed(description),
-        )
-        query_embeddings = list(all_embeddings[: len(queries)])
-        signal_embedding = all_embeddings[-1]
-
-        return queries, query_embeddings, signal_embedding
-
-    async def _match(
-        self,
-        description: str,
-        case: EvalSignalCase,
-        queries: list[str],
-        query_embeddings: list[list[float]],
-    ) -> tuple[MatchResult, MatchResult, list[list[SignalCandidate]]]:
-        """Search, LLM-match, and verify specificity. Must run under _match_lock."""
-
+        query_embeddings = list(await asyncio.gather(*[self.store.embed(q) for q in queries]))
         candidates = [self.store.search(emb) for emb in query_embeddings]
 
         match_result = await match_signal_to_report(
@@ -317,22 +306,22 @@ class TestGroupingPipeline:
                     ),
                 )
 
-        return match_result, specificity_match_result, candidates
+        return match_result, specificity_match_result, queries, query_embeddings, candidates
 
-    def _persist_signal(
+    async def _persist_signal(
         self,
         record_id: int,
         description: str,
         case: EvalSignalCase,
         match_result: MatchResult,
-        signal_embedding: list[float],
     ) -> str:
-        """Write match result to both stores. Must run under _match_lock."""
+        """Write match result to both stores."""
 
         report_id = match_result.report_id if isinstance(match_result, ExistingReportMatch) else str(uuid.uuid4())
 
         self.report_store.insert(report_id, match_result, case.group_index)
 
+        signal_embedding = await self.store.embed(description)
         self.store.store(
             signal_id=f"sig-{record_id}",
             content=description,
@@ -346,7 +335,7 @@ class TestGroupingPipeline:
 
         return report_id
 
-    async def pre_emit(self, record_id: int, case: EvalSignalCase) -> str | None:
+    async def pre_emit(self, case: EvalSignalCase) -> str | None:
         output = case.signal.content
         config = case.signal.config
 
