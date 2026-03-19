@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from django.db import transaction
 from django.db.models import QuerySet
 
@@ -16,6 +18,10 @@ from products.logs.backend.models import LogsAlertConfiguration
 
 ALLOWED_WINDOW_MINUTES = {1, 5, 10, 15, 30, 60}
 MAX_ALERTS_PER_TEAM = 20
+
+
+def _any_field_changed(instance: LogsAlertConfiguration, validated_data: dict, fields: set[str]) -> bool:
+    return any(f in validated_data and validated_data[f] != getattr(instance, f) for f in fields)
 
 
 class LogsAlertConfigurationSerializer(serializers.ModelSerializer):
@@ -105,7 +111,39 @@ class LogsAlertConfigurationSerializer(serializers.ModelSerializer):
                 }
             )
 
+        snooze_until = attrs.get("snooze_until")
+        if snooze_until is not None and snooze_until <= datetime.now(UTC):
+            raise ValidationError({"snooze_until": "Must be a future datetime."})
+
         return attrs
+
+    def update(self, instance: LogsAlertConfiguration, validated_data: dict) -> LogsAlertConfiguration:
+        if "snooze_until" in validated_data:
+            snooze_value = validated_data.pop("snooze_until")
+            if snooze_value is None:
+                instance.state = LogsAlertConfiguration.State.NOT_FIRING
+                instance.snooze_until = None
+            else:
+                instance.state = LogsAlertConfiguration.State.SNOOZED
+                instance.snooze_until = snooze_value
+
+        threshold_or_filter_fields = {
+            "threshold_count",
+            "threshold_operator",
+            "filters",
+            "datapoints_to_alarm",
+            "evaluation_periods",
+        }
+
+        threshold_changed = _any_field_changed(instance, validated_data, threshold_or_filter_fields)
+        window_changed = _any_field_changed(instance, validated_data, {"window_minutes"})
+
+        if threshold_changed:
+            instance.mark_for_recheck(reset_state=True)
+        elif window_changed:
+            instance.mark_for_recheck(reset_state=False)
+
+        return super().update(instance, validated_data)
 
     def create(self, validated_data: dict) -> LogsAlertConfiguration:
         validated_data["team_id"] = self.context["team_id"]
