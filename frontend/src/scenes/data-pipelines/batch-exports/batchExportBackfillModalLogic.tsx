@@ -12,11 +12,12 @@ import { ProductIntentContext, ProductKey } from '~/queries/schema/schema-genera
 import { BatchExportConfiguration } from '~/types'
 
 import type { batchExportBackfillModalLogicType } from './batchExportBackfillModalLogicType'
-import { batchExportBackfillsLogic } from './batchExportBackfillsLogic'
+import { BatchExportContext, batchExportBackfillsLogic } from './batchExportBackfillsLogic'
 import { dayOptions } from './utils'
 
 export interface BatchExportBackfillModalLogicProps {
     id: string
+    context?: BatchExportContext
 }
 
 /**
@@ -145,6 +146,10 @@ export const batchExportBackfillModalLogic = kea<batchExportBackfillModalLogicTy
         ],
     }),
     selectors({
+        isHogFunction: [
+            () => [(_, props) => props],
+            (props: BatchExportBackfillModalLogicProps): boolean => props.context === 'hog_function',
+        ],
         interval: [
             (s) => [s.batchExportConfig],
             (batchExportConfig: BatchExportConfiguration | null): string | undefined => batchExportConfig?.interval,

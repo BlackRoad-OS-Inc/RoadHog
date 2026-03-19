@@ -26,7 +26,10 @@ export function HogFunctionBackfills({ id }: BatchExportBackfillsLogicProps): JS
     }
 
     return (
-        <BindLogic logic={batchExportBackfillsLogic} props={{ id: configuration.batch_export_id! }}>
+        <BindLogic
+            logic={batchExportBackfillsLogic}
+            props={{ id: configuration.batch_export_id!, context: 'hog_function' }}
+        >
             <BackfillsWithLoadingCheck batchExportId={configuration.batch_export_id!} />
         </BindLogic>
     )
@@ -47,5 +50,5 @@ function BackfillsWithLoadingCheck({ batchExportId }: { batchExportId: string })
         )
     }
 
-    return <BatchExportBackfills id={batchExportId} />
+    return <BatchExportBackfills id={batchExportId} context="hog_function" />
 }

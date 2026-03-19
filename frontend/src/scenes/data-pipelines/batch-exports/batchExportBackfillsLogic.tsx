@@ -10,9 +10,13 @@ import { BatchExportBackfill, BatchExportConfiguration, RawBatchExportBackfill }
 
 import type { batchExportBackfillsLogicType } from './batchExportBackfillsLogicType'
 
+/** Controls wording in shared batch export components */
+export type BatchExportContext = 'batch_export' | 'hog_function'
+
 export interface BatchExportBackfillsLogicProps {
     id: string
     batchExportConfig?: BatchExportConfiguration | null
+    context?: BatchExportContext
 }
 
 export const batchExportBackfillsLogic = kea<batchExportBackfillsLogicType>([
@@ -70,6 +74,10 @@ export const batchExportBackfillsLogic = kea<batchExportBackfillsLogicType>([
         ],
     })),
     selectors({
+        recordLabel: [
+            () => [(_, props) => props],
+            (props: BatchExportBackfillsLogicProps): string => (props.context === 'hog_function' ? 'events' : 'rows'),
+        ],
         hasMoreBackfillsToLoad: [
             (s) => [s.backfillsPaginatedResponse],
             (backfillsPaginatedResponse) => !!backfillsPaginatedResponse?.next,
@@ -102,7 +110,7 @@ export const batchExportBackfillsLogic = kea<batchExportBackfillsLogicType>([
             },
         ],
     }),
-    listeners(({ actions, props }) => ({
+    listeners(({ actions, props, values }) => ({
         cancelBackfill: async ({ backfill }) => {
             try {
                 await api.batchExports.cancelBackfill(props.id, backfill.id)
@@ -127,11 +135,11 @@ export const batchExportBackfillsLogic = kea<batchExportBackfillsLogicType>([
                     if (backfill?.total_records_count != null) {
                         if (backfill.total_records_count === 0) {
                             lemonToast.warning(
-                                'No rows found to export for the selected time range. The backfill will finish with nothing to export.'
+                                `No ${values.recordLabel} found to export for the selected time range. The backfill will finish with nothing to export.`
                             )
                         } else {
                             lemonToast.info(
-                                `Estimated ~${backfill.total_records_count.toLocaleString()} rows to export`,
+                                `Estimated ~${backfill.total_records_count.toLocaleString()} ${values.recordLabel} to export`,
                                 {
                                     button: {
                                         label: 'Cancel backfill',
