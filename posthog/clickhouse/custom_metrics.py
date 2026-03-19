@@ -10,7 +10,10 @@ from posthog.clickhouse.table_engines import MergeTreeEngine, ReplicationScheme
 # This view is accesed through an endpoint exposed to Prometheus.
 # It's scraped every minute and store the results in VictoriaMetrics.
 def CUSTOM_METRICS_VIEW(
-    include_counters: bool = False, include_server_crash: bool = False, include_table_sizes: bool = False
+    include_counters: bool = False,
+    include_server_crash: bool = False,
+    include_table_sizes: bool = False,
+    include_merge_failures: bool = False,
 ) -> str:
     statement = """
     CREATE OR REPLACE VIEW custom_metrics(
@@ -28,10 +31,9 @@ def CUSTOM_METRICS_VIEW(
     UNION ALL
     SELECT * REPLACE (toFloat64(value) as value)
     FROM custom_metrics_events_recent_lag
-    UNION ALL
-    SELECT * REPLACE (toFloat64(value) as value)
-    FROM custom_metrics_merge_failures
     """
+    if include_merge_failures:
+        statement += "UNION ALL SELECT * REPLACE (toFloat64(value) as value) FROM custom_metrics_merge_failures\n"
     if include_counters:
         statement += "UNION ALL SELECT * FROM custom_metrics_counters\n"
     if include_server_crash:

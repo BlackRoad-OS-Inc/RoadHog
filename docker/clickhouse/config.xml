@@ -320,6 +320,16 @@
         <flush_on_crash>true</flush_on_crash>
     </crash_log>
 
+    <!-- Part log. Stores information about events that occurred with data parts
+         (merge, download, mutation, etc.). Needed for merge failure metrics. -->
+    <part_log>
+        <database>system</database>
+        <table>part_log</table>
+
+        <partition_by>toYYYYMM(event_date)</partition_by>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </part_log>
+
     <!-- Session log. Stores user log in (successful or not) and log out events. -->
     <session_log>
         <database>system</database>
