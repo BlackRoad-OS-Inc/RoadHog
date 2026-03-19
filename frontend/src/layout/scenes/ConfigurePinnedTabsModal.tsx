@@ -1,4 +1,5 @@
 import { useActions, useValues } from 'kea'
+import posthog from 'posthog-js'
 
 import { LemonButton, LemonSelect, LemonSelectOptions, LemonTag } from '@posthog/lemon-ui'
 
@@ -175,7 +176,11 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                         <LemonButton
                                             size="small"
                                             type="secondary"
-                                            onClick={() => setHomepage(null)}
+                                            onClick={() => {
+                                                posthog.capture('configure homepage modal set launchpad clicked')
+                                                setHomepage(null)
+                                            }}
+                                            data-attr="configure-homepage-modal-set-launchpad"
                                             disabled={isUsingProjectDefault}
                                         >
                                             Launchpad
@@ -183,7 +188,11 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                         <LemonButton
                                             size="small"
                                             type="secondary"
-                                            onClick={() => setHomepage(newTabHomepage)}
+                                            onClick={() => {
+                                                posthog.capture('configure homepage modal set search clicked')
+                                                setHomepage(newTabHomepage)
+                                            }}
+                                            data-attr="configure-homepage-modal-set-search"
                                             disabled={isUsingNewTabHomepage}
                                         >
                                             Search
@@ -192,6 +201,9 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                             size="small"
                                             type="secondary"
                                             onClick={() => {
+                                                posthog.capture(
+                                                    'configure homepage modal set default dashboard clicked'
+                                                )
                                                 const dashboardId = currentTeam?.primary_dashboard
                                                 if (dashboardId) {
                                                     setHomepage({
@@ -209,6 +221,7 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                                     })
                                                 }
                                             }}
+                                            data-attr="configure-homepage-modal-set-default-dashboard"
                                             disabled={isUsingDefaultDashboard || !currentTeam?.primary_dashboard}
                                             disabledReason={
                                                 !currentTeam?.primary_dashboard
@@ -256,9 +269,11 @@ export function ConfigurePinnedTabsModal({ isOpen, onClose }: ConfigurePinnedTab
                                     fullWidth
                                     options={projectDefaultDashboardOptions}
                                     value={projectDefaultDashboardId}
-                                    onChange={(dashboardId) =>
+                                    data-attr="configure-homepage-modal-set-default-dashboard-select"
+                                    onChange={(dashboardId) => {
+                                        posthog.capture('configure homepage modal set default dashboard changed')
                                         updateCurrentTeam({ primary_dashboard: dashboardId ?? null })
-                                    }
+                                    }}
                                     disabledReason={dashboardsLoading ? 'Loading dashboards…' : undefined}
                                 />
                             </section>

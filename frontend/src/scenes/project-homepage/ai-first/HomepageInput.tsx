@@ -288,7 +288,10 @@ function HomePageOfframp(): JSX.Element {
         <div className="flex items-center gap-2">
             <ButtonPrimitive
                 variant="panel"
-                onClick={() => showConfigurePinnedTabsModal()}
+                onClick={() => {
+                    posthog.capture('homepage offramp configure home clicked')
+                    showConfigurePinnedTabsModal()
+                }}
                 tooltip="Configure tabs & home"
                 className="text-tertiary hover:text-primary"
             >
