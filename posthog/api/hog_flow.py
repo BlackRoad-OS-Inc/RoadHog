@@ -262,7 +262,7 @@ def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
         starts_at = isoparse(schedule_config["starts_at"])
         tz = schedule_config.get("timezone", "UTC")
     else:
-        # One-time schedule from scheduled_at — create a COUNT=1 RRULE
+        # One-time schedule from scheduled_at: COUNT=1 fires once
         rrule_str = "FREQ=DAILY;COUNT=1"
         starts_at = isoparse(scheduled_at_str)
         tz = "UTC"
