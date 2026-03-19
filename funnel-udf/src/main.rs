@@ -5,16 +5,13 @@ mod unordered_steps;
 mod unordered_trends;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::env;
 use std::io::{self, BufRead, Write};
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-#[serde(untagged)]
-enum PropVal {
-    String(String),
-    Vec(Vec<String>),
-    Int(u32),
-}
+#[serde(transparent)]
+struct PropVal(Value);
 
 fn main() {
     let args: Vec<String> = env::args().collect();
