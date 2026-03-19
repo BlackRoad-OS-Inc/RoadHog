@@ -15,7 +15,7 @@ use crate::{
     api::CaptureError,
     debug_or_info, error_tracking_sampler,
     event_restrictions::{EventContext as RestrictionEventContext, EventRestrictionService},
-    prometheus::report_dropped_events,
+    prometheus::{report_clock_skew, report_dropped_events},
     router, sinks,
     utils::uuid_v7,
     v0_request::{DataType, ProcessedEvent, ProcessedEventMetadata, ProcessingContext},
@@ -74,7 +74,7 @@ pub fn process_single_event(
         context.now,
     );
     if let Some(skew) = parsed_timestamp.clock_skew {
-        crate::prometheus::report_clock_skew(skew);
+        report_clock_skew(skew);
     }
 
     let event_name = event.event.clone();
