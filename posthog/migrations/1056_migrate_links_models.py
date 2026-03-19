@@ -2,17 +2,42 @@
 
 from django.db import migrations
 
+MODELS_TO_MOVE = ["link"]
+
+
+def _move_content_types(apps, schema_editor, from_label, to_label):
+    """Move ContentTypes between apps, handling duplicates idempotently.
+
+    If the target (app_label, model) already exists (e.g., Django auto-created
+    it before migration ran, or a prior failed attempt), merges permissions
+    onto the target and deletes the source to avoid unique constraint violations.
+
+    Uses schema_editor.connection.alias for multi-DB safety.
+    """
+    db_alias = schema_editor.connection.alias
+    ContentType = apps.get_model("contenttypes", "ContentType")
+    Permission = apps.get_model("auth", "Permission")
+
+    for model_name in MODELS_TO_MOVE:
+        source = ContentType.objects.using(db_alias).filter(app_label=from_label, model=model_name).first()
+        target = ContentType.objects.using(db_alias).filter(app_label=to_label, model=model_name).first()
+
+        if source and target:
+            Permission.objects.using(db_alias).filter(content_type=source).update(content_type=target)
+            source.delete(using=db_alias)
+        elif source:
+            source.app_label = to_label
+            source.save(using=db_alias)
+
 
 def update_content_types(apps, schema_editor):
-    """Update ContentType for Link model from posthog to links app."""
-    ContentType = apps.get_model("contenttypes", "ContentType")
-    ContentType.objects.filter(app_label="posthog", model="link").update(app_label="links")
+    """Move ContentType for Link model from posthog to links app."""
+    _move_content_types(apps, schema_editor, "posthog", "links")
 
 
 def reverse_content_types(apps, schema_editor):
-    """Reverse ContentType update for Link model."""
-    ContentType = apps.get_model("contenttypes", "ContentType")
-    ContentType.objects.filter(app_label="links", model="link").update(app_label="posthog")
+    """Move ContentType for Link model from links back to posthog app."""
+    _move_content_types(apps, schema_editor, "links", "posthog")
 
 
 class Migration(migrations.Migration):
