@@ -724,3 +724,6 @@ environment:
         description: Disable anonymous usage telemetry
     telemetry:status:
         description: Show current telemetry settings
+    generate:ci:diagrams:
+        bin_script: generate-ci-diagrams.py
+        description: Regenerate Mermaid DAG diagrams for top CI workflows
