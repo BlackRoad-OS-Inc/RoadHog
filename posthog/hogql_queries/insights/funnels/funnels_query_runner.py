@@ -172,11 +172,11 @@ class FunnelsQueryRunner(AnalyticsQueryRunner[FunnelsQueryResponse]):
 
         return sub_query
 
-    def _run_sub_query(self, sub_query: FunnelsQuery) -> FunnelsQueryResponse:
+    def _run_sub_query(self, sub_query: FunnelsQuery, series_index: int = 0) -> FunnelsQueryResponse:
         runner = FunnelsQueryRunner(
             query=sub_query,
             team=self.team,
-            timings=self.timings,
+            timings=self.timings.clone_for_subquery(series_index),
             modifiers=self.modifiers,
             limit_context=self.limit_context,
             just_summarize=self.just_summarize,
@@ -209,12 +209,12 @@ class FunnelsQueryRunner(AnalyticsQueryRunner[FunnelsQueryResponse]):
 
         if connection.in_atomic_block:
             # Inside a transaction (e.g. tests) — threads can't see uncommitted data
-            in_response = self._run_sub_query(in_query)
-            not_in_response = self._run_sub_query(not_in_query)
+            in_response = self._run_sub_query(in_query, series_index=0)
+            not_in_response = self._run_sub_query(not_in_query, series_index=1)
         else:
             with ThreadPoolExecutor(max_workers=2) as executor:
-                in_future = executor.submit(self._run_sub_query, in_query)
-                not_in_future = executor.submit(self._run_sub_query, not_in_query)
+                in_future = executor.submit(self._run_sub_query, in_query, 0)
+                not_in_future = executor.submit(self._run_sub_query, not_in_query, 1)
                 in_response = in_future.result()
                 not_in_response = not_in_future.result()
 
