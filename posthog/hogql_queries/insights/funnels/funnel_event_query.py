@@ -15,6 +15,7 @@ from posthog.schema import (
     FunnelsDataWarehouseNode,
     GroupNode,
     StepOrderValue,
+    SystemTableNode,
 )
 
 from posthog.hogql import ast
@@ -351,6 +352,8 @@ class FunnelEventQuery(DataWarehouseSchemaMixin):
                 child_exprs.append(self._build_step_query(child, table_entity))
             if step_entity.operator == FilterLogicalOperator.OR_:
                 event_expr = ast.Or(exprs=child_exprs)
+        elif isinstance(step_entity, SystemTableNode):
+            event_expr = ast.Constant(value=1)
         elif step_entity.event is None:
             # all events
             if isinstance(table_entity, FunnelsDataWarehouseNode):

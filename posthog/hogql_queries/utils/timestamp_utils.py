@@ -183,19 +183,12 @@ def get_earliest_timestamp_from_series(
     """
     # Expand GroupNode nodes into individual nodes
     nodes: list[
-        Union[
-            EventsNode,
-            ActionsNode,
-            DataWarehouseNode,
-            FunnelsDataWarehouseNode,
-            LifecycleDataWarehouseNode,
-            SystemTableNode,
-        ]
+        Union[EventsNode, ActionsNode, DataWarehouseNode, FunnelsDataWarehouseNode, LifecycleDataWarehouseNode]
     ] = []
     for node in series:
         if isinstance(node, GroupNode):
-            nodes.extend(node.nodes)
-        else:
+            nodes.extend(n for n in node.nodes if not isinstance(n, SystemTableNode))
+        elif not isinstance(node, SystemTableNode):
             nodes.append(node)
 
     timestamps = []

@@ -421,6 +421,8 @@ class StickinessQueryRunner(AnalyticsQueryRunner[StickinessQueryResponse]):
             action = Action.objects.get(pk=int(series.id), team__project_id=self.team.project_id)
             return action.name
 
+        return None
+
     def intervals_num(self):
         delta = self.query_date_range.date_to() - self.query_date_range.date_from()
         if self.query_date_range.interval_name == "day":
