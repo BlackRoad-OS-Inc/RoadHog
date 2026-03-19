@@ -94,14 +94,15 @@ export class CdpPrecalculatedFiltersConsumer extends CdpConsumerBase {
         }
 
         try {
-            const messages = events.map((event) => ({
-                value: JSON.stringify(event.payload),
-            }))
-
-            await this.kafkaProducer.queueMessages({
-                topic: KAFKA_CDP_CLICKHOUSE_PRECALCULATED_PERSON_PROPERTIES,
-                messages,
-            })
+            // Send messages individually to ensure round-robin partition distribution
+            for (const event of events) {
+                await this.kafkaProducer.queueMessage({
+                    topic: KAFKA_CDP_CLICKHOUSE_PRECALCULATED_PERSON_PROPERTIES,
+                    message: {
+                        value: JSON.stringify(event.payload),
+                    },
+                })
+            }
         } catch (error) {
             logger.error('Error publishing person property events', {
                 error,
