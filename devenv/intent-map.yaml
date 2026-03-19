@@ -70,7 +70,7 @@ capabilities:
 
     # Dagster code location groups control which dagster locations are loaded
     # Only shared (monitoring sensors) is in the base capability
-    dagster_pipelines:
+    dagster_shared:
         description: 'Dagster data pipeline orchestration'
         requires: [core_infra]
         docker_profiles: []
@@ -79,63 +79,63 @@ capabilities:
 
     dagster_analytics_platform:
         description: 'Dagster sessions backfill and cleanup jobs'
-        requires: [dagster_pipelines]
+        requires: [dagster_shared]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.analytics_platform
 
     dagster_growth:
         description: 'Dagster growth jobs (OAuth, SDK versions, user product list)'
-        requires: [dagster_pipelines]
+        requires: [dagster_shared]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.growth
 
     dagster_ingestion:
         description: 'Dagster person/identity management jobs'
-        requires: [dagster_pipelines]
+        requires: [dagster_shared]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.ingestion
 
     dagster_web_analytics:
         description: 'Dagster web analytics pre-aggregation and maintenance jobs'
-        requires: [dagster_pipelines]
+        requires: [dagster_shared]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.web_analytics
 
     dagster_llm_analytics:
         description: 'Dagster LLM analytics metrics jobs'
-        requires: [dagster_pipelines]
+        requires: [dagster_shared]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.llm_analytics
 
     dagster_error_tracking:
         description: 'Dagster error tracking cleanup jobs'
-        requires: [dagster_pipelines]
+        requires: [dagster_shared]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.error_tracking
 
     dagster_ai:
         description: 'Dagster PostHog AI evaluation jobs'
-        requires: [dagster_pipelines]
+        requires: [dagster_shared]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.posthog_ai
 
     dagster_logs:
         description: 'Dagster logs backup jobs'
-        requires: [dagster_pipelines]
+        requires: [dagster_shared]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.logs
 
     dagster_data_warehouse:
         description: 'Dagster data warehouse backfill and sync jobs'
-        requires: [dagster_pipelines]
+        requires: [dagster_shared]
         docker_profiles: []
         dagster_locations:
             - posthog.dags.locations.data_stack
@@ -374,7 +374,7 @@ intents:
         description: 'Dagster for clickhouse maintenance, system workflows'
         capabilities:
             [
-                dagster_pipelines,
+                dagster_shared,
                 dagster_analytics_platform,
                 dagster_growth,
                 dagster_ingestion,

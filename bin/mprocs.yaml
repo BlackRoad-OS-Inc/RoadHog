@@ -95,7 +95,7 @@ procs:
             bin/wait-for-docker && \
             bin/check_ducklake_up && \
             dagster dev --workspace $DAGSTER_HOME/workspace.yaml -p $DAGSTER_UI_PORT
-        capability: dagster_pipelines
+        capability: dagster_shared
         ready_pattern: 'Launching Dagster services'
 
     docker-compose:
