@@ -1,8 +1,12 @@
 """Email channel settings API for connect/disconnect flows."""
 
 import secrets
+from email.utils import formataddr, make_msgid
 
+from django.conf import settings as django_settings
+from django.core import mail
 from django.db import IntegrityError, transaction
+from django.utils.module_loading import import_string
 
 import structlog
 from rest_framework import serializers
@@ -14,6 +18,11 @@ from rest_framework.views import APIView
 from posthog.models.instance_setting import get_instance_setting
 from posthog.models.user import User
 
+from products.conversations.backend.mailgun import (
+    add_domain as mailgun_add_domain,
+    delete_domain as mailgun_delete_domain,
+    verify_domain as mailgun_verify_domain,
+)
 from products.conversations.backend.models import TeamConversationsEmailConfig
 
 logger = structlog.get_logger(__name__)
@@ -53,6 +62,7 @@ class EmailStatusView(APIView):
                 "from_name": config.from_name,
                 "domain": config.domain,
                 "domain_verified": config.domain_verified,
+                "dns_records": config.dns_records,
             }
         )
 
@@ -80,6 +90,15 @@ class EmailConnectView(APIView):
                 status=400,
             )
 
+        # Register domain with Mailgun for outbound sending
+        dns_records: dict = {}
+        try:
+            dns_records = mailgun_add_domain(domain)
+        except ValueError:
+            logger.info("email_connect_no_mailgun_key", team_id=team.id, domain=domain)
+        except Exception:
+            logger.exception("email_connect_mailgun_add_domain_failed", team_id=team.id, domain=domain)
+
         def _enable_email_on_team() -> None:
             s = team.conversations_settings or {}
             s["email_enabled"] = True
@@ -92,7 +111,9 @@ class EmailConnectView(APIView):
                 config.from_email = from_email
                 config.from_name = from_name
                 config.domain = domain
-                config.save(update_fields=["from_email", "from_name", "domain"])
+                if dns_records:
+                    config.dns_records = dns_records
+                config.save(update_fields=["from_email", "from_name", "domain", "dns_records"])
                 _enable_email_on_team()
         except TeamConversationsEmailConfig.DoesNotExist:
             try:
@@ -103,6 +124,7 @@ class EmailConnectView(APIView):
                         from_email=from_email,
                         from_name=from_name,
                         domain=domain,
+                        dns_records=dns_records,
                     )
                     _enable_email_on_team()
             except IntegrityError:
@@ -111,7 +133,9 @@ class EmailConnectView(APIView):
                     config.from_email = from_email
                     config.from_name = from_name
                     config.domain = domain
-                    config.save(update_fields=["from_email", "from_name", "domain"])
+                    if dns_records:
+                        config.dns_records = dns_records
+                    config.save(update_fields=["from_email", "from_name", "domain", "dns_records"])
                     _enable_email_on_team()
 
         forwarding_address = f"team-{config.inbound_token}@{inbound_domain}"
@@ -125,8 +149,118 @@ class EmailConnectView(APIView):
                 "from_email": from_email,
                 "from_name": from_name,
                 "domain": domain,
+                "dns_records": dns_records,
             }
         )
+
+
+class EmailVerifyDomainView(APIView):
+    """Trigger Mailgun DNS verification and update local config."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        user = request.user
+        if not isinstance(user, User) or user.current_team is None:
+            return Response({"error": "No current team selected"}, status=400)
+
+        team = user.current_team
+
+        try:
+            config = TeamConversationsEmailConfig.objects.get(team=team)
+        except TeamConversationsEmailConfig.DoesNotExist:
+            return Response({"error": "Email channel not connected"}, status=400)
+
+        try:
+            result = mailgun_verify_domain(config.domain)
+        except ValueError:
+            return Response({"error": "Mailgun API key not configured"}, status=400)
+        except Exception:
+            logger.exception("email_verify_domain_failed", team_id=team.id, domain=config.domain)
+            return Response({"error": "Failed to verify domain with Mailgun"}, status=502)
+
+        is_active = result.get("state") == "active"
+        config.domain_verified = is_active
+        config.dns_records = {
+            "sending_dns_records": result.get("sending_dns_records", []),
+            "receiving_dns_records": result.get("receiving_dns_records", []),
+        }
+        config.save(update_fields=["domain_verified", "dns_records"])
+
+        logger.info(
+            "email_domain_verified",
+            team_id=team.id,
+            domain=config.domain,
+            verified=is_active,
+            user_id=user.id,
+        )
+
+        return Response(
+            {
+                "domain_verified": is_active,
+                "dns_records": config.dns_records,
+            }
+        )
+
+
+class EmailSendTestView(APIView):
+    """Send a test email to verify the outbound pipeline works."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        user = request.user
+        if not isinstance(user, User) or user.current_team is None:
+            return Response({"error": "No current team selected"}, status=400)
+
+        team = user.current_team
+
+        try:
+            config = TeamConversationsEmailConfig.objects.get(team=team)
+        except TeamConversationsEmailConfig.DoesNotExist:
+            return Response({"error": "Email channel not connected"}, status=400)
+
+        if not config.domain_verified:
+            return Response({"error": "Domain not yet verified. Please verify DNS records first."}, status=400)
+
+        inbound_domain = get_instance_setting("CONVERSATIONS_EMAIL_INBOUND_DOMAIN") or config.domain
+        message_id = make_msgid(domain=inbound_domain)
+        from_addr = formataddr((config.from_name, config.from_email))
+
+        email_message = mail.EmailMultiAlternatives(
+            subject="Test email from PostHog Conversations",
+            body="This is a test email to confirm your outbound email is working correctly.",
+            from_email=from_addr,
+            to=[user.email],
+            headers={"Message-ID": message_id},
+        )
+        html_body = (
+            "<p>This is a test email to confirm your outbound email is working correctly.</p>"
+            "<p>If you received this, your email channel is configured properly.</p>"
+        )
+        email_message.attach_alternative(html_body, "text/html")
+
+        try:
+            email_backend = django_settings.EMAIL_BACKEND
+            klass = import_string(email_backend) if email_backend else mail.get_connection().__class__
+            connection = klass(
+                host=get_instance_setting("EMAIL_HOST"),
+                port=get_instance_setting("EMAIL_PORT"),
+                username=get_instance_setting("EMAIL_HOST_USER"),
+                password=get_instance_setting("EMAIL_HOST_PASSWORD"),
+                use_tls=get_instance_setting("EMAIL_USE_TLS"),
+                use_ssl=get_instance_setting("EMAIL_USE_SSL"),
+            )
+            connection.open()
+            connection.send_messages([email_message])
+            connection.close()
+        except Exception:
+            logger.exception("email_send_test_failed", team_id=team.id)
+            return Response({"error": "Failed to send test email. Check SMTP settings."}, status=502)
+
+        logger.info("email_test_sent", team_id=team.id, to=user.email, user_id=user.id)
+
+        return Response({"ok": True, "sent_to": user.email})
 
 
 class EmailDisconnectView(APIView):
@@ -139,9 +273,13 @@ class EmailDisconnectView(APIView):
 
         team = user.current_team
 
+        # Capture domain before deleting config so we can clean up Mailgun after
+        domain_to_delete: str | None = None
+
         with transaction.atomic():
             try:
                 config = TeamConversationsEmailConfig.objects.get(team=team)
+                domain_to_delete = config.domain
                 config.delete()
             except TeamConversationsEmailConfig.DoesNotExist:
                 pass
@@ -150,6 +288,15 @@ class EmailDisconnectView(APIView):
             settings["email_enabled"] = False
             team.conversations_settings = settings
             team.save(update_fields=["conversations_settings"])
+
+        # Remove domain from Mailgun outside the transaction to avoid holding DB connections during HTTP calls
+        if domain_to_delete:
+            try:
+                mailgun_delete_domain(domain_to_delete)
+            except ValueError:
+                logger.info("email_disconnect_no_mailgun_key", team_id=team.id)
+            except Exception:
+                logger.exception("email_disconnect_mailgun_delete_failed", team_id=team.id, domain=domain_to_delete)
 
         logger.info("email_channel_disconnected", team_id=team.id, user_id=user.id, user_email=user.email)
 
