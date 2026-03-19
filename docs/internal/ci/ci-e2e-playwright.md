@@ -51,6 +51,6 @@ Edge labels show the change-detection output that gates the job.
 | -------------------- | ------------------------------ | ------------------------------------------ | ------ |
 | `changes`            | -                              | github.event_name == 'push' \|\| github... | -      |
 | `playwright`         | changes                        | shouldRun                                  | -      |
-| `capture-run-time`   | changes, playwright            | shouldRun                                  | -      |
-| `handle-screenshots` | playwright, changes            | shouldRun                                  | -      |
+| `capture-run-time`   | changes, playwright            | github.actor != 'dependabot[bot]' && ...   | -      |
+| `handle-screenshots` | playwright, changes            | needs.changes.outputs.mode == 'update...   | -      |
 | `playwright_tests`   | playwright, handle-screenshots | -                                          | -      |

@@ -17,6 +17,7 @@ import argparse
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -69,11 +70,11 @@ class JobInfo:
     id: str
     name: str
     needs: list[str]
-    condition: str
-    condition_label: str
-    matrix_keys: list[str]
-    category: str
-    uses_paths_filter: bool = False
+    raw_condition: str = ""
+    summary_condition: str = ""
+    edge_labels_by_dep: dict[str, list[str]] = field(default_factory=dict)
+    matrix_keys: list[str] = field(default_factory=list)
+    category: str = "test"
 
 
 @dataclass
@@ -84,7 +85,13 @@ class WorkflowInfo:
     jobs: list[JobInfo] = field(default_factory=list)
 
 
-def parse_triggers(raw: dict) -> list[str]:
+@dataclass(frozen=True)
+class ConditionInfo:
+    summary: str
+    edge_labels_by_dep: dict[str, list[str]]
+
+
+def parse_triggers(raw: Any) -> list[str]:
     """Extract trigger event names from the workflow's on: block."""
     # PyYAML parses `on:` as boolean True
     triggers: list[str] = []
@@ -134,24 +141,66 @@ def classify_job(job_id: str, job_data: dict) -> str:
     return "test"
 
 
-def simplify_condition(raw: str) -> str:
-    """Extract a short label from an if: condition for edge display."""
+def normalize_condition(raw: str) -> str:
+    """Normalize a GitHub Actions if: expression for analysis."""
     if not raw:
         return ""
-
-    # needs.X.outputs.Y == 'true' -> Y
-    match = re.search(r"needs\.(\w[\w-]*)\.outputs\.(\w+)\s*==\s*'true'", raw)
-    if match:
-        return match.group(2)
-
-    if raw.strip().startswith("always()"):
-        return ""
-
-    # Truncate complex conditions
     cleaned = raw.strip().replace("\n", " ")
-    if len(cleaned) > 40:
-        return cleaned[:37] + "..."
+    wrapped = re.fullmatch(r"\$\{\{\s*(.*?)\s*\}\}", cleaned)
+    if wrapped:
+        return wrapped.group(1).strip()
     return cleaned
+
+
+def _truncate_text(text: str) -> str:
+    """Truncate text for compact display."""
+    if not text:
+        return ""
+    if len(text) > 40:
+        return text[:37] + "..."
+    return text
+
+
+def parse_condition(raw: str) -> ConditionInfo:
+    """Extract dependency gate labels and a summary from a job-level if: expression."""
+    cleaned = normalize_condition(raw)
+    if not cleaned:
+        return ConditionInfo(summary="", edge_labels_by_dep={})
+
+    match_pattern = re.compile(r"needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)\s*==\s*'true'")
+    edge_labels_by_dep: dict[str, list[str]] = {}
+
+    def replacement(match: re.Match[str]) -> str:
+        dep = match.group(1)
+        output = match.group(2)
+        labels = edge_labels_by_dep.setdefault(dep, [])
+        if output not in labels:
+            labels.append(output)
+        return output
+
+    simplified = match_pattern.sub(replacement, cleaned)
+
+    # Treat always() as flow-control noise for display when the remaining
+    # expression is otherwise a simple composition of output gates.
+    simplified = re.sub(r"\balways\(\)\s*&&\s*", "", simplified).strip()
+    is_simple_gate = (
+        bool(edge_labels_by_dep)
+        and not re.search(r"[=!<>]", simplified)
+        and not re.search(
+            r"\b(github|steps|runner|matrix|env|inputs|vars|secrets|contains|failure|success|cancelled)\b",
+            simplified,
+        )
+    )
+
+    if is_simple_gate:
+        summary = simplified
+    else:
+        summary = _truncate_text(simplified)
+
+    if summary == "always()":
+        summary = ""
+
+    return ConditionInfo(summary=summary, edge_labels_by_dep=edge_labels_by_dep)
 
 
 def extract_matrix_keys(strategy: dict | None) -> list[str]:
@@ -183,7 +232,7 @@ def extract_matrix_keys(strategy: dict | None) -> list[str]:
 
 def parse_workflow(path: Path) -> WorkflowInfo:
     """Parse a workflow YAML file into WorkflowInfo."""
-    with open(path) as f:
+    with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     name = data.get("name", path.stem)
@@ -207,27 +256,31 @@ def parse_workflow(path: Path) -> WorkflowInfo:
         if isinstance(needs_raw, str):
             needs_raw = [needs_raw]
 
-        condition = str(job_data.get("if", ""))
-        condition_label = simplify_condition(condition)
-        matrix_keys = extract_matrix_keys(job_data.get("strategy"))
-        category = classify_job(job_id, job_data)
-        has_paths_filter = uses_paths_filter(job_data)
-
         wf.jobs.append(
             JobInfo(
                 id=job_id,
                 name=job_name,
                 needs=needs_raw,
-                condition=condition,
-                condition_label=condition_label,
-                matrix_keys=matrix_keys,
-                category=category,
-                uses_paths_filter=has_paths_filter,
+                raw_condition=str(job_data.get("if", "")),
             )
         )
 
+    wf = derive_workflow_metadata(wf, jobs)
+
     # Topological sort for deterministic output
     wf.jobs = _topo_sort(wf.jobs)
+    return wf
+
+
+def derive_workflow_metadata(wf: WorkflowInfo, raw_jobs: dict[str, Any]) -> WorkflowInfo:
+    """Populate derived diagram metadata for each job."""
+    for job in wf.jobs:
+        job_data = raw_jobs.get(job.id, {})
+        condition_info = parse_condition(job.raw_condition)
+        job.summary_condition = condition_info.summary
+        job.edge_labels_by_dep = condition_info.edge_labels_by_dep
+        job.matrix_keys = extract_matrix_keys(job_data.get("strategy"))
+        job.category = classify_job(job.id, job_data)
     return wf
 
 
@@ -278,6 +331,19 @@ def escape_mermaid_label(text: str) -> str:
     return text.replace('"', "'").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def render_edge_label(labels: list[str]) -> str:
+    """Render one or more edge labels for Mermaid."""
+    return ", ".join(labels)
+
+
+def display_path(path: Path) -> Path:
+    """Return a readable path for logs, relative to the repo when possible."""
+    try:
+        return path.relative_to(REPO_ROOT)
+    except ValueError:
+        return path
+
+
 def generate_mermaid(wf: WorkflowInfo) -> str:
     """Generate a Mermaid graph TD string from a WorkflowInfo."""
     lines = ["graph TD"]
@@ -304,10 +370,7 @@ def generate_mermaid(wf: WorkflowInfo) -> str:
         mid = sanitize_mermaid_id(job.id)
         for dep in sorted(job.needs):
             dep_mid = sanitize_mermaid_id(dep)
-            # Apply condition label only to the edge from the referenced parent
-            edge_label = ""
-            if job.condition_label and f"needs.{dep}.outputs" in job.condition:
-                edge_label = job.condition_label
+            edge_label = render_edge_label(job.edge_labels_by_dep.get(dep, []))
             if edge_label:
                 lines.append(f"    {dep_mid} -->|{edge_label}| {mid}")
             else:
@@ -331,7 +394,7 @@ def generate_markdown(wf: WorkflowInfo, mermaid: str) -> str:
     job_rows: list[str] = []
     for job in wf.jobs:
         deps = ", ".join(job.needs) if job.needs else "-"
-        cond = job.condition_label.replace("|", "\\|") if job.condition_label else "-"
+        cond = job.summary_condition.replace("|", "\\|") if job.summary_condition else "-"
         matrix = " x ".join(job.matrix_keys) if job.matrix_keys else "-"
         job_rows.append(f"| `{job.id}` | {deps} | {cond} | {matrix} |")
 
@@ -399,41 +462,49 @@ python bin/generate-ci-diagrams.py ci-backend.yml
 """
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate Mermaid CI workflow diagrams")
     parser.add_argument(
         "workflows",
         nargs="*",
-        default=DEFAULT_WORKFLOWS,
         help="Workflow filenames to process (default: top 10 complex workflows)",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    requested_workflows = args.workflows or DEFAULT_WORKFLOWS
+    should_rebuild_index = not args.workflows
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     workflows: list[WorkflowInfo] = []
-    for filename in args.workflows:
+    for filename in requested_workflows:
         path = WORKFLOWS_DIR / filename
         if not path.exists():
             print(f"Warning: {path} not found, skipping", file=sys.stderr)
             continue
         print(f"Processing {filename}...")
-        wf = parse_workflow(path)
+        try:
+            wf = parse_workflow(path)
+        except yaml.YAMLError as err:
+            print(f"Warning: failed to parse {path}: {err}", file=sys.stderr)
+            continue
         mermaid = generate_mermaid(wf)
         md = generate_markdown(wf, mermaid)
 
         out_path = OUTPUT_DIR / f"{path.stem}.md"
-        out_path.write_text(md)
-        print(f"  -> {out_path.relative_to(REPO_ROOT)} ({len(wf.jobs)} jobs)")
+        out_path.write_text(md, encoding="utf-8")
+        print(f"  -> {display_path(out_path)} ({len(wf.jobs)} jobs)")
         workflows.append(wf)
 
-    if workflows:
+    if should_rebuild_index and workflows:
         index_path = OUTPUT_DIR / "README.md"
-        index_path.write_text(generate_index(workflows))
-        print(f"  -> {index_path.relative_to(REPO_ROOT)} (index)")
+        index_path.write_text(generate_index(workflows), encoding="utf-8")
+        print(f"  -> {display_path(index_path)} (index)")
 
     print(f"Done. Generated {len(workflows)} diagrams.")
+    if not workflows:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

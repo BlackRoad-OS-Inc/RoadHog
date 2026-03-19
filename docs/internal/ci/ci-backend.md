@@ -27,7 +27,7 @@ graph TD
     django_tests[["Django Tests Pass"]]
     calculate-running-time(["Calculate running time"])
 
-    changes -->|backend| check-migrations
+    changes -->|backend, openapi_types| check-migrations
     changes -->|backend| detect-snapshot-mode
     changes -->|backend| get_clickhouse_versions
     changes -->|backend| build_django_matrix
@@ -35,19 +35,19 @@ graph TD
     changes -->|llm_gateway| llm-gateway
     changes -->|backend| repo-checks
     changes -->|backend| turbo-discover
-    changes -->|backend| async-migrations
+    changes -->|backend, legacy| async-migrations
     get_clickhouse_versions --> async-migrations
-    turbo-discover -->|backend| async-migrations
+    turbo-discover -->|run_legacy| async-migrations
     build_django_matrix --> django
-    changes -->|backend| django
+    changes -->|backend, legacy| django
     detect-snapshot-mode --> django
     get_clickhouse_versions --> django
-    turbo-discover -->|backend| django
+    turbo-discover -->|run_legacy| django
     changes --> turbo-tests
     detect-snapshot-mode --> turbo-tests
     turbo-discover --> turbo-tests
     changes -->|backend| handle-snapshots
-    detect-snapshot-mode -->|backend| handle-snapshots
+    detect-snapshot-mode --> handle-snapshots
     django --> handle-snapshots
     turbo-tests --> handle-snapshots
     async-migrations --> django_tests
@@ -90,19 +90,19 @@ Edge labels show the change-detection output that gates the job.
 
 ## Job details
 
-| Job                       | Depends on                                                                                             | Condition   | Matrix  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------ | ----------- | ------- |
-| `changes`                 | -                                                                                                      | -           | -       |
-| `check-migrations`        | changes                                                                                                | backend     | -       |
-| `detect-snapshot-mode`    | changes                                                                                                | backend     | -       |
-| `get_clickhouse_versions` | changes                                                                                                | backend     | -       |
-| `build_django_matrix`     | changes, get_clickhouse_versions                                                                       | backend     | -       |
-| `llm-gateway`             | changes                                                                                                | llm_gateway | -       |
-| `repo-checks`             | changes                                                                                                | backend     | -       |
-| `turbo-discover`          | changes                                                                                                | backend     | -       |
-| `async-migrations`        | changes, turbo-discover, get_clickhouse_versions                                                       | backend     | dynamic |
-| `django`                  | changes, turbo-discover, detect-snapshot-mode, get_clickhouse_versions, build_django_matrix            | backend     | dynamic |
-| `turbo-tests`             | changes, turbo-discover, detect-snapshot-mode                                                          | -           | dynamic |
-| `handle-snapshots`        | changes, detect-snapshot-mode, django, turbo-tests                                                     | backend     | -       |
-| `django_tests`            | django, check-migrations, async-migrations, turbo-discover, turbo-tests, handle-snapshots, repo-checks | -           | -       |
-| `calculate-running-time`  | django_tests, async-migrations                                                                         | -           | -       |
+| Job                       | Depends on                                                                                             | Condition                                   | Matrix  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------- | ------- |
+| `changes`                 | -                                                                                                      | -                                           | -       |
+| `check-migrations`        | changes                                                                                                | backend \|\| openapi_types                  | -       |
+| `detect-snapshot-mode`    | changes                                                                                                | backend                                     | -       |
+| `get_clickhouse_versions` | changes                                                                                                | backend                                     | -       |
+| `build_django_matrix`     | changes, get_clickhouse_versions                                                                       | backend                                     | -       |
+| `llm-gateway`             | changes                                                                                                | llm_gateway                                 | -       |
+| `repo-checks`             | changes                                                                                                | backend                                     | -       |
+| `turbo-discover`          | changes                                                                                                | backend                                     | -       |
+| `async-migrations`        | changes, turbo-discover, get_clickhouse_versions                                                       | backend && (legacy \|\| run_legacy \|\| ... | dynamic |
+| `django`                  | changes, turbo-discover, detect-snapshot-mode, get_clickhouse_versions, build_django_matrix            | backend && needs.build_django_matrix....    | dynamic |
+| `turbo-tests`             | changes, turbo-discover, detect-snapshot-mode                                                          | needs.turbo-discover.result == 'succe...    | dynamic |
+| `handle-snapshots`        | changes, detect-snapshot-mode, django, turbo-tests                                                     | needs.detect-snapshot-mode.outputs.mo...    | -       |
+| `django_tests`            | django, check-migrations, async-migrations, turbo-discover, turbo-tests, handle-snapshots, repo-checks | -                                           | -       |
+| `calculate-running-time`  | django_tests, async-migrations                                                                         | github.actor != 'dependabot[bot]' && ...    | -       |

@@ -57,12 +57,12 @@ Edge labels show the change-detection output that gates the job.
 
 ## Job details
 
-| Job                          | Depends on                                                                       | Condition | Matrix          |
-| ---------------------------- | -------------------------------------------------------------------------------- | --------- | --------------- |
-| `changes`                    | -                                                                                | -         | -               |
-| `frontend-bundle-size`       | changes                                                                          | frontend  | -               |
-| `frontend-format`            | changes                                                                          | frontend  | -               |
-| `frontend-typescript-checks` | changes                                                                          | frontend  | -               |
-| `jest`                       | changes                                                                          | frontend  | segment x chunk |
-| `calculate-running-time`     | jest, frontend-typescript-checks, frontend-format, frontend-bundle-size, changes | frontend  | -               |
-| `frontend_tests`             | jest, frontend-format, frontend-bundle-size, frontend-typescript-checks          | -         | -               |
+| Job                          | Depends on                                                                       | Condition                                | Matrix          |
+| ---------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------- | --------------- |
+| `changes`                    | -                                                                                | -                                        | -               |
+| `frontend-bundle-size`       | changes                                                                          | frontend && github.event_name != 'mer... | -               |
+| `frontend-format`            | changes                                                                          | frontend                                 | -               |
+| `frontend-typescript-checks` | changes                                                                          | frontend                                 | -               |
+| `jest`                       | changes                                                                          | frontend                                 | segment x chunk |
+| `calculate-running-time`     | jest, frontend-typescript-checks, frontend-format, frontend-bundle-size, changes | github.actor != 'dependabot[bot]' && ... | -               |
+| `frontend_tests`             | jest, frontend-format, frontend-bundle-size, frontend-typescript-checks          | -                                        | -               |

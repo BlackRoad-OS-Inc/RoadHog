@@ -63,14 +63,14 @@ Edge labels show the change-detection output that gates the job.
 
 ## Job details
 
-| Job                        | Depends on                          | Condition                          | Matrix      |
-| -------------------------- | ----------------------------------- | ---------------------------------- | ----------- |
-| `changes`                  | -                                   | github.event_name != 'merge_group' | -           |
-| `build-storybook`          | changes                             | frontend                           | -           |
-| `flake-verification`       | changes, build-storybook            | frontend                           | -           |
-| `visual-regression`        | changes, build-storybook            | frontend                           | include(20) |
-| `calculate-running-time`   | visual-regression, changes          | frontend                           | -           |
-| `handle-snapshots`         | visual-regression, changes          | frontend                           | -           |
-| `snapshot-failure-comment` | visual-regression, changes          | -                                  | -           |
-| `snapshot-success-cleanup` | visual-regression, changes          | -                                  | -           |
-| `visual_regression_tests`  | visual-regression, handle-snapshots | -                                  | -           |
+| Job                        | Depends on                          | Condition                                | Matrix      |
+| -------------------------- | ----------------------------------- | ---------------------------------------- | ----------- |
+| `changes`                  | -                                   | github.event_name != 'merge_group'       | -           |
+| `build-storybook`          | changes                             | frontend                                 | -           |
+| `flake-verification`       | changes, build-storybook            | frontend && github.event_name == 'pul... | -           |
+| `visual-regression`        | changes, build-storybook            | frontend                                 | include(20) |
+| `calculate-running-time`   | visual-regression, changes          | github.actor != 'dependabot[bot]' && ... | -           |
+| `handle-snapshots`         | visual-regression, changes          | needs.changes.outputs.mode == 'update... | -           |
+| `snapshot-failure-comment` | visual-regression, changes          | needs.visual-regression.result == 'fa... | -           |
+| `snapshot-success-cleanup` | visual-regression, changes          | needs.visual-regression.result == 'su... | -           |
+| `visual_regression_tests`  | visual-regression, handle-snapshots | -                                        | -           |

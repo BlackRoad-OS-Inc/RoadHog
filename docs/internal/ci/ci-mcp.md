@@ -52,11 +52,11 @@ Edge labels show the change-detection output that gates the job.
 
 ## Job details
 
-| Job                 | Depends on                                                      | Condition | Matrix |
-| ------------------- | --------------------------------------------------------------- | --------- | ------ |
-| `changes`           | -                                                               | -         | -      |
-| `build`             | changes                                                         | mcp       | -      |
-| `integration-tests` | changes                                                         | mcp       | -      |
-| `unit-tests`        | changes                                                         | mcp       | -      |
-| `handle-snapshots`  | changes, unit-tests                                             | mcp       | -      |
-| `mcp_tests`         | changes, build, unit-tests, integration-tests, handle-snapshots | -         | -      |
+| Job                 | Depends on                                                      | Condition                                | Matrix |
+| ------------------- | --------------------------------------------------------------- | ---------------------------------------- | ------ |
+| `changes`           | -                                                               | -                                        | -      |
+| `build`             | changes                                                         | mcp                                      | -      |
+| `integration-tests` | changes                                                         | mcp                                      | -      |
+| `unit-tests`        | changes                                                         | mcp                                      | -      |
+| `handle-snapshots`  | changes, unit-tests                                             | mcp && github.event_name == 'pull_req... | -      |
+| `mcp_tests`         | changes, build, unit-tests, integration-tests, handle-snapshots | -                                        | -      |
