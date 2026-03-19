@@ -296,7 +296,7 @@ export function ReplayTriggers(): JSX.Element {
     const { featureFlags } = useValues(featureFlagLogic)
     const statuses = useHeaderStatuses(currentTeam)
 
-    const isV2TriggersEnabled = featureFlags[FEATURE_FLAGS.REPLAY_TRIGGERS_V2]
+    const isV2TriggersEnabled = featureFlags[FEATURE_FLAGS.REPLAY_TRIGGERS_V2] || true
 
     const tabs: LemonTab<'web' | 'mobile'>[] = [
         {
