@@ -51,6 +51,7 @@ import { AccessControlLevel, AccessControlResourceType, DashboardMode, ExporterF
 import { dashboardInsightColorsModalLogic } from './dashboardInsightColorsModalLogic'
 import { dashboardLogic } from './dashboardLogic'
 import { dashboardTemplateEditorLogic } from './dashboardTemplateEditorLogic'
+import { LAYOUT_EDITING_DISABLED_MESSAGE } from './dashboardUtils'
 
 const RESOURCE_TYPE = 'dashboard'
 
@@ -84,6 +85,8 @@ export function DashboardScenePanel(): JSX.Element | null {
     const hasDashboardColors = useFeatureFlag('PRODUCT_ANALYTICS_DASHBOARD_COLORS')
 
     const { push } = useActions(router)
+
+    const isEditModeEntryDisabled = currentLayoutSize === 'xs' && dashboardMode !== DashboardMode.Edit
 
     return (
         <ScenePanel>
@@ -152,6 +155,7 @@ export function DashboardScenePanel(): JSX.Element | null {
                             keybind={[keyBinds.edit]}
                             intent="Toggle edit mode"
                             interaction="click"
+                            disabled={isEditModeEntryDisabled}
                         >
                             <ButtonPrimitive
                                 onClick={() => {
@@ -164,6 +168,10 @@ export function DashboardScenePanel(): JSX.Element | null {
                                 }}
                                 menuItem
                                 active={dashboardMode === DashboardMode.Edit}
+                                disabled={isEditModeEntryDisabled}
+                                disabledReasons={
+                                    isEditModeEntryDisabled ? { [LAYOUT_EDITING_DISABLED_MESSAGE]: true } : undefined
+                                }
                                 data-attr={`${RESOURCE_TYPE}-edit-layout`}
                                 tooltip="Toggle edit mode"
                                 tooltipPlacement="left"

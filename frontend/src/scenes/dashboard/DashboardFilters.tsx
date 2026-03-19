@@ -163,31 +163,34 @@ interface DashboardFilterBarProps {
 export function DashboardFilterBar({ backTo }: DashboardFilterBarProps): JSX.Element {
     const { placement, dashboard, dashboardMode, hasVariables, dashboardFiltersEnabled } = useValues(dashboardLogic)
 
+    const hideFiltersInLayoutEdit = dashboardMode === DashboardMode.Edit
+
     return (
-        <div className="flex flex-col gap-2 w-full">
-            <div className="flex gap-2 justify-between">
-                <div className="flex flex-col md:flex-row gap-2 justify-between shrink-0 items-start lg:items-center">
-                    {![
-                        DashboardPlacement.Public,
-                        DashboardPlacement.Export,
-                        DashboardPlacement.FeatureFlag,
-                        DashboardPlacement.Group,
-                        DashboardPlacement.DataOps,
-                        DashboardPlacement.Builtin,
-                    ].includes(placement) &&
+        <div className="flex min-w-0 flex-col gap-2 w-full">
+            <div className="flex min-w-0 w-full flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-start lg:justify-between lg:gap-x-4 lg:gap-y-3">
+                <div className="flex min-w-0 flex-col gap-2 md:flex-row md:flex-wrap md:items-start lg:items-center">
+                    {!hideFiltersInLayoutEdit &&
+                        ![
+                            DashboardPlacement.Public,
+                            DashboardPlacement.Export,
+                            DashboardPlacement.FeatureFlag,
+                            DashboardPlacement.Group,
+                            DashboardPlacement.DataOps,
+                            DashboardPlacement.Builtin,
+                        ].includes(placement) &&
                         dashboard &&
                         (dashboardFiltersEnabled ? <DashboardPrimaryFilters /> : <DashboardEditBar />)}
                 </div>
                 {![DashboardPlacement.Export, DashboardPlacement.Builtin].includes(placement) && (
                     <div
                         className={clsx(
-                            'flex flex-col lg:flex-row items-end lg:items-center shrink-0 gap-4 dashoard-items-actions ml-auto',
+                            'dashoard-items-actions flex min-w-0 w-full flex-wrap items-start justify-start gap-x-4 gap-y-2 sm:items-end lg:ml-auto lg:w-auto lg:shrink-0 lg:justify-end',
                             {
-                                'mt-7': hasVariables,
+                                'lg:mt-7': hasVariables,
                             }
                         )}
                     >
-                        {dashboardFiltersEnabled && <DashboardAdvancedOptionsToggle />}
+                        {dashboardFiltersEnabled && !hideFiltersInLayoutEdit && <DashboardAdvancedOptionsToggle />}
                         <div className={`left-item ${placement === DashboardPlacement.Public ? 'text-right' : ''}`}>
                             {[DashboardPlacement.Public].includes(placement) ? (
                                 <LastRefreshText />
@@ -223,13 +226,13 @@ export function DashboardFilterBar({ backTo }: DashboardFilterBarProps): JSX.Ele
                 )}
             </div>
 
-            {dashboardFiltersEnabled && (
+            {dashboardFiltersEnabled && !hideFiltersInLayoutEdit && (
                 <div className="flex items-center gap-2 flex-wrap">
                     <DashboardQuickFiltersRow />
                 </div>
             )}
 
-            {dashboardFiltersEnabled && <DashboardAdvancedOptions />}
+            {dashboardFiltersEnabled && !hideFiltersInLayoutEdit && <DashboardAdvancedOptions />}
         </div>
     )
 }

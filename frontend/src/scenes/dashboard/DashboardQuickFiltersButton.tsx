@@ -41,6 +41,7 @@ export function DashboardQuickFiltersButton({ context, dashboard }: DashboardQui
                     onClick={openConfigureModal}
                     tooltip="Configure quick filters"
                     aria-label="Configure quick filters"
+                    className="self-start"
                 >
                     {selectedDashboardFilterIds.length === 0 ? 'Configure quick filters' : undefined}
                 </LemonButton>

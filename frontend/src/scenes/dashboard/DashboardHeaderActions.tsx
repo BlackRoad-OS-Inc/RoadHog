@@ -17,6 +17,7 @@ import { AccessControlLevel, AccessControlResourceType, DashboardMode } from '~/
 
 import { addInsightToDashboardLogic } from './addInsightToDashboardModalLogic'
 import { DashboardLoadAction, dashboardLogic } from './dashboardLogic'
+import { LAYOUT_EDITING_DISABLED_MESSAGE } from './dashboardUtils'
 
 export function EditModeActions(): JSX.Element {
     const { dashboardLoading, canEditDashboard } = useValues(dashboardLogic)
@@ -64,7 +65,7 @@ export function EditModeActions(): JSX.Element {
                               : 'Not privileged to edit this dashboard'
                     }
                 >
-                    Save
+                    Save Layout
                 </LemonButton>
             </AppShortcut>
         </>
@@ -89,7 +90,8 @@ export function FullscreenModeActions(): JSX.Element {
 }
 
 export function ViewModeActions(): JSX.Element {
-    const { dashboard, canEditDashboard } = useValues(dashboardLogic)
+    const { dashboard, canEditDashboard, currentLayoutSize } = useValues(dashboardLogic)
+    const isLayoutEditingDisabled = currentLayoutSize === 'xs'
     const { setDashboardMode, loadDashboard } = useActions(dashboardLogic)
     const { showAddInsightToDashboardModal } = useActions(addInsightToDashboardLogic)
     const { push } = useActions(router)
@@ -142,6 +144,7 @@ export function ViewModeActions(): JSX.Element {
                     keybind={[keyBinds.edit]}
                     intent="Enter edit mode"
                     interaction="click"
+                    disabled={isLayoutEditingDisabled}
                 >
                     <LemonButton
                         type="secondary"
@@ -151,6 +154,8 @@ export function ViewModeActions(): JSX.Element {
                         icon={<IconGridMasonry fontSize="16" />}
                         tooltip="Edit layout"
                         tooltipPlacement="top"
+                        disabled={isLayoutEditingDisabled}
+                        disabledReason={isLayoutEditingDisabled ? LAYOUT_EDITING_DISABLED_MESSAGE : undefined}
                     >
                         Edit layout
                     </LemonButton>

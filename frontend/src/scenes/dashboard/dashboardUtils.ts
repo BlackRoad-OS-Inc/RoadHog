@@ -25,6 +25,9 @@ export const BREAKPOINTS: Record<DashboardLayoutSize, number> = {
 }
 export const BREAKPOINT_COLUMN_COUNTS: Record<DashboardLayoutSize, number> = { sm: 12, xs: 1 }
 
+/** Shown when layout drag/resize is off (narrow grid / mobile breakpoint). */
+export const LAYOUT_EDITING_DISABLED_MESSAGE = 'Layout editing is disabled on smaller screens.'
+
 /**
  * The minimum interval between manual dashboard refreshes.
  * This is used to block the dashboard refresh button.
