@@ -120,35 +120,41 @@ class ModelRegistryService:
         )
 
     def get_available_models(self, product: str) -> list[ModelInfo]:
-        """Get raw provider models available to a product."""
+        """Get raw provider models available for a given product."""
         config = get_product_config(product)
         configured_providers = _get_configured_providers()
         allowed_models = config.allowed_models if config else None
 
-        # Fetch all chat models from LiteLLM, filtered by configured providers
         all_litellm_models = ModelCostService.get_instance().get_all_models()
         models_by_id: dict[str, ModelInfo] = {}
+
+        # Iterate over all LiteLLM models and filter out models that don't meet the criteria
         for raw_model_id in sorted(all_litellm_models.keys()):
-            cost_data = all_litellm_models[raw_model_id]
-            provider = cost_data.get("litellm_provider", "")
-            if not _is_configured_provider(provider, configured_providers):
+            model_cost_data = all_litellm_models[raw_model_id]
+            model_provider = model_cost_data.get("litellm_provider", "")
+
+            # Filter out models where provider is not configured
+            if not _is_configured_provider(model_provider, configured_providers):
                 continue
-            if not _is_chat_model(cost_data):
+            # Filter out non-chat models
+            if not _is_chat_model(model_cost_data):
                 continue
-            if not _supports_bedrock_messages_endpoint(raw_model_id, provider):
+            # Filter out Bedrock models that don't support the messages endpoint
+            if not _supports_bedrock_messages_endpoint(raw_model_id, model_provider):
                 continue
+            # Filter out models that are not in the allowed models list
             if allowed_models is not None and not _model_matches_allowlist(raw_model_id, allowed_models):
                 continue
-            existing = models_by_id.get(raw_model_id)
-            candidate = ModelInfo(
-                id=raw_model_id,
-                provider=_normalize_provider(provider),
-                context_window=cost_data.get("max_input_tokens") or 0,
-                supports_vision=bool(cost_data.get("supports_vision", False)),
-                supports_streaming=True,
-            )
-            if existing is None:
-                models_by_id[raw_model_id] = candidate
+
+            if models_by_id.get(raw_model_id) is None:
+                # Add the model to the dictionary if it doesn't exist
+                models_by_id[raw_model_id] = ModelInfo(
+                    id=raw_model_id,
+                    provider=_normalize_provider(model_provider),
+                    context_window=model_cost_data.get("max_input_tokens") or 0,
+                    supports_vision=bool(model_cost_data.get("supports_vision", False)),
+                    supports_streaming=True,
+                )
         return list(models_by_id.values())
 
     def is_model_available(self, model_id: str, product: str) -> bool:
@@ -157,7 +163,7 @@ class ModelRegistryService:
 
         # If product has explicit allowed_models, check against those
         if config is not None and config.allowed_models is not None:
-            if not _model_matches_allowlist(model_id, config.allowed_models):
+            if config.allowed_models and not _model_matches_allowlist(model_id, config.allowed_models):
                 return False
 
         configured_providers = _get_configured_providers()
