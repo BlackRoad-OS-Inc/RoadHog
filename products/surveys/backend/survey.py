@@ -461,7 +461,7 @@ def update_survey_iterations(sender, instance, *args, **kwargs):
 
 
 def _get_surveys_response(team: "Team") -> dict:
-    from posthog.api.survey import get_surveys_response
+    from products.surveys.backend.api.survey import get_surveys_response
 
     return get_surveys_response(team)
 
