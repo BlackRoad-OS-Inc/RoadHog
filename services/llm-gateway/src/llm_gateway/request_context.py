@@ -108,8 +108,10 @@ def apply_posthog_context_from_headers(request: Request) -> None:
     properties = extract_posthog_properties_from_headers(request)
     flags = extract_posthog_flags_from_headers(request)
 
-    if properties or flags:
-        set_posthog_context(properties=properties or None, flags=flags or None)
+    if properties:
+        set_posthog_properties(properties)
+    if flags:
+        set_posthog_flags(flags)
 
 
 def set_throttle_context(runner: ThrottleRunner, context: ThrottleContext) -> None:
