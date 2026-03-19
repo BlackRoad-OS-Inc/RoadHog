@@ -17,6 +17,7 @@ import {
     WarehouseSavedQueriesRunCreateParams,
     WarehouseSavedQueriesRunHistoryRetrieveParams,
 } from '@/generated/data_warehouse/api'
+import { withPostHogUrl, type WithPostHogUrl } from '@/tools/tool-utils'
 import type { Context, ToolBase, ZodObjectAny } from '@/tools/types'
 
 const WarehouseSavedQueriesListSchema = WarehouseSavedQueriesListQueryParams
@@ -35,14 +36,15 @@ const warehouseSavedQueriesList = (): ToolBase<typeof WarehouseSavedQueriesListS
             },
         })
         const items = (result as any).results ?? result
-        return {
-            ...(result as any),
-            results: (items as any[]).map((item: any) => ({
-                ...item,
-                _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${item.id}`,
-            })),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/sql`,
-        }
+        return withPostHogUrl(
+            {
+                ...(result as any),
+                results: (items as any[]).map((item: any) =>
+                    withPostHogUrl(item, `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${item.id}`)
+                ),
+            },
+            `${context.api.getProjectBaseUrl(projectId)}/sql`
+        )
     },
 })
 
@@ -50,7 +52,7 @@ const WarehouseSavedQueriesCreateSchema = WarehouseSavedQueriesCreateBody
 
 const warehouseSavedQueriesCreate = (): ToolBase<
     typeof WarehouseSavedQueriesCreateSchema,
-    Schemas.DataWarehouseSavedQuery & { _posthogUrl: string }
+    WithPostHogUrl<Schemas.DataWarehouseSavedQuery>
 > => ({
     name: 'warehouse-saved-queries-create',
     schema: WarehouseSavedQueriesCreateSchema,
@@ -68,10 +70,10 @@ const warehouseSavedQueriesCreate = (): ToolBase<
             path: `/api/projects/${projectId}/warehouse_saved_queries/`,
             body,
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`,
-        }
+        return withPostHogUrl(
+            result as any,
+            `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`
+        )
     },
 })
 
@@ -79,7 +81,7 @@ const WarehouseSavedQueriesRetrieveSchema = WarehouseSavedQueriesRetrieveParams.
 
 const warehouseSavedQueriesRetrieve = (): ToolBase<
     typeof WarehouseSavedQueriesRetrieveSchema,
-    Schemas.DataWarehouseSavedQuery & { _posthogUrl: string }
+    WithPostHogUrl<Schemas.DataWarehouseSavedQuery>
 > => ({
     name: 'warehouse-saved-queries-retrieve',
     schema: WarehouseSavedQueriesRetrieveSchema,
@@ -89,10 +91,10 @@ const warehouseSavedQueriesRetrieve = (): ToolBase<
             method: 'GET',
             path: `/api/projects/${projectId}/warehouse_saved_queries/${params.id}/`,
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`,
-        }
+        return withPostHogUrl(
+            result as any,
+            `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`
+        )
     },
 })
 
@@ -102,7 +104,7 @@ const WarehouseSavedQueriesPartialUpdateSchema = WarehouseSavedQueriesPartialUpd
 
 const warehouseSavedQueriesPartialUpdate = (): ToolBase<
     typeof WarehouseSavedQueriesPartialUpdateSchema,
-    Schemas.DataWarehouseSavedQuery & { _posthogUrl: string }
+    WithPostHogUrl<Schemas.DataWarehouseSavedQuery>
 > => ({
     name: 'warehouse-saved-queries-partial-update',
     schema: WarehouseSavedQueriesPartialUpdateSchema,
@@ -123,10 +125,10 @@ const warehouseSavedQueriesPartialUpdate = (): ToolBase<
             path: `/api/projects/${projectId}/warehouse_saved_queries/${params.id}/`,
             body,
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`,
-        }
+        return withPostHogUrl(
+            result as any,
+            `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`
+        )
     },
 })
 
@@ -152,7 +154,7 @@ const WarehouseSavedQueriesMaterializeCreateSchema = WarehouseSavedQueriesMateri
 
 const warehouseSavedQueriesMaterializeCreate = (): ToolBase<
     typeof WarehouseSavedQueriesMaterializeCreateSchema,
-    Schemas.DataWarehouseSavedQuery & { _posthogUrl: string }
+    WithPostHogUrl<Schemas.DataWarehouseSavedQuery>
 > => ({
     name: 'warehouse-saved-queries-materialize-create',
     schema: WarehouseSavedQueriesMaterializeCreateSchema,
@@ -179,10 +181,10 @@ const warehouseSavedQueriesMaterializeCreate = (): ToolBase<
             path: `/api/projects/${projectId}/warehouse_saved_queries/${params.id}/materialize/`,
             body,
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`,
-        }
+        return withPostHogUrl(
+            result as any,
+            `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`
+        )
     },
 })
 
@@ -193,7 +195,7 @@ const WarehouseSavedQueriesRevertMaterializationCreateSchema =
 
 const warehouseSavedQueriesRevertMaterializationCreate = (): ToolBase<
     typeof WarehouseSavedQueriesRevertMaterializationCreateSchema,
-    Schemas.DataWarehouseSavedQuery & { _posthogUrl: string }
+    WithPostHogUrl<Schemas.DataWarehouseSavedQuery>
 > => ({
     name: 'warehouse-saved-queries-revert-materialization-create',
     schema: WarehouseSavedQueriesRevertMaterializationCreateSchema,
@@ -223,10 +225,10 @@ const warehouseSavedQueriesRevertMaterializationCreate = (): ToolBase<
             path: `/api/projects/${projectId}/warehouse_saved_queries/${params.id}/revert_materialization/`,
             body,
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`,
-        }
+        return withPostHogUrl(
+            result as any,
+            `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`
+        )
     },
 })
 
@@ -236,7 +238,7 @@ const WarehouseSavedQueriesRunCreateSchema = WarehouseSavedQueriesRunCreateParam
 
 const warehouseSavedQueriesRunCreate = (): ToolBase<
     typeof WarehouseSavedQueriesRunCreateSchema,
-    Schemas.DataWarehouseSavedQuery & { _posthogUrl: string }
+    WithPostHogUrl<Schemas.DataWarehouseSavedQuery>
 > => ({
     name: 'warehouse-saved-queries-run-create',
     schema: WarehouseSavedQueriesRunCreateSchema,
@@ -263,10 +265,10 @@ const warehouseSavedQueriesRunCreate = (): ToolBase<
             path: `/api/projects/${projectId}/warehouse_saved_queries/${params.id}/run/`,
             body,
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`,
-        }
+        return withPostHogUrl(
+            result as any,
+            `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`
+        )
     },
 })
 
@@ -276,7 +278,7 @@ const WarehouseSavedQueriesRunHistoryRetrieveSchema = WarehouseSavedQueriesRunHi
 
 const warehouseSavedQueriesRunHistoryRetrieve = (): ToolBase<
     typeof WarehouseSavedQueriesRunHistoryRetrieveSchema,
-    Schemas.DataWarehouseSavedQuery & { _posthogUrl: string }
+    WithPostHogUrl<Schemas.DataWarehouseSavedQuery>
 > => ({
     name: 'warehouse-saved-queries-run-history-retrieve',
     schema: WarehouseSavedQueriesRunHistoryRetrieveSchema,
@@ -286,10 +288,10 @@ const warehouseSavedQueriesRunHistoryRetrieve = (): ToolBase<
             method: 'GET',
             path: `/api/projects/${projectId}/warehouse_saved_queries/${params.id}/run_history/`,
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`,
-        }
+        return withPostHogUrl(
+            result as any,
+            `${context.api.getProjectBaseUrl(projectId)}/sql/?open_view=${(result as any).id}`
+        )
     },
 })
 

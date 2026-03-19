@@ -10,11 +10,12 @@ import {
     AlertsPartialUpdateParams,
     AlertsRetrieveParams,
 } from '@/generated/alerts/api'
+import { withPostHogUrl, type WithPostHogUrl } from '@/tools/tool-utils'
 import type { Context, ToolBase, ZodObjectAny } from '@/tools/types'
 
 const AlertsListSchema = AlertsListQueryParams
 
-const alertsList = (): ToolBase<typeof AlertsListSchema, Schemas.PaginatedAlertList & { _posthogUrl: string }> => ({
+const alertsList = (): ToolBase<typeof AlertsListSchema, WithPostHogUrl<Schemas.PaginatedAlertList>> => ({
     name: 'alerts-list',
     schema: AlertsListSchema,
     handler: async (context: Context, params: z.infer<typeof AlertsListSchema>) => {
@@ -27,10 +28,7 @@ const alertsList = (): ToolBase<typeof AlertsListSchema, Schemas.PaginatedAlertL
                 offset: params.offset,
             },
         })
-        return {
-            ...(result as any),
-            _posthogUrl: `${context.api.getProjectBaseUrl(projectId)}/insights`,
-        }
+        return withPostHogUrl(result as any, `${context.api.getProjectBaseUrl(projectId)}/insights`)
     },
 })
 
