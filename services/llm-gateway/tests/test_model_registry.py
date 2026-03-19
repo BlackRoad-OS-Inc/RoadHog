@@ -7,6 +7,7 @@ from llm_gateway.rate_limiting.model_cost_service import ModelCost, ModelCostSer
 from llm_gateway.services.model_registry import (
     ModelInfo,
     ModelRegistryService,
+    _model_matches_allowlist,
     get_available_models,
     is_model_available,
 )
@@ -305,6 +306,24 @@ class TestProviderFiltering:
                 model_ids = {m.id for m in models}
                 assert "us.anthropic.claude-sonnet-4-5-20250929-v1:0" in model_ids
                 assert "us.meta.llama3-2-90b-instruct-v1:0" not in model_ids
+
+
+class TestModelMatchesAllowlist:
+    @pytest.mark.parametrize(
+        "model_id,expected",
+        [
+            ("gpt-4o", True),
+            ("GPT-4O", True),
+            ("Gpt-4o", True),
+            ("claude-sonnet-4-5", True),
+            ("CLAUDE-SONNET-4-5", True),
+            ("unknown-model", False),
+            ("gpt-4o-extra", False),
+        ],
+    )
+    def test_case_insensitive_exact_matching(self, model_id: str, expected: bool):
+        allowlist = frozenset({"gpt-4o", "claude-sonnet-4-5"})
+        assert _model_matches_allowlist(model_id, allowlist) == expected
 
 
 class TestIsModelAvailable:

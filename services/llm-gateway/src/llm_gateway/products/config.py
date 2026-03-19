@@ -167,7 +167,8 @@ def check_product_access(
             return False, f"OAuth application not authorized for product '{product}'"
 
     if model and config.allowed_models is not None:
-        if model not in config.allowed_models:
+        model_lower = model.lower()
+        if not any(model_lower.startswith(allowed) for allowed in config.allowed_models):
             return False, f"Model '{model}' not allowed for product '{product}'"
 
     return True, None

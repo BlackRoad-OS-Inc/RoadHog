@@ -47,6 +47,11 @@ def _is_bedrock_configured(settings: object) -> bool:
     )
 
 
+def _model_matches_allowlist(model_id: str, allowed_models: frozenset[str]) -> bool:
+    """Check if model matches allowlist using exact matching for /models endpoint listing."""
+    return model_id.lower() in allowed_models
+
+
 def _get_configured_providers() -> frozenset[str]:
     """Return the set of providers that have required configuration."""
     settings = get_settings()
@@ -132,7 +137,7 @@ class ModelRegistryService:
                 continue
             if not _supports_bedrock_messages_endpoint(raw_model_id, provider):
                 continue
-            if allowed_models is not None and raw_model_id not in allowed_models:
+            if allowed_models is not None and not _model_matches_allowlist(raw_model_id, allowed_models):
                 continue
             existing = models_by_id.get(raw_model_id)
             candidate = ModelInfo(
@@ -152,7 +157,7 @@ class ModelRegistryService:
 
         # If product has explicit allowed_models, check against those
         if config is not None and config.allowed_models is not None:
-            if model_id not in config.allowed_models:
+            if not _model_matches_allowlist(model_id, config.allowed_models):
                 return False
 
         configured_providers = _get_configured_providers()

@@ -127,16 +127,33 @@ class TestCheckProductAccess:
         assert allowed is True
         assert error is None
 
-    def test_posthog_code_rejects_dated_variant_when_not_listed_exactly(self):
-        allowed, error = check_product_access(
-            "posthog_code",
-            "oauth_access_token",
-            POSTHOG_CODE_US_APP_ID,
+    @pytest.mark.parametrize(
+        "model",
+        [
             "claude-opus-4-5-20260101",
-        )
-        assert allowed is False
-        assert error is not None
-        assert "not allowed" in error
+            "claude-sonnet-4-5-20250929",
+            "claude-haiku-4-5-20251001-v2",
+            "gpt-5.2-turbo",
+        ],
+    )
+    def test_posthog_code_allows_dated_variants_via_prefix_matching(self, model: str):
+        allowed, error = check_product_access("posthog_code", "oauth_access_token", POSTHOG_CODE_US_APP_ID, model)
+        assert allowed is True
+        assert error is None
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "Claude-Opus-4-5",
+            "CLAUDE-SONNET-4-5",
+            "GPT-5.2",
+            "Claude-Haiku-4-5",
+        ],
+    )
+    def test_model_matching_is_case_insensitive(self, model: str):
+        allowed, error = check_product_access("posthog_code", "oauth_access_token", POSTHOG_CODE_US_APP_ID, model)
+        assert allowed is True
+        assert error is None
 
     @pytest.mark.parametrize(
         "alias",
