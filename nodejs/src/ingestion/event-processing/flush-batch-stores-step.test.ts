@@ -4,7 +4,7 @@ import { BatchWritingGroupStore } from '../../worker/ingestion/groups/batch-writ
 import { FlushResult, PersonsStore } from '../../worker/ingestion/persons/persons-store'
 import { captureIngestionWarning } from '../../worker/ingestion/utils'
 import { AfterBatchInput } from '../pipelines/batching-pipeline'
-import { isOkResult } from '../pipelines/results'
+import { isOkResult, ok } from '../pipelines/results'
 import { FlushBatchStoresStepConfig, createFlushBatchStoresStep } from './flush-batch-stores-step'
 
 jest.mock('../../worker/ingestion/utils', () => ({
@@ -46,9 +46,12 @@ describe('flush-batch-stores-step', () => {
     describe('createFlushBatchStoresStep', () => {
         let step: ReturnType<typeof createFlushBatchStoresStep>
 
-        function makeInput(): AfterBatchInput<void, any, NonNullable<unknown>> {
+        function makeInput(elementCount = 2): AfterBatchInput<void, any, NonNullable<unknown>> {
             return {
-                elements: [],
+                elements: Array.from({ length: elementCount }, () => ({
+                    result: ok(undefined),
+                    context: { sideEffects: [], warnings: [] },
+                })),
                 batchContext: {},
                 batchId: 0,
             }
@@ -373,13 +376,13 @@ describe('flush-batch-stores-step', () => {
             mockPersonsStore.flush.mockResolvedValue([])
             mockGroupStore.flush.mockResolvedValue([])
 
-            const input = makeInput()
-            input.elements = [{ result: 'test-element' }] as any
+            const input = makeInput(3)
             const result = await step(input)
 
             expect(isOkResult(result)).toBe(true)
             if (isOkResult(result)) {
-                expect(result.value.elements).toEqual([{ result: 'test-element' }])
+                expect(result.value.elements).toHaveLength(3)
+                expect(result.value.elements).toBe(input.elements)
                 expect(result.value.batchContext).toBe(input.batchContext)
             }
         })
