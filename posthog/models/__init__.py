@@ -58,7 +58,6 @@ from .insight_caching_state import InsightCachingState
 from .insight_variable import InsightVariable
 from .instance_setting import InstanceSetting
 from .integration import Integration
-from .link import Link
 from .llm_prompt import LLMPrompt
 from .materialized_column_slots import MaterializedColumnSlot, MaterializedColumnSlotState
 from .message_template import MessageTemplate
@@ -162,7 +161,6 @@ __all__ = [
     "HogFlow",
     "HogFunction",
     "HogFunctionTemplate",
-    "Link",
     "LLMPrompt",
     "HostDefinition",
     "Insight",
