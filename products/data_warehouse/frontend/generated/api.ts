@@ -383,6 +383,20 @@ export const dataWarehouseDataOpsDashboardRetrieve = async (
 }
 
 /**
+ * Start deprovisioning the managed warehouse for this team.
+ */
+export const getDataWarehouseDeprovisionCreateUrl = (projectId: string) => {
+    return `/api/projects/${projectId}/data_warehouse/deprovision/`
+}
+
+export const dataWarehouseDeprovisionCreate = async (projectId: string, options?: RequestInit): Promise<void> => {
+    return apiMutator<void>(getDataWarehouseDeprovisionCreateUrl(projectId), {
+        ...options,
+        method: 'POST',
+    })
+}
+
+/**
  * Returns success and failed job statistics for the last 1, 7, or 30 days.
 Query parameter 'days' can be 1, 7, or 30 (default: 7).
  */
@@ -412,6 +426,20 @@ export const dataWarehousePropertyValuesRetrieve = async (projectId: string, opt
 }
 
 /**
+ * Start provisioning a managed warehouse for this team.
+ */
+export const getDataWarehouseProvisionCreateUrl = (projectId: string) => {
+    return `/api/projects/${projectId}/data_warehouse/provision/`
+}
+
+export const dataWarehouseProvisionCreate = async (projectId: string, options?: RequestInit): Promise<void> => {
+    return apiMutator<void>(getDataWarehouseProvisionCreateUrl(projectId), {
+        ...options,
+        method: 'POST',
+    })
+}
+
+/**
  * Returns currently running activities (jobs with status 'Running').
 Supports pagination and cutoff time filtering.
  */
@@ -436,6 +464,20 @@ export const getDataWarehouseTotalRowsStatsRetrieveUrl = (projectId: string) => 
 
 export const dataWarehouseTotalRowsStatsRetrieve = async (projectId: string, options?: RequestInit): Promise<void> => {
     return apiMutator<void>(getDataWarehouseTotalRowsStatsRetrieveUrl(projectId), {
+        ...options,
+        method: 'GET',
+    })
+}
+
+/**
+ * Get the current provisioning status of the managed warehouse.
+ */
+export const getDataWarehouseWarehouseStatusRetrieveUrl = (projectId: string) => {
+    return `/api/projects/${projectId}/data_warehouse/warehouse_status/`
+}
+
+export const dataWarehouseWarehouseStatusRetrieve = async (projectId: string, options?: RequestInit): Promise<void> => {
+    return apiMutator<void>(getDataWarehouseWarehouseStatusRetrieveUrl(projectId), {
         ...options,
         method: 'GET',
     })
