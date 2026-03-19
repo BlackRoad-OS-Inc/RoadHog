@@ -9,7 +9,7 @@ from parameterized import parameterized
 
 from posthog.models.experiment import Experiment, ExperimentMetricResult
 from posthog.models.feature_flag import FeatureFlag
-from posthog.temporal.experiments.activities import _check_significance_transition
+from posthog.temporal.experiments.utils import check_significance_transition
 
 METRIC_DICT = {
     "uuid": "metric-123",
@@ -100,7 +100,7 @@ class TestCheckSignificanceTransition(BaseTest):
                 )
 
         result_dict = _make_result(new_significant)
-        _check_significance_transition(experiment, metric_uuid, fingerprint, result_dict, query_to_utc)
+        check_significance_transition(experiment, metric_uuid, fingerprint, result_dict, query_to_utc)
 
         if expect_event:
             mock_produce.assert_called_once()
@@ -136,7 +136,7 @@ class TestCheckSignificanceTransition(BaseTest):
         )
 
         result_dict = _make_result(["test", "control"])
-        _check_significance_transition(experiment, metric_uuid, fingerprint, result_dict, query_to_utc)
+        check_significance_transition(experiment, metric_uuid, fingerprint, result_dict, query_to_utc)
 
         mock_produce.assert_called_once()
         event = (
@@ -169,7 +169,7 @@ class TestCheckSignificanceTransition(BaseTest):
         )
 
         result_dict = _make_result(["test"])
-        _check_significance_transition(
+        check_significance_transition(
             experiment, "metric-456", "fp", result_dict, datetime(2024, 1, 10, tzinfo=ZoneInfo("UTC"))
         )
 
