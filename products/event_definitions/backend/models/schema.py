@@ -135,9 +135,7 @@ class EventSchema(UUIDTModel):
         return f"{self.event_definition.name} → {self.property_group.name}"
 
 
-# Signal handlers to auto-increment EventDefinition.schema_version
-# when the schema structure changes. This covers all mutation paths
-# (API, admin, management commands, tests) without coupling to viewsets.
+# Signal handlers to auto-increment EventDefinition.schema_version when the schema structure changes.
 
 
 @mutable_receiver([post_save, post_delete], sender=EventSchema)
