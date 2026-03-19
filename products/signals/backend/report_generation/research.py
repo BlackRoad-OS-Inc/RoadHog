@@ -412,7 +412,7 @@ def build_report_presentation_prompt(
 
 ## Output goals
 
-- **Title**: a PR-style title (max 70 chars) scoped to one concrete concern. 
+- **Title**: a PR-style title (max 70 chars) scoped to one concrete concern.
 - If the report already has a title that is PR-specific and still accurate after your research, keep it — don't replace a good PR title with a vaguer one.
 - It should read like a pull request title that one engineer could ship in a single PR. Target one feature, one bug, one component, or one tightly-scoped change.
   - Good: "Fix date picker timezone handling in insights"

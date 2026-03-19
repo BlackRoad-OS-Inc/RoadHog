@@ -55,8 +55,8 @@ Return ONLY valid JSON, no other text."""
 
 
 def _build_report_safety_judge_prompt(
-    title: str,
-    summary: str,
+    title: str | None,
+    summary: str | None,
     signals: list[SignalData],
 ) -> str:
     report_sections = ["REPORT TO REVIEW:"]

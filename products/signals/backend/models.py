@@ -65,6 +65,8 @@ class SignalReport(UUIDModel):
     # Incremented each summary run to prevent re-promoting on every signal.
     # The snooze action sets it to signal_count + N to delay re-promotion by N signals.
     signals_at_run = models.IntegerField(default=0)
+    # How many times the summary workflow has run for this report (incremented on each CANDIDATE -> IN_PROGRESS).
+    run_count = models.IntegerField(default=0)
 
     # LLM-generated during signal matching
     title = models.TextField(null=True, blank=True)
@@ -134,7 +136,8 @@ class SignalReport(UUIDModel):
                     raise ValueError("signals_at_run_increment is required for candidate -> in_progress")
                 self.last_run_at = timezone.now()
                 self.signals_at_run = self.signal_count + signals_at_run_increment
-                updated_fields.update(["last_run_at", "signals_at_run"])
+                self.run_count += 1
+                updated_fields.update(["last_run_at", "signals_at_run", "run_count"])
 
             case (S.IN_PROGRESS, S.READY):
                 if title is None or summary is None:
