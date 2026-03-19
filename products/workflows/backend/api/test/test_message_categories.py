@@ -5,7 +5,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from rest_framework import status
 
-from posthog.models import MessageCategory, Team
+from posthog.models import Team
+
+from products.messaging.backend.models.message_category import MessageCategory
 
 
 class TestMessageCategoryAPI(APIBaseTest):

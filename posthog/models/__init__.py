@@ -60,10 +60,6 @@ from .integration import Integration
 from .link import Link
 from .llm_prompt import LLMPrompt
 from .materialized_column_slots import MaterializedColumnSlot, MaterializedColumnSlotState
-from .message_template import MessageTemplate
-from .message_category import MessageCategory
-from .message_preferences import MessageRecipientPreference
-from .messaging import MessagingRecord
 from .object_media_preview import ObjectMediaPreview
 from .organization import Organization, OrganizationMembership
 from .organization_domain import OrganizationDomain
@@ -167,10 +163,6 @@ __all__ = [
     "InviteExpiredException",
     "MaterializedColumnSlot",
     "MaterializedColumnSlotState",
-    "MessageCategory",
-    "MessageRecipientPreference",
-    "MessageTemplate",
-    "MessagingRecord",
     "Notebook",
     "MigrationStatus",
     "NotificationViewed",

@@ -3,7 +3,7 @@ import hashlib
 from django.conf import settings
 from django.db import models
 
-from .utils import UUIDTModel
+from posthog.models.utils import UUIDTModel
 
 
 def get_email_hash(email: str) -> str:
@@ -51,3 +51,4 @@ class MessagingRecord(UUIDTModel):
             "email_hash",
             "campaign_key",
         )  # can only send campaign once to each email
+        db_table = "posthog_messagingrecord"

@@ -365,3 +365,12 @@ interfaces = [
     "products.metrics.backend.facade",
     "products.metrics.backend.presentation.views",
 ]
+
+[[modules]]
+path = "products.messaging"
+depends_on = ["posthog"]
+layer = "products"
+interfaces = [
+    "products.messaging.backend.facade",
+    "products.messaging.backend.presentation.views",
+]

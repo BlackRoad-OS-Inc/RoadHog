@@ -25,8 +25,9 @@ from lxml import html as lxml_html
 
 from posthog.exceptions_capture import capture_exception
 from posthog.models.instance_setting import get_instance_setting
-from posthog.models.messaging import MessagingRecord
 from posthog.tasks.utils import CeleryQueue
+
+from products.messaging.backend.models.messaging import MessagingRecord
 
 
 def inline_css(value: str) -> str:
