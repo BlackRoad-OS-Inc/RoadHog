@@ -1248,7 +1248,8 @@ async def _process_signal_batch(
     # All match calls fire concurrently against the same search snapshot.
 
     # Step 6: Concurrent match LLM calls
-    match_results: list[MatchResult] = list(
+    # return_exceptions=True so one failed match doesn't kill the whole batch
+    match_results_raw: list[MatchResult | BaseException] = list(
         await asyncio.gather(
             *[
                 workflow.execute_activity(
@@ -1265,12 +1266,32 @@ async def _process_signal_batch(
                     retry_policy=RetryPolicy(maximum_attempts=5),
                 )
                 for i, signal in enumerate(batch)
-            ]
+            ],
+            return_exceptions=True,
         )
     )
 
+    # Log and mark failed matches so we skip them in later steps
+    failed_match_indices: set[int] = set()
+    match_results: list[MatchResult | None] = []
+    for i, result in enumerate(match_results_raw):
+        if isinstance(result, BaseException):
+            failed_match_indices.add(i)
+            match_results.append(None)
+            dropped += 1
+            workflow.logger.exception(
+                "Match LLM call failed for signal in batch",
+                exc_info=result,
+                team_id=team_id,
+                source_product=batch[i].source_product,
+                source_type=batch[i].source_type,
+                source_id=batch[i].source_id,
+            )
+        else:
+            match_results.append(result)
+
     # Step 7: Concurrent specificity checks for existing matches
-    existing_indices = [i for i, r in enumerate(match_results) if isinstance(r, ExistingReportMatch)]
+    existing_indices = [i for i, r in enumerate(match_results) if r is not None and isinstance(r, ExistingReportMatch)]
 
     # Fetch group signals concurrently (deduplicated by report_id)
     group_signals_by_idx: dict[int, FetchSignalsForReportOutput] = {}
@@ -1289,16 +1310,29 @@ async def _process_signal_batch(
             )
             for rid in unique_report_ids
         }
-        fetch_results = await asyncio.gather(*fetch_tasks.values())
-        rid_to_signals = dict(zip(fetch_tasks.keys(), fetch_results))
-        for rid, indices in unique_report_ids.items():
-            for i in indices:
-                group_signals_by_idx[i] = rid_to_signals[rid]
+        fetch_results = await asyncio.gather(*fetch_tasks.values(), return_exceptions=True)
+        for rid, fetch_result in zip(fetch_tasks.keys(), fetch_results):
+            if isinstance(fetch_result, BaseException):
+                workflow.logger.exception(
+                    "Failed to fetch group signals for report",
+                    exc_info=fetch_result,
+                    team_id=team_id,
+                    report_id=rid,
+                )
+                # Mark all signals targeting this report as failed
+                for i in unique_report_ids[rid]:
+                    failed_match_indices.add(i)
+                    dropped += 1
+            else:
+                for i in unique_report_ids[rid]:
+                    group_signals_by_idx[i] = fetch_result
 
+    # Only run specificity for indices that still have valid group signals
+    specificity_indices = [i for i in existing_indices if i not in failed_match_indices]
     specificity_by_idx: dict[int, VerifyMatchSpecificityOutput] = {}
-    if existing_indices:
+    if specificity_indices:
         specificity_tasks = []
-        for i in existing_indices:
+        for i in specificity_indices:
             match_result = cast(ExistingReportMatch, match_results[i])
             signal = batch[i]
             group_signals_result = group_signals_by_idx[i]
@@ -1319,18 +1353,34 @@ async def _process_signal_batch(
                     retry_policy=RetryPolicy(maximum_attempts=5),
                 )
             )
-        specificity_results = await asyncio.gather(*specificity_tasks)
-        for idx, i in enumerate(existing_indices):
-            specificity_by_idx[i] = specificity_results[idx]
+        specificity_results = await asyncio.gather(*specificity_tasks, return_exceptions=True)
+        for idx, i in enumerate(specificity_indices):
+            result = specificity_results[idx]
+            if isinstance(result, BaseException):
+                workflow.logger.exception(
+                    "Specificity check failed for signal in batch",
+                    exc_info=result,
+                    team_id=team_id,
+                    source_product=batch[i].source_product,
+                    source_type=batch[i].source_type,
+                    source_id=batch[i].source_id,
+                )
+                failed_match_indices.add(i)
+                dropped += 1
+            else:
+                specificity_by_idx[i] = result
 
     # Apply specificity + sequential assign+emit
     promoted_reports: dict[str, SignalReportSummaryWorkflowInputs] = {}
     emitted_signals: list[tuple[str, AssignAndEmitSignalOutput]] = []
 
     for i, signal in enumerate(batch):
+        if i in failed_match_indices:
+            continue
         signal_id = str(uuid.uuid4())
         try:
             match_result = match_results[i]
+            assert match_result is not None  # Guaranteed by failed_match_indices skip above
             updated_title: Optional[str] = None
 
             if i in specificity_by_idx and isinstance(match_result, ExistingReportMatch):
