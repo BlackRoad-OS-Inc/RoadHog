@@ -16,6 +16,7 @@ uv sync
 
 # Node dependencies
 echo "Installing Node dependencies..."
+export COREPACK_ENABLE_AUTO_PIN=0
 corepack enable
 pnpm install --frozen-lockfile
 

@@ -8,6 +8,7 @@ echo "=== PostHog devbox: update-content ==="
 cd /workspaces/posthog
 
 uv sync
+export COREPACK_ENABLE_AUTO_PIN=0
 pnpm install --frozen-lockfile
 
 # Regenerate mprocs config if it exists

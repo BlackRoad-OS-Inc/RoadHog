@@ -30,6 +30,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Node.js 24 via NodeSource
 ARG NODE_MAJOR=24
+ENV COREPACK_ENABLE_AUTO_PIN=0
+ENV COREPACK_ENABLE_AUTO_PIN=0
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && corepack enable \
