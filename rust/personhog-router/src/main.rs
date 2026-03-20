@@ -158,6 +158,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &config.replica_url,
         config.backend_timeout(),
         config.retry_config(),
+        config.backend_keepalive_interval(),
+        config.backend_keepalive_timeout(),
     )
     .expect("Failed to create replica backend");
 
@@ -207,16 +209,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let leader_port = config.leader_port;
     let leader_backend = Arc::new(LeaderBackend::new(
         shared_table,
-        Arc::new(move |pod_name: &str| {
-            Some(format!("http://{}:{}", pod_name, leader_port))
-        }),
+        Arc::new(move |pod_name: &str| Some(format!("http://{}:{}", pod_name, leader_port))),
         num_partitions,
         config.backend_timeout(),
         config.retry_config(),
     ));
 
     // Fill the slot so the cutover handler can access the leader backend
-    if leader_backend_slot.set(Arc::clone(&leader_backend)).is_err() {
+    if leader_backend_slot
+        .set(Arc::clone(&leader_backend))
+        .is_err()
+    {
         panic!("leader_backend_slot already set");
     }
 
@@ -236,13 +239,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         let _guard = coordination_handle.process_scope();
         if let Err(e) = coordination_routing_table.run(cancel).await {
-            coordination_handle
-                .signal_failure(format!("Coordination error: {e}"));
+            coordination_handle.signal_failure(format!("Coordination error: {e}"));
         }
     });
 
     // gRPC server
     let grpc_addr = config.grpc_address;
+    let keepalive_interval = config.grpc_keepalive_interval();
+    let keepalive_timeout = config.grpc_keepalive_timeout();
     tracing::info!("Starting gRPC server on {}", grpc_addr);
 
     tokio::spawn(async move {
@@ -256,6 +260,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         let incoming = tracked_tcp_incoming(listener);
         if let Err(e) = Server::builder()
+            .http2_keepalive_interval(keepalive_interval)
+            .http2_keepalive_timeout(keepalive_timeout)
             .layer(GrpcMetricsLayer)
             .add_service(PersonHogServiceServer::new(service))
             .serve_with_incoming_shutdown(incoming, grpc_handle.shutdown_signal())

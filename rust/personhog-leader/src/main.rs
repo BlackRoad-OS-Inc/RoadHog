@@ -140,8 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         let _guard = coordination_handle.process_scope();
         if let Err(e) = pod.run(cancel).await {
-            coordination_handle
-                .signal_failure(format!("Coordination error: {e}"));
+            coordination_handle.signal_failure(format!("Coordination error: {e}"));
         }
     });
 
