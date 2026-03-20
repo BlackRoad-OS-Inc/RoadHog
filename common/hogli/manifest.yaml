@@ -26,6 +26,8 @@ metadata:
           title: Developer tools and utilities
         - key: utilities
           title: Git worktrees and admin
+        - key: sandbox
+          title: Isolated dev sandboxes
         - key: environment
           title: Environment and shell
     services:
@@ -710,6 +712,28 @@ utilities:
         bin_script: check_uv_python_compatibility.py
         description: CI validation for uv/Python version compatibility
         hidden: true
+sandbox:
+    sandbox:create:
+        bin_script: sandbox
+        description: Create an isolated dev sandbox for a branch
+    sandbox:list:
+        bin_script: sandbox
+        description: List all dev sandboxes
+    sandbox:stop:
+        bin_script: sandbox
+        description: Stop a sandbox (preserves state)
+    sandbox:start:
+        bin_script: sandbox
+        description: Start a stopped sandbox
+    sandbox:destroy:
+        bin_script: sandbox
+        description: Destroy a sandbox and clean up everything
+    sandbox:shell:
+        bin_script: sandbox
+        description: Open a shell in a sandbox container
+    sandbox:logs:
+        bin_script: sandbox
+        description: Tail logs from a sandbox
 environment:
     flox:activate:
         cmd: flox activate
