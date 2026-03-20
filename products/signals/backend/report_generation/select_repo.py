@@ -123,6 +123,8 @@ async def select_repository_for_report(
         output_fn=output_fn,
     )
     # Validate that the selected repo is actually in the candidate list
+    if result.repository is not None:
+        result.repository = result.repository.strip()
     if result.repository is not None and result.repository not in candidate_repos:
         logger.warning(
             "repo selection agent returned unknown repository %s, treating as no match",
