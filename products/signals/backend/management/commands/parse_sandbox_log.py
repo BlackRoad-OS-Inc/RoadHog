@@ -226,7 +226,7 @@ class Command(BaseCommand):
                         self.stdout.write(f"  {ts_str}    {_c(_BLUE, '  <')} {_c(_DIM, _truncate(summary, 150))}")
                     elif raw_output:
                         self.stdout.write(f"  {ts_str}    {_c(_BLUE, '  <')} {_c(_DIM, _truncate(raw_output, 150))}")
-                elif status == "failed":
+                elif status in ("failed", "error"):
                     raw_output = update.get("rawOutput", "tool call failed")
                     self.stdout.write(f"  {ts_str}    {_c(_RED, '  !')} {_c(_RED, _truncate(raw_output, 150))}")
                 continue
