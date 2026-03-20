@@ -1,7 +1,7 @@
 import { BindLogic, useActions, useValues } from 'kea'
 import { useState } from 'react'
 
-import { IconDatabase, IconPlus } from '@posthog/icons'
+import { IconCheck, IconDatabase, IconPlus } from '@posthog/icons'
 import { LemonButton, LemonCard, LemonSkeleton } from '@posthog/lemon-ui'
 
 import { DataWarehouseSourceIcon } from 'scenes/data-warehouse/settings/DataWarehouseSourceIcon'
@@ -17,11 +17,14 @@ export type InlineSourceSetupView = 'selection' | 'connecting'
 interface SourceItem {
     id: ExternalDataSourceType
     label: string
+    connected: boolean
 }
 
 export interface InlineSourceSetupProps {
     /** Callback when source connection is completed */
     onComplete?: () => void
+    /** Callback when at least one source has been added (for updating parent UI) */
+    onSourceAdded?: () => void
     /** When true, show only featured sources initially with an expand option to show all */
     featured?: boolean
     /** Custom title for the source selection */
@@ -32,6 +35,7 @@ export interface InlineSourceSetupProps {
 
 function InternalInlineSourceSetup({
     onComplete,
+    onSourceAdded,
     featured = false,
     title = 'Connect a data source',
     subtitle = 'Choose a source to import data from',
@@ -48,10 +52,12 @@ function InternalInlineSourceSetup({
     const featuredSources = availableConnectors.filter((c: SourceConfig) => c.featured)
     const hiddenSources = availableConnectors.filter((c: SourceConfig) => !c.featured)
     const sourcesToShow = expanded ? availableConnectors : featuredSources
+    const hasConnectedSources = availableConnectors.some((c: SourceConfig) => c.existingSource)
 
     const sourceItems: SourceItem[] = sourcesToShow.map((source: SourceConfig) => ({
         id: source.name,
         label: source.label ?? source.name,
+        connected: !!source.existingSource,
     }))
 
     const handleSourceSelect = (sourceId: ExternalDataSourceType): void => {
@@ -63,7 +69,7 @@ function InternalInlineSourceSetup({
         setCurrentView('selection')
         setSelectedSource(null)
         onClear()
-        onComplete?.()
+        onSourceAdded?.()
     }
 
     const handleBack = (): void => {
@@ -92,11 +98,14 @@ function InternalInlineSourceSetup({
                             {sourceItems.map((source) => (
                                 <div
                                     key={source.id}
-                                    className="flex items-center gap-3 p-3 rounded-lg border border-border bg-bg-light cursor-pointer"
+                                    className={`flex items-center gap-3 p-3 rounded-lg border bg-bg-light cursor-pointer hover:border-primary ${
+                                        source.connected ? 'border-success' : 'border-border'
+                                    }`}
                                     onClick={() => handleSourceSelect(source.id)}
                                 >
                                     <DataWarehouseSourceIcon type={source.id} size="small" disableTooltip />
-                                    <span className="font-medium text-sm">{source.label}</span>
+                                    <span className="font-medium text-sm flex-1">{source.label}</span>
+                                    {source.connected && <IconCheck className="w-4 h-4 text-success shrink-0" />}
                                 </div>
                             ))}
                         </div>
@@ -111,6 +120,14 @@ function InternalInlineSourceSetup({
                                 >
                                     Show {hiddenSources.length} more source
                                     {hiddenSources.length !== 1 ? 's' : ''}
+                                </LemonButton>
+                            </div>
+                        )}
+
+                        {hasConnectedSources && onComplete && (
+                            <div className="flex justify-end pt-2">
+                                <LemonButton type="primary" onClick={onComplete}>
+                                    Continue
                                 </LemonButton>
                             </div>
                         )}
