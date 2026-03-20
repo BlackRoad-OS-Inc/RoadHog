@@ -2347,7 +2347,7 @@ class TestInviteSignupAPI(APIBaseTest):
         # AND then
         self.assertEqual(response.json()["detail"], f"/login?next=/signup/{invite.id}")
 
-    def test_process_social_invite_signup_returns_false_for_nonexistent_invite(self):
+    def test_process_social_invite_signup_returns_none_for_nonexistent_invite(self):
         nonexistent_id = str(uuid.uuid4())
         result = process_social_invite_signup(mock.MagicMock(), nonexistent_id, "test@example.com", "Test User")
-        self.assertFalse(result)
+        self.assertIsNone(result)
