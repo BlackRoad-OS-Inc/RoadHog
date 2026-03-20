@@ -116,6 +116,9 @@ export default defineConfig(({ mode }) => {
             global: 'globalThis',
             'process.env.NODE_ENV': isDev ? '"development"' : '"production"',
             'process.env': '{}',
+            'process.browser': 'true',
+            'process.version': '""',
+            'process.nextTick': '(cb => Promise.resolve().then(cb))',
         },
         css: {
             devSourcemap: true,

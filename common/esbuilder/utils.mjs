@@ -213,6 +213,9 @@ export const commonConfig = {
         global: 'globalThis',
         'process.env.NODE_ENV': isDev ? '"development"' : '"production"',
         'process.env': '{}',
+        'process.browser': 'true',
+        'process.version': '""',
+        'process.nextTick': '(cb => Promise.resolve().then(cb))',
     },
     loader: {
         '.ttf': 'file',
