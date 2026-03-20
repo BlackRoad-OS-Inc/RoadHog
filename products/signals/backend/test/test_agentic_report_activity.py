@@ -3,6 +3,7 @@ import random
 from datetime import UTC, datetime
 
 import pytest
+from unittest.mock import patch
 
 import pytest_asyncio
 from asgiref.sync import sync_to_async
@@ -258,55 +259,56 @@ async def test_run_agentic_report_activity_persists_artefacts(monkeypatch, ateam
         fake_run_multi_turn_research,
     )
 
-    result = await run_agentic_report_activity(
-        RunAgenticReportInput(
-            team_id=ateam.id,
-            report_id=str(report.id),
-            signals=_build_signals(),
-            repo_selection=RepoSelectionResult(
-                repository="posthog/posthog", reason="Single repository connected: posthog/posthog"
-            ),
+    with patch("products.signals.backend.temporal.agentic.report.Heartbeater"):
+        result = await run_agentic_report_activity(
+            RunAgenticReportInput(
+                team_id=ateam.id,
+                report_id=str(report.id),
+                signals=_build_signals(),
+                repo_selection=RepoSelectionResult(
+                    repository="posthog/posthog", reason="Single repository connected: posthog/posthog"
+                ),
+            )
         )
-    )
 
-    assert result.title == "Onboarding funnel completion tracking may be regressing"
-    assert result.choice == ActionabilityChoice.IMMEDIATELY_ACTIONABLE
-    assert result.priority == Priority.P1
-    assert result.already_addressed is False
-    assert result.repository == "posthog/posthog"
+        assert result.title == "Onboarding funnel completion tracking may be regressing"
+        assert result.choice == ActionabilityChoice.IMMEDIATELY_ACTIONABLE
+        assert result.priority == Priority.P1
+        assert result.already_addressed is False
+        assert result.repository == "posthog/posthog"
 
-    artefacts = await database_sync_to_async(
-        lambda: list(SignalReportArtefact.objects.filter(report=report).order_by("type", "created_at"))
-    )()
-    assert [artefact.type for artefact in artefacts] == [
-        SignalReportArtefact.ArtefactType.ACTIONABILITY_JUDGMENT,
-        SignalReportArtefact.ArtefactType.PRIORITY_JUDGMENT,
-        SignalReportArtefact.ArtefactType.REPO_SELECTION,
-        SignalReportArtefact.ArtefactType.SIGNAL_FINDING,
-        SignalReportArtefact.ArtefactType.SIGNAL_FINDING,
-    ]
+        artefacts = await database_sync_to_async(
+            lambda: list(SignalReportArtefact.objects.filter(report=report).order_by("type", "created_at"))
+        )()
+        assert [artefact.type for artefact in artefacts] == [
+            SignalReportArtefact.ArtefactType.ACTIONABILITY_JUDGMENT,
+            SignalReportArtefact.ArtefactType.PRIORITY_JUDGMENT,
+            SignalReportArtefact.ArtefactType.REPO_SELECTION,
+            SignalReportArtefact.ArtefactType.SIGNAL_FINDING,
+            SignalReportArtefact.ArtefactType.SIGNAL_FINDING,
+        ]
 
-    actionability_content = json.loads(artefacts[0].content)
-    assert actionability_content == {
-        "actionability": "immediately_actionable",
-        "explanation": "The issue has a clear code path and supporting event-volume evidence.",
-        "already_addressed": False,
-    }
+        actionability_content = json.loads(artefacts[0].content)
+        assert actionability_content == {
+            "actionability": "immediately_actionable",
+            "explanation": "The issue has a clear code path and supporting event-volume evidence.",
+            "already_addressed": False,
+        }
 
-    priority_content = json.loads(artefacts[1].content)
-    assert priority_content == {
-        "priority": "P1",
-        "explanation": "The regression affects a core onboarding flow and should be addressed quickly.",
-    }
+        priority_content = json.loads(artefacts[1].content)
+        assert priority_content == {
+            "priority": "P1",
+            "explanation": "The regression affects a core onboarding flow and should be addressed quickly.",
+        }
 
-    repo_selection_content = json.loads(artefacts[2].content)
-    assert repo_selection_content == {
-        "repository": "posthog/posthog",
-        "reason": "Single repository connected: posthog/posthog",
-    }
+        repo_selection_content = json.loads(artefacts[2].content)
+        assert repo_selection_content == {
+            "repository": "posthog/posthog",
+            "reason": "Single repository connected: posthog/posthog",
+        }
 
-    finding_contents = [json.loads(artefact.content) for artefact in artefacts[3:]]
-    assert [finding["signal_id"] for finding in finding_contents] == ["sig-1", "sig-2"]
+        finding_contents = [json.loads(artefact.content) for artefact in artefacts[3:]]
+        assert [finding["signal_id"] for finding in finding_contents] == ["sig-1", "sig-2"]
 
 
 @pytest.mark.asyncio
@@ -332,15 +334,18 @@ async def test_run_agentic_report_activity_does_not_persist_partial_artefacts(mo
         fake_run_multi_turn_research,
     )
 
-    with pytest.raises(RuntimeError, match="sandbox failed"):
-        await run_agentic_report_activity(
-            RunAgenticReportInput(
-                team_id=ateam.id,
-                report_id=str(report.id),
-                signals=_build_signals()[:1],
-                repo_selection=RepoSelectionResult(repository="posthog/posthog", reason="test"),
+    with patch("products.signals.backend.temporal.agentic.report.Heartbeater"):
+        with pytest.raises(RuntimeError, match="sandbox failed"):
+            await run_agentic_report_activity(
+                RunAgenticReportInput(
+                    team_id=ateam.id,
+                    report_id=str(report.id),
+                    signals=_build_signals()[:1],
+                    repo_selection=RepoSelectionResult(repository="posthog/posthog", reason="test"),
+                )
             )
-        )
 
-    artefact_count = await database_sync_to_async(lambda: SignalReportArtefact.objects.filter(report=report).count())()
-    assert artefact_count == 0
+        artefact_count = await database_sync_to_async(
+            lambda: SignalReportArtefact.objects.filter(report=report).count()
+        )()
+        assert artefact_count == 0
