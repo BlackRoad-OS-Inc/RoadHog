@@ -433,6 +433,18 @@ Respond with a JSON object matching this schema:
 </jsonschema>"""
 
 
+def _enforce_signal_id(finding: SignalFinding, expected_id: str) -> SignalFinding:
+    """Correct the finding's signal_id if the model returned a wrong one."""
+    if finding.signal_id != expected_id:
+        logger.exception(
+            "Signal ID mismatch: expected %s, got %s — correcting",
+            expected_id,
+            finding.signal_id,
+        )
+        finding = finding.model_copy(update={"signal_id": expected_id})
+    return finding
+
+
 async def run_multi_turn_research(
     signals: list[SignalData],
     context: CustomPromptSandboxContext,
@@ -486,6 +498,7 @@ async def run_multi_turn_research(
         verbose=verbose,
         output_fn=output_fn,
     )
+    first_finding = _enforce_signal_id(first_finding, signals[0].signal_id)
     findings: list[SignalFinding] = [first_finding]
     if output_fn:
         output_fn(f"Signal 1/{total} done: {first_finding.signal_id}")
@@ -506,6 +519,7 @@ async def run_multi_turn_research(
             SignalFinding,
             label=f"signal_{i}_of_{total}",
         )
+        finding = _enforce_signal_id(finding, signal.signal_id)
         findings.append(finding)
         if output_fn:
             output_fn(f"Signal {i}/{total} done: {finding.signal_id}")
