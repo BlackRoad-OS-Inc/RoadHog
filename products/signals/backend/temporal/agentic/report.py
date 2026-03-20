@@ -60,8 +60,6 @@ async def signals_agentic_report_gate_activity(input: SignalsAgenticReportGateIn
                     "id": str(team.id),
                 },
             },
-            only_evaluate_locally=True,
-            send_feature_flag_events=False,
         )
     except Exception:
         logger.exception(

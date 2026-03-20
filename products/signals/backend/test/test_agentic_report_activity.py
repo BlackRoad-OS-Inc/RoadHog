@@ -145,8 +145,8 @@ async def test_signals_agentic_report_gate_activity(monkeypatch, ateam, flag_ena
     assert captured["key"] == "signals-agentic-report-generation"
     assert captured["distinct_id"] == str(ateam.uuid)
     assert captured["groups"] == {"organization": str(ateam.organization_id), "project": str(ateam.id)}
-    assert captured["only_evaluate_locally"] is True
-    assert captured["send_feature_flag_events"] is False
+    assert captured["only_evaluate_locally"] is False
+    assert captured["send_feature_flag_events"] is True
 
 
 @pytest.mark.asyncio
