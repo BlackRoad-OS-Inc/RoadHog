@@ -1455,7 +1455,8 @@ GROUP_DATA = [
         ],
     ),
     # ==================================================================================
-    # ERROR TRACKING SIGNALS — groups 41–45
+    # ERROR TRACKING SIGNALS — groups 41–46
+    # ==================================================================================
     # ==================================================================================
     # --- Group 41: ClickHouse query memory limit exceeded in marketing analytics (3 signals, error tracking only) ---
     EvalGroupSpec(
