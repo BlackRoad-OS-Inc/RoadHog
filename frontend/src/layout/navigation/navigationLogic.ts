@@ -129,7 +129,7 @@ export const navigationLogic = kea<navigationLogicType>([
                 proxyRecords,
                 hasClosedNotice
             ): ProjectNoticeVariant | null => {
-                if (!organization) {
+                if (!organization || !projectNoticesAcknowledged) {
                     return null
                 }
 
