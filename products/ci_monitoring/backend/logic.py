@@ -106,20 +106,31 @@ def get_test_executions(*, test_case_id: uuid.UUID, team_id: int, limit: int = 1
 
 def update_flake_scores(*, repo_id: uuid.UUID, team_id: int) -> None:
     """Recompute rolling 30-day flake scores for all tests in a repo."""
+    from django.db.models import Count, Q
+
     cutoff = timezone.now() - datetime.timedelta(days=30)
 
-    test_cases = TestCase.objects.filter(repo_id=repo_id, team_id=team_id)
-    for tc in test_cases:
-        recent = TestExecution.objects.filter(test_case=tc, created_at__gte=cutoff)
-        total = recent.count()
-        if total == 0:
-            continue
+    annotated = (
+        TestCase.objects.filter(repo_id=repo_id, team_id=team_id)
+        .annotate(
+            recent_total=Count("executions", filter=Q(executions__created_at__gte=cutoff)),
+            recent_flaky=Count(
+                "executions",
+                filter=Q(executions__created_at__gte=cutoff, executions__status=TestExecutionStatus.FLAKY),
+            ),
+        )
+        .filter(recent_total__gt=0)
+    )
 
-        flaky_count = recent.filter(status=TestExecutionStatus.FLAKY).count()
-        tc.flake_score = round((flaky_count / total) * 100, 2)
-        tc.total_runs = total
-        tc.total_flakes = flaky_count
-        tc.save(update_fields=["flake_score", "total_runs", "total_flakes", "last_seen_at"])
+    to_update = []
+    for tc in annotated:
+        tc.flake_score = round((tc.recent_flaky / tc.recent_total) * 100, 2)
+        tc.total_runs = tc.recent_total
+        tc.total_flakes = tc.recent_flaky
+        to_update.append(tc)
+
+    if to_update:
+        TestCase.objects.bulk_update(to_update, ["flake_score", "total_runs", "total_flakes"])
 
 
 # --- Master Streak ---
@@ -235,8 +246,8 @@ def create_quarantine(
     return q
 
 
-def resolve_quarantine(*, quarantine_id: uuid.UUID, resolved_by_id: int) -> Quarantine:
-    q = Quarantine.objects.get(id=quarantine_id)
+def resolve_quarantine(*, quarantine_id: uuid.UUID, team_id: int, resolved_by_id: int) -> Quarantine:
+    q = Quarantine.objects.get(id=quarantine_id, team_id=team_id)
     q.state = QuarantineState.RESOLVED
     q.resolved_at = timezone.now()
     q.resolved_by_id = resolved_by_id

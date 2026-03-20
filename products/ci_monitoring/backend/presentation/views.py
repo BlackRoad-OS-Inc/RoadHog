@@ -1,5 +1,7 @@
 """DRF views for ci_monitoring."""
 
+from __future__ import annotations
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -77,7 +79,7 @@ class TestCaseViewSet(TeamAndOrgViewSetMixin, viewsets.GenericViewSet):
             team_id=self.team_id,
             repo_id=request.query_params.get("repo_id"),
             suite=request.query_params.get("suite"),
-            min_flake_score=float(request.query_params.get("min_flake_score", 0)),
+            min_flake_score=_safe_float(request.query_params.get("min_flake_score"), 0.0),
         )
         return Response(TestCaseSerializer(tests, many=True).data)
 
@@ -118,7 +120,17 @@ class QuarantineViewSet(TeamAndOrgViewSetMixin, viewsets.GenericViewSet):
         quarantine = api.resolve_quarantine(
             contracts.ResolveQuarantineInput(
                 quarantine_id=kwargs["pk"],
+                team_id=self.team_id,
                 resolved_by_id=request.user.id,
             )
         )
         return Response(QuarantineSerializer(quarantine).data)
+
+
+def _safe_float(value: str | None, default: float) -> float:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default

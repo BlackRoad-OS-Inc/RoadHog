@@ -50,6 +50,7 @@ class CreateQuarantineInput:
 @dataclass(frozen=True)
 class ResolveQuarantineInput:
     quarantine_id: uuid.UUID
+    team_id: int
     resolved_by_id: int
 
 

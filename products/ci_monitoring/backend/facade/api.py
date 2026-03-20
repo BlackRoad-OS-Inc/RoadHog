@@ -22,6 +22,7 @@ import uuid
 from django.utils import timezone
 
 from .. import logic
+from ..models import Quarantine
 from . import contracts
 from .enums import QuarantineState
 
@@ -84,8 +85,6 @@ def _to_test_case(tc, *, include_quarantine: bool = False) -> contracts.TestCase
     if include_quarantine:
         active_q = getattr(tc, "_active_quarantine", None)
         if active_q is None:
-            from ..models import Quarantine
-
             active_q = Quarantine.objects.filter(test_case=tc, state=QuarantineState.ACTIVE).first()
         if active_q:
             quarantine = _to_quarantine(active_q)
@@ -191,13 +190,24 @@ def list_tests_needing_attention(
     min_flake_score: float = 0.0,
     limit: int = 50,
 ) -> list[contracts.TestCase]:
-    tests = logic.list_tests_needing_attention(
-        team_id=team_id,
-        repo_id=repo_id,
-        suite=suite,
-        min_flake_score=min_flake_score,
-        limit=limit,
+    tests = list(
+        logic.list_tests_needing_attention(
+            team_id=team_id,
+            repo_id=repo_id,
+            suite=suite,
+            min_flake_score=min_flake_score,
+            limit=limit,
+        )
     )
+
+    # Prefetch active quarantines to avoid N+1
+    test_ids = [t.id for t in tests]
+    quarantines = {
+        q.test_case_id: q for q in Quarantine.objects.filter(test_case_id__in=test_ids, state=QuarantineState.ACTIVE)
+    }
+    for t in tests:
+        t._active_quarantine = quarantines.get(t.id)
+
     return [_to_test_case(t, include_quarantine=True) for t in tests]
 
 
@@ -245,6 +255,7 @@ def create_quarantine(input: contracts.CreateQuarantineInput) -> contracts.Quara
 def resolve_quarantine(input: contracts.ResolveQuarantineInput) -> contracts.Quarantine:
     q = logic.resolve_quarantine(
         quarantine_id=input.quarantine_id,
+        team_id=input.team_id,
         resolved_by_id=input.resolved_by_id,
     )
     return _to_quarantine(q)
