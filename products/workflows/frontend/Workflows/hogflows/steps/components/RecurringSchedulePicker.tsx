@@ -180,10 +180,17 @@ function computePreviewOccurrences(state: ScheduleState, startsAt: string, count
     try {
         // Build the RRule directly from state rather than re-parsing from string,
         // because fromString() can lose negative values like BYMONTHDAY=-1
+        // Feed rrule.js the local time components as UTC so all occurrences
+        // stay at the same local time (e.g. "7:00 AM" stays "7:00 AM" across DST).
+        // The server does proper timezone-aware expansion for actual execution.
+        const local = dayjs(startsAt)
+        const dtstartLocal = new Date(
+            Date.UTC(local.year(), local.month(), local.date(), local.hour(), local.minute(), 0)
+        )
         const options: Partial<ConstructorParameters<typeof RRule>[0]> = {
             freq: frequencyToRRule(state.frequency),
             interval: state.interval,
-            dtstart: new Date(startsAt),
+            dtstart: dtstartLocal,
         }
 
         if (state.frequency === 'weekly' && state.weekdays.length > 0) {
@@ -273,7 +280,7 @@ function OccurrencesList({ occurrences, isFinite }: { occurrences: Date[]; isFin
                         }`}
                     />
                     <span className={isFirst || isLast ? 'font-semibold' : 'text-muted'}>
-                        {dayjs(date).utc().format('ddd, MMM D YYYY · h:mm A')} UTC
+                        {dayjs(date).utc().format('dddd, MMMM D YYYY · h:mm A')}
                     </span>
                 </div>
                 {isFirst && (
@@ -366,7 +373,7 @@ export function RecurringSchedulePicker({
     const monthlyNthLabel = startsAt
         ? (() => {
               const { n, weekday } = getNthWeekdayOfMonth(dayjs(startsAt))
-              return `${NTH_LABELS[n - 1]} ${WEEKDAY_LABELS[weekday]}`
+              return `${NTH_LABELS[n - 1]} ${WEEKDAY_FULL_LABELS[weekday]}`
           })()
         : 'Nth weekday'
 
@@ -376,12 +383,17 @@ export function RecurringSchedulePicker({
                 <div className="flex-1 min-w-0">
                     <LemonCalendarSelectInput
                         buttonProps={{ fullWidth: true }}
+                        clearable
                         value={startsAt ? dayjs(startsAt) : null}
                         onChange={(date) => {
                             const newStartsAt = date ? date.toISOString() : null
                             setLocalStartsAt(newStartsAt)
-                            if (isRepeating && newStartsAt) {
-                                emitChange(state, newStartsAt, timezone)
+                            if (isRepeating) {
+                                if (newStartsAt) {
+                                    emitChange(state, newStartsAt, timezone)
+                                } else {
+                                    onChange(null)
+                                }
                             }
                             onScheduledAtChange?.(newStartsAt)
                         }}
@@ -567,7 +579,7 @@ export function RecurringSchedulePicker({
                         startsAt &&
                         dayjs(startsAt).date() >= 29 && (
                             <div className="text-xs text-warning">
-                                Some months don't have a {dayjs(startsAt).format('Do')} — those months will be skipped.
+                                Some months don't have a {dayjs(startsAt).format('Do')}. Those months will be skipped.
                                 Use "Last day" to run on the last day of every month instead.
                             </div>
                         )}

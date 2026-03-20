@@ -312,6 +312,7 @@ def _replenish_scheduled_runs(schedule: HogFlowSchedule, team_id: int) -> None:
     occurrences = compute_next_occurrences(
         rrule_string=schedule.rrule,
         starts_at=schedule.starts_at,
+        timezone_str=schedule.timezone,
         after=after,
     )
 

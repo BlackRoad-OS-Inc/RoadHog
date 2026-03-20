@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon'
 import { Pool } from 'pg'
 import { RRule } from 'rrule'
 
@@ -249,7 +250,13 @@ export class HogFlowScheduleService {
         const needed = this.windowSize - pendingCount
         const after = lastRunResult.rows[0]?.scheduled_at || null
         const afterDate = after ? new Date(after) : new Date()
-        const occurrences = this.computeOccurrences(sched.rrule, new Date(sched.starts_at), afterDate, needed)
+        const occurrences = this.computeOccurrences(
+            sched.rrule,
+            new Date(sched.starts_at),
+            afterDate,
+            needed,
+            sched.timezone
+        )
 
         if (occurrences.length === 0) {
             // RRULE is exhausted
@@ -280,17 +287,62 @@ export class HogFlowScheduleService {
         )
     }
 
-    private computeOccurrences(rruleStr: string, dtstart: Date, after: Date, count: number): Date[] {
-        // Build rule with dtstart — must construct fresh to include dtstart
+    private computeOccurrences(
+        rruleStr: string,
+        startsAt: Date,
+        after: Date,
+        count: number,
+        timezone: string = 'UTC'
+    ): Date[] {
+        // Convert startsAt to the schedule's timezone for RRULE expansion
+        // so that "9 AM Europe/Prague" stays at 9 AM local across DST changes
+        const startsAtLocal = DateTime.fromJSDate(startsAt, { zone: 'utc' }).setZone(timezone)
+        const dtstart = new Date(
+            Date.UTC(
+                startsAtLocal.year,
+                startsAtLocal.month - 1,
+                startsAtLocal.day,
+                startsAtLocal.hour,
+                startsAtLocal.minute,
+                startsAtLocal.second
+            )
+        )
+
         const parsed = RRule.fromString(rruleStr)
         const rule = new RRule({ ...parsed.origOptions, dtstart })
 
-        // Use between() which respects COUNT/UNTIL, unlike after() which ignores them
-        // Set a far-future upper bound for "never ending" rules
-        const upperBound = new Date(after.getTime() + 365 * 24 * 60 * 60 * 1000 * 10) // 10 years
-        const allOccurrences = rule.between(after, upperBound, false) // inc=false excludes exact match
+        // Convert after to the same "fake UTC" representation for comparison
+        const afterLocal = DateTime.fromJSDate(after, { zone: 'utc' }).setZone(timezone)
+        const afterFakeUtc = new Date(
+            Date.UTC(
+                afterLocal.year,
+                afterLocal.month - 1,
+                afterLocal.day,
+                afterLocal.hour,
+                afterLocal.minute,
+                afterLocal.second
+            )
+        )
 
-        return allOccurrences.slice(0, count)
+        // Use between() which respects COUNT/UNTIL
+        const upperBound = new Date(afterFakeUtc.getTime() + 365 * 24 * 60 * 60 * 1000 * 10)
+        const fakeUtcOccurrences = rule.between(afterFakeUtc, upperBound, false)
+
+        // Convert back from "fake UTC" (really local times) to actual UTC
+        return fakeUtcOccurrences.slice(0, count).map((d) => {
+            const localDt = DateTime.fromObject(
+                {
+                    year: d.getUTCFullYear(),
+                    month: d.getUTCMonth() + 1,
+                    day: d.getUTCDate(),
+                    hour: d.getUTCHours(),
+                    minute: d.getUTCMinutes(),
+                    second: d.getUTCSeconds(),
+                },
+                { zone: timezone }
+            )
+            return localDt.toUTC().toJSDate()
+        })
     }
 
     isRunning(): boolean {
