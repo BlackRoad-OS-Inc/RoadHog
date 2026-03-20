@@ -58,7 +58,7 @@ def _render_error_tracking_description(title: str, body: str, source_type: str) 
     return f"{preamble}:\n{title}\n\n```\n{body}\n```"
 
 
-def _noop_emitter(_team_id: int, _record: dict[str, Any]) -> None:
+def _noop_emitter(_team_id: int, _record: dict[str, Any]) -> SignalEmitterOutput | None:
     return None
 
 
