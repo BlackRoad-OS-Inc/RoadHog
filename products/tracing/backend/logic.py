@@ -236,7 +236,6 @@ class TraceSpansQueryRunner(AnalyticsQueryRunner[TraceSpansQueryResponse]):
             allow_experimental_object_type=False,
             allow_experimental_join_condition=False,
             transform_null_in=False,
-            allow_experimental_analyzer=True,
             max_bytes_to_read=None,
             read_overflow_mode=None,
         )

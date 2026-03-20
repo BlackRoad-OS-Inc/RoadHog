@@ -54,7 +54,7 @@ class SpansViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.ViewSet)
             rootSpans=query_data.get("rootSpans", True),
         )
 
-        runner = TraceSpansQueryRunner(spans_query, self.team, request=request)
+        runner = TraceSpansQueryRunner(spans_query, self.team)
         response = runner.run(ExecutionMode.CALCULATE_BLOCKING_ALWAYS)
         assert isinstance(response, TraceSpansQueryResponse | CachedTraceSpansQueryResponse)
 
@@ -92,7 +92,7 @@ class SpansViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.ViewSet)
             rootSpans=False,
         )
 
-        runner = TraceSpansQueryRunner(spans_query, self.team, request=request)
+        runner = TraceSpansQueryRunner(spans_query, self.team)
         response = runner.run(ExecutionMode.CALCULATE_BLOCKING_ALWAYS)
         assert isinstance(response, TraceSpansQueryResponse | CachedTraceSpansQueryResponse)
 
