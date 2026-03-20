@@ -43,6 +43,24 @@ logger = structlog.get_logger(__name__)
 V = TypeVar("V", ExperimentVariantTrendsBaseStats, ExperimentVariantFunnelsBaseStats, ExperimentStatsBase)
 
 
+def get_experiment_query_hogql(experiment_query_ast: ast.SelectQuery, team: Team) -> str:
+    """
+    Generate HogQL for debugging from experiment query AST with proper limit applied
+    """
+    executor = HogQLQueryExecutor(
+        query=experiment_query_ast,
+        team=team,
+        modifiers=create_default_modifiers_for_team(team),
+    )
+    # Generate HogQL - this internally calls _apply_limit() so the limit will match ClickHouse
+    executor._parse_query()
+    executor._process_variables()
+    executor._process_placeholders()
+    executor._apply_limit()
+    executor._generate_hogql()
+    return executor.hogql
+
+
 def get_experiment_query_sql(experiment_query_ast: ast.SelectQuery, team: Team) -> str:
     """
     Generate raw SQL for debugging from experiment query AST
