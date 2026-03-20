@@ -83,6 +83,7 @@ depends_on = [
     "products.logs",
     "products.marketing_analytics",
     "products.mcp_store",
+    "products.messaging",
     "products.notebooks",
     "products.notifications",
     "products.posthog_ai",
@@ -439,8 +440,4 @@ interfaces = [
 [[modules]]
 path = "products.messaging"
 depends_on = ["posthog"]
-layer = "products"
-interfaces = [
-    "products.messaging.backend.facade",
-    "products.messaging.backend.presentation.views",
-]
+layer = "non_isolated"
