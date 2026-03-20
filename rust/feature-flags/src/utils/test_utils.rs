@@ -173,7 +173,7 @@ pub async fn setup_hypercache_reader(
 fn setup_mock_hypercache_reader(
     redis_client: Arc<dyn RedisClientTrait + Send + Sync>,
     namespace: &str,
-    value: &str,
+    object_name: &str,
     token_based: bool,
 ) -> Arc<HyperCacheReader> {
     use common_s3::{S3Client, S3Error};
@@ -189,7 +189,7 @@ fn setup_mock_hypercache_reader(
 
     let mut config = HyperCacheConfig::new(
         namespace.to_string(),
-        value.to_string(),
+        object_name.to_string(),
         "us-east-1".to_string(),
         "posthog".to_string(),
     );
