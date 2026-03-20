@@ -2,7 +2,7 @@ from posthog.clickhouse.client.migration_tools import NodeRole, run_sql_with_exc
 from posthog.models.event.sql import EVENTS_TABLE_JSON_MV_SQL, KAFKA_EVENTS_TABLE_JSON_SQL
 
 ALTER_EVENTS_TABLE_ADD_COLUMN = """
-ALTER TABLE IF EXISTS {table_name}
+ALTER TABLE {table_name}
     ADD COLUMN IF NOT EXISTS validated_schema_version Int16 DEFAULT 0
 """
 
