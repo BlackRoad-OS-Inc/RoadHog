@@ -137,7 +137,8 @@ class PostHogSCIMGroup(SCIMGroup):
                     RoleMembership.objects.get_or_create(
                         role=role, user=user, defaults={"organization_member": org_membership}
                     )
-            except User.DoesNotExist:
+            except (User.DoesNotExist, ValueError):
+                # Silently skip non-user members (e.g., nested group references from IdPs)
                 continue
 
         # Remove members no longer in the group
@@ -231,7 +232,8 @@ class PostHogSCIMGroup(SCIMGroup):
                         RoleMembership.objects.get_or_create(
                             role=self.obj, user=user, defaults={"organization_member": org_membership}
                         )
-                    except User.DoesNotExist:
+                    except (User.DoesNotExist, ValueError):
+                        # Silently skip non-user members (e.g., nested group references from IdPs)
                         continue
 
     def handle_remove(self, path: AttrPath, value: Union[str, list, dict], operation: dict) -> None:
