@@ -1,7 +1,13 @@
 import * as d3 from 'd3'
 
-import { VOLUME_SPARKLINE_X_AXIS_RESERVE_PX } from './sparklineDomain'
 import type { SparklineData, SparklineDatum, SparklineEvent, VolumeSparklineXAxisMode } from './types'
+
+/** Bottom reserve for tick labels (px) by x-axis mode. */
+const VOLUME_SPARKLINE_X_AXIS_RESERVE_PX: Record<VolumeSparklineXAxisMode, number> = {
+    full: 26,
+    minimal: 2,
+    none: 0,
+}
 import { renderVolumeSparklineEventMarkers } from './volumeSparklineEvents'
 
 const STRIPE_CELL = 12
