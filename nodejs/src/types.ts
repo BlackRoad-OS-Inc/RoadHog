@@ -262,29 +262,13 @@ export interface RawOrganization {
 // NOTE: We don't need to list all options here - only the ones we use
 export type OrganizationAvailableFeature = 'group_analytics' | 'data_pipelines' | 'zapier'
 
-export interface PropertyValidationRules {
-    enum?: string[]
-    not?: { enum: string[] }
-    minimum?: number
-    exclusiveMinimum?: number
-    maximum?: number
-    exclusiveMaximum?: number
-}
-
-export interface SchemaPropertyConfig {
-    types: string[]
-    is_required: boolean
-}
-
-/** Event schema with enforcement enabled. Includes all properties (required and optional). */
+/** Event schema with enforcement enabled. Only includes required properties since optional properties are not validated. */
 export interface EventSchemaEnforcement {
     event_name: string
     enforcement_mode: 'reject' | 'enforce'
     schema_version: number
-    /** Map from property name to its type config and optionality */
-    properties: Map<string, SchemaPropertyConfig>
-    /** Map from property name to validation rules from each property group (OR semantics across groups) */
-    property_validation_rules: Map<string, PropertyValidationRules[]>
+    /** Map from property name to accepted types (multiple types when property groups disagree) */
+    required_properties: Map<string, string[]>
 }
 
 /** Usable Team model. */
@@ -320,7 +304,7 @@ export interface Team {
     drop_events_older_than_seconds: number | null
     logs_settings?: LogsSettings | null
     extra_settings: Record<string, string | number | boolean> | null
-    schema_validation_disabled: boolean | null
+    schema_validation_disabled?: boolean | null
 }
 
 /** Properties shared by RawEventMessage and EventMessage. */

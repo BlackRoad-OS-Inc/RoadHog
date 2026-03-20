@@ -1,4 +1,4 @@
-import { EventSchemaEnforcement, PropertyValidationRules } from '../types'
+import { EventSchemaEnforcement } from '../types'
 import { PostgresRouter, PostgresUse } from './db/postgres'
 import { LazyLoader } from './lazy-loader'
 
@@ -13,14 +13,12 @@ interface RawSchemaPropertyRow {
     schema_version: number
     property_name: string
     property_types: string[]
-    is_required: boolean
-    validation_rules: object[] | null
 }
 
 /**
  * Manages event schema enforcement configuration for teams.
  *
- * Fetches schemas for events that have enforcement_mode='reject' on their EventDefinition,
+ * Fetches schemas for events that have enforcement_mode='reject' or 'enforce' on their EventDefinition,
  * which are validated at ingestion time.
  */
 /** Map from event_name to schema for O(1) lookups */
@@ -82,14 +80,13 @@ export class EventSchemaEnforcementManager {
                 ed.enforcement_mode,
                 ed.schema_version,
                 p.name as property_name,
-                array_agg(DISTINCT p.property_type ORDER BY p.property_type) as property_types,
-                bool_or(p.is_required) as is_required,
-                jsonb_agg(p.validation_rules) FILTER (WHERE p.validation_rules IS NOT NULL) as validation_rules
+                array_agg(DISTINCT p.property_type ORDER BY p.property_type) as property_types
             FROM posthog_eventdefinition ed
             JOIN posthog_eventschema es ON es.event_definition_id = ed.id
             JOIN posthog_schemapropertygroupproperty p ON p.property_group_id = es.property_group_id
             WHERE ed.team_id = ANY($1)
               AND ed.enforcement_mode IN ('reject', 'enforce')
+              AND p.is_required = true
             GROUP BY ed.team_id, ed.name, ed.enforcement_mode, ed.schema_version, p.name
             ORDER BY ed.team_id, ed.name, p.name`,
             [numericTeamIds],
@@ -123,23 +120,12 @@ export class EventSchemaEnforcementManager {
                     event_name: row.event_name,
                     enforcement_mode: row.enforcement_mode,
                     schema_version: row.schema_version,
-                    properties: new Map(),
-                    property_validation_rules: new Map(),
+                    required_properties: new Map(),
                 }
                 result[teamId].set(row.event_name, schema)
             }
 
-            schema.properties.set(row.property_name, {
-                types: row.property_types,
-                is_required: row.is_required,
-            })
-
-            if (row.validation_rules && row.validation_rules.length > 0) {
-                schema.property_validation_rules.set(
-                    row.property_name,
-                    row.validation_rules as PropertyValidationRules[]
-                )
-            }
+            schema.required_properties.set(row.property_name, row.property_types)
         }
 
         return result
