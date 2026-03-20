@@ -434,3 +434,12 @@ interfaces = [
     "products.metrics.backend.facade",
     "products.metrics.backend.presentation.views",
 ]
+
+[[modules]]
+path = "products.ci_monitoring"
+depends_on = ["posthog"]
+layer = "products"
+interfaces = [
+    "products.ci_monitoring.backend.facade",
+    "products.ci_monitoring.backend.presentation.views",
+]

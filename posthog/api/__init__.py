@@ -24,6 +24,12 @@ import products.marketing_analytics.backend.api as marketing_analytics
 import products.early_access_features.backend.api as early_access_feature
 import products.customer_analytics.backend.api.views as customer_analytics
 import products.data_warehouse.backend.api.fix_hogql as fix_hogql
+from products.ci_monitoring.backend.presentation.views import (
+    CIRunViewSet as CIMonitoringRunViewSet,
+    QuarantineViewSet as CIMonitoringQuarantineViewSet,
+    RepoViewSet as CIMonitoringRepoViewSet,
+    TestCaseViewSet as CIMonitoringTestCaseViewSet,
+)
 from products.data_modeling.backend.api import EdgeViewSet, NodeViewSet
 from products.data_warehouse.backend.api import (
     data_modeling_job,
@@ -1130,6 +1136,31 @@ environments_router.register(
     UserInterviewViewSet,
     "environment_user_interviews",
     ["team_id"],
+)
+
+projects_router.register(
+    r"ci_monitoring/repos",
+    CIMonitoringRepoViewSet,
+    "project_ci_monitoring_repos",
+    ["project_id"],
+)
+projects_router.register(
+    r"ci_monitoring/runs",
+    CIMonitoringRunViewSet,
+    "project_ci_monitoring_runs",
+    ["project_id"],
+)
+projects_router.register(
+    r"ci_monitoring/tests",
+    CIMonitoringTestCaseViewSet,
+    "project_ci_monitoring_tests",
+    ["project_id"],
+)
+projects_router.register(
+    r"ci_monitoring/quarantines",
+    CIMonitoringQuarantineViewSet,
+    "project_ci_monitoring_quarantines",
+    ["project_id"],
 )
 
 projects_router.register(
