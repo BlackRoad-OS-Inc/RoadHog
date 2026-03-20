@@ -9,14 +9,15 @@ from products.conversations.backend.ai.graph import SupportAgentGraph
 
 from ee.hogai.chat_agent.stream_processor import BaseStreamProcessor
 from ee.hogai.core.runner import BaseAgentRunner
-from ee.hogai.utils.types import AssistantNodeName, AssistantState, PartialAssistantState
-from ee.hogai.utils.types.base import ContextMessage
+from ee.hogai.utils.types import AssistantState, PartialAssistantState
+from ee.hogai.utils.types.base import AssistantNodeName, ContextMessage
+from ee.hogai.utils.types.composed import MaxNodeName
 from ee.models import Conversation
 
 SUPPORT_TRIGGER_MESSAGE = "Generate a suggested reply for this support ticket."
 
-STREAMING_NODES = {AssistantNodeName.ROOT}
-VERBOSE_NODES = {AssistantNodeName.ROOT, AssistantNodeName.ROOT_TOOLS}
+STREAMING_NODES: set[MaxNodeName] = {AssistantNodeName.ROOT}
+VERBOSE_NODES: set[MaxNodeName] = {AssistantNodeName.ROOT, AssistantNodeName.ROOT_TOOLS}
 
 
 class SupportAgentRunner(BaseAgentRunner):
