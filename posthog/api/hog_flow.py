@@ -117,7 +117,27 @@ class HogFlowActionSerializer(serializers.Serializer):
                     try:
                         validate_rrule(rrule_str)
                     except (ValueError, TypeError) as e:
-                        raise serializers.ValidationError({"schedule": {"rrule": f"Invalid RRULE: {e}"}})
+                        logger.warning("Invalid RRULE encountered during validation", rrule=rrule_str, error=str(e))
+                        raise serializers.ValidationError({"schedule": {"rrule": "Invalid RRULE."}})
+
+                    # Enforce minimum interval of 1 hour for batch triggers
+                    from dateutil.rrule import (
+                        HOURLY,
+                        MINUTELY,
+                        SECONDLY,
+                        rrulestr as rrulestr_parse,
+                    )
+
+                    parsed_rule = rrulestr_parse(rrule_str)
+                    if parsed_rule._freq in (MINUTELY, SECONDLY):
+                        raise serializers.ValidationError(
+                            {"schedule": {"rrule": "Batch schedules must run at most once per hour."}}
+                        )
+                    if parsed_rule._freq == HOURLY and (parsed_rule._interval or 1) < 1:
+                        raise serializers.ValidationError(
+                            {"schedule": {"rrule": "Batch schedules must run at most once per hour."}}
+                        )
+
                     if not schedule.get("starts_at"):
                         raise serializers.ValidationError({"schedule": {"starts_at": "Start date is required."}})
             else:
