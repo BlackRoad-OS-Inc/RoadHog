@@ -174,7 +174,12 @@ pub struct HyperCacheConfig {
 
 impl HyperCacheConfig {
     /// Create config with explicit settings (defaults django_cache_version to "1")
-    pub fn new(namespace: String, object_name: String, s3_region: String, s3_bucket: String) -> Self {
+    pub fn new(
+        namespace: String,
+        object_name: String,
+        s3_region: String,
+        s3_bucket: String,
+    ) -> Self {
         Self {
             s3_bucket,
             s3_region,
@@ -242,7 +247,10 @@ impl HyperCacheConfig {
                 key_str, self.namespace, self.object_name
             )
         } else {
-            format!("cache/teams/{}/{}/{}", key_str, self.namespace, self.object_name)
+            format!(
+                "cache/teams/{}/{}/{}",
+                key_str, self.namespace, self.object_name
+            )
         }
     }
 }
