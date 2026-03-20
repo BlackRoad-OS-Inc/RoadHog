@@ -32,6 +32,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import APIException
 from rest_framework.request import Request
 from rest_framework.response import Response
+from social_core.exceptions import AuthFailed, AuthMissingParameter
 from social_django.strategy import DjangoStrategy
 from social_django.views import auth
 from two_factor.utils import default_device
@@ -144,9 +145,12 @@ def sso_login(request: HttpRequest, backend: str) -> HttpResponse:
         return redirect(f"/login?error_code=invalid_sso_provider")
 
     if not sso_providers[backend]:
-        return redirect(f"/login?error_code=improperly_configured_sso")
+        return redirect("/login?error_code=improperly_configured_sso")
 
-    return auth(request, backend)
+    try:
+        return auth(request, backend)
+    except (AuthFailed, AuthMissingParameter):
+        return redirect("/login?error_code=improperly_configured_sso")
 
 
 class TwoFactorRequired(APIException):
