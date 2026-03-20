@@ -14398,6 +14398,8 @@ export namespace Schemas {
 
     export type FeatureFlagFilters = {[key: string]: unknown};
 
+    export type FeatureFlagExperimentSetItem = {[key: string]: unknown};
+
     export type FeatureFlagSurveys = {[key: string]: unknown};
 
     export type FeatureFlagFeatures = {[key: string]: unknown};
@@ -14442,7 +14444,7 @@ export namespace Schemas {
       readonly last_modified_by: UserBasic;
       /** @nullable */
       ensure_experience_continuity?: boolean | null;
-      readonly experiment_set: readonly number[];
+      readonly experiment_set: readonly FeatureFlagExperimentSetItem[];
       readonly surveys: FeatureFlagSurveys;
       readonly features: FeatureFlagFeatures;
       rollback_conditions?: unknown | null;
