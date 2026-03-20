@@ -231,6 +231,17 @@ def KAFKA_EVENTS_TABLE_JSON_SQL():
     )
 
 
+# NOTE: All parameters must have defaults - zero-argument calls must remain valid.
+# 8+ frozen migrations and schema.py reference this function without parameters.
+#
+# Override parameters to create separate pipelines that reuse the events schema:
+# - mv_name: unique MV name to avoid conflicts with the main events_json_mv
+# - kafka_table: different Kafka table consuming from a different topic
+# - target_table: different target table for the MV to write to
+# - on_cluster: False when running on specific node roles (e.g., ingestion layer)
+#
+# Example: error_tracking_events_test uses custom values to create a parallel
+# pipeline for validating Node.js ingestion output against the Python pipeline.
 def EVENTS_TABLE_JSON_MV_SQL(
     mv_name="events_json_mv",
     kafka_table="kafka_events_json",

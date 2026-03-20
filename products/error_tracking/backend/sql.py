@@ -2,7 +2,7 @@ from django.conf import settings
 
 from posthog.clickhouse.cluster import ON_CLUSTER_CLAUSE
 from posthog.clickhouse.indexes import index_by_kafka_timestamp
-from posthog.clickhouse.kafka_engine import KAFKA_COLUMNS, KAFKA_COLUMNS_WITH_PARTITION, kafka_engine
+from posthog.clickhouse.kafka_engine import KAFKA_COLUMNS, KAFKA_COLUMNS_WITH_PARTITION, kafka_engine, ttl_period
 from posthog.clickhouse.table_engines import Distributed, ReplacingMergeTree
 from posthog.kafka_client.topics import (
     KAFKA_ERROR_TRACKING_EVENTS_TEST,
@@ -240,11 +240,15 @@ def ERROR_TRACKING_EVENTS_TEST_TABLE_ENGINE():
     return ReplacingMergeTree(ERROR_TRACKING_EVENTS_TEST_TABLE, ver="_timestamp")
 
 
+ERROR_TRACKING_EVENTS_TEST_TTL_DAYS = 30
+
+
 def ERROR_TRACKING_EVENTS_TEST_TABLE_SQL(on_cluster=True):
     return (
         EVENTS_TABLE_BASE_SQL
         + """PARTITION BY toYYYYMM(timestamp)
 ORDER BY (team_id, toDate(timestamp), event, cityHash64(distinct_id), cityHash64(uuid))
+{ttl_period}
 """
     ).format(
         table_name=ERROR_TRACKING_EVENTS_TEST_TABLE,
@@ -254,14 +258,17 @@ ORDER BY (team_id, toDate(timestamp), event, cityHash64(distinct_id), cityHash64
         materialized_columns="",
         indexes=f", {index_by_kafka_timestamp(ERROR_TRACKING_EVENTS_TEST_TABLE)}",
         extra_fields=KAFKA_COLUMNS + INSERTED_AT_COLUMN + KAFKA_CONSUMER_BREADCRUMBS_COLUMN,
+        ttl_period=ttl_period("timestamp", ERROR_TRACKING_EVENTS_TEST_TTL_DAYS, unit="DAY"),
     )
 
 
 def KAFKA_ERROR_TRACKING_EVENTS_TEST_TABLE_SQL(on_cluster=True):
+    # kafka_skip_broken_messages = 0 ensures malformed messages surface as consumer lag
+    # rather than being silently discarded, making pipeline issues visible during validation
     return (
         EVENTS_TABLE_BASE_SQL
         + """
-    SETTINGS kafka_skip_broken_messages = 100
+    SETTINGS kafka_skip_broken_messages = 0
 """
     ).format(
         table_name=ERROR_TRACKING_EVENTS_TEST_KAFKA_TABLE,
