@@ -1,21 +1,23 @@
 import { DateTime } from 'luxon'
 
+import { INGESTION_WARNINGS_OUTPUT, IngestionOutputs } from '../../../ingestion/event-processing/ingestion-outputs'
 import { UUIDT } from '../../../utils/utils'
-import { captureIngestionWarning } from '../utils'
+import { produceIngestionWarning } from '../utils'
 import { PersonContext } from './person-context'
 import { PersonCreateService } from './person-create-service'
 import { createDefaultSyncMergeMode } from './person-merge-types'
 import { PersonPropertiesSizeViolationError } from './repositories/person-repository'
 
 jest.mock('../utils', () => ({
-    captureIngestionWarning: jest.fn().mockResolvedValue(undefined),
+    produceIngestionWarning: jest.fn().mockResolvedValue(undefined),
 }))
 
-const mockCaptureIngestionWarning = captureIngestionWarning as jest.MockedFunction<typeof captureIngestionWarning>
+const mockProduceIngestionWarning = produceIngestionWarning as jest.MockedFunction<typeof produceIngestionWarning>
 
 describe('PersonCreateService', () => {
     let mockPersonStore: any
     let mockKafkaProducer: any
+    let mockOutputs: any
     let personContext: PersonContext
     let personCreateService: PersonCreateService
     const teamId = 123
@@ -26,6 +28,12 @@ describe('PersonCreateService', () => {
         mockKafkaProducer = {
             queueMessages: jest.fn().mockResolvedValue(undefined),
         }
+
+        mockOutputs = new IngestionOutputs({
+            [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+        })
+        // Also add produceMessages mock for handling result.messages
+        jest.spyOn(mockOutputs, 'produceMessages').mockResolvedValue(undefined)
 
         mockPersonStore = {
             createPerson: jest.fn(),
@@ -48,7 +56,7 @@ describe('PersonCreateService', () => {
             'test-distinct-id',
             DateTime.now(),
             true,
-            mockKafkaProducer,
+            mockOutputs,
             mockPersonStore,
             0,
             createDefaultSyncMergeMode()
@@ -103,7 +111,7 @@ describe('PersonCreateService', () => {
 
             expect(person).toEqual(mockPerson)
             expect(created).toBe(true)
-            expect(mockKafkaProducer.queueMessages).toHaveBeenCalledWith(mockResult.messages)
+            expect(mockOutputs.produceMessages).toHaveBeenCalledWith(mockResult.messages)
         })
 
         it('should handle PersonPropertiesSizeViolationError and log ingestion warning', async () => {
@@ -129,8 +137,9 @@ describe('PersonCreateService', () => {
                 )
             ).rejects.toThrow(PersonPropertiesSizeViolationError)
 
-            expect(mockCaptureIngestionWarning).toHaveBeenCalledWith(
+            expect(mockProduceIngestionWarning).toHaveBeenCalledWith(
                 mockKafkaProducer,
+                'ingestion_warnings_test',
                 teamId,
                 'person_properties_size_violation',
                 {
@@ -224,7 +233,7 @@ describe('PersonCreateService', () => {
                 )
             ).rejects.toThrow('Some other database error')
 
-            expect(mockCaptureIngestionWarning).not.toHaveBeenCalled()
+            expect(mockProduceIngestionWarning).not.toHaveBeenCalled()
         })
     })
 })

@@ -1,6 +1,13 @@
 import { DateTime } from 'luxon'
 
 import { createTeam, insertRow, resetTestDatabase } from '../../../../../tests/helpers/sql'
+import { KAFKA_INGESTION_WARNINGS, KAFKA_PERSON, KAFKA_PERSON_DISTINCT_ID } from '../../../../config/kafka-topics'
+import {
+    INGESTION_WARNINGS_OUTPUT,
+    IngestionOutputs,
+    PERSONS_OUTPUT,
+    PERSON_DISTINCT_IDS_OUTPUT,
+} from '../../../../ingestion/event-processing/ingestion-outputs'
 import { Hub, InternalPerson, PropertyUpdateOperation, Team } from '../../../../types'
 import { closeHub, createHub } from '../../../../utils/db/hub'
 import { PostgresRouter, PostgresUse } from '../../../../utils/db/postgres'
@@ -11,6 +18,14 @@ import { PostgresPersonRepository } from './postgres-person-repository'
 import { createPersonUpdateFields, fetchDistinctIdValues, fetchDistinctIds } from './test-helpers'
 
 jest.mock('../../../../utils/logger')
+
+function createTestPersonOutputs(hub: Hub) {
+    return new IngestionOutputs({
+        [PERSONS_OUTPUT]: { topic: KAFKA_PERSON, producer: hub.kafkaProducer },
+        [PERSON_DISTINCT_IDS_OUTPUT]: { topic: KAFKA_PERSON_DISTINCT_ID, producer: hub.kafkaProducer },
+        [INGESTION_WARNINGS_OUTPUT]: { topic: KAFKA_INGESTION_WARNINGS, producer: hub.kafkaProducer },
+    })
+}
 
 describe('PostgresPersonRepository', () => {
     let hub: Hub
@@ -48,7 +63,7 @@ describe('PostgresPersonRepository', () => {
         if (!result.success) {
             throw new Error('Failed to create person')
         }
-        await hub.kafkaProducer.queueMessages(result.messages)
+        await createTestPersonOutputs(hub).produceMessages(result.messages)
         return result.person
     }
 
@@ -212,8 +227,8 @@ describe('PostgresPersonRepository', () => {
             )
 
             expect(kafkaMessages).toHaveLength(2) // One for person, one for distinct ID
-            expect(kafkaMessages[0].topic).toBe('clickhouse_person_test')
-            expect(kafkaMessages[1].topic).toBe('clickhouse_person_distinct_id_test')
+            expect(kafkaMessages[0].output).toBe(PERSONS_OUTPUT)
+            expect(kafkaMessages[1].output).toBe(PERSON_DISTINCT_IDS_OUTPUT)
         })
 
         it('creates a person with multiple distinct IDs', async () => {
@@ -252,9 +267,9 @@ describe('PostgresPersonRepository', () => {
             )
 
             expect(kafkaMessages).toHaveLength(3) // One for person, two for distinct IDs
-            expect(kafkaMessages[0].topic).toBe('clickhouse_person_test')
-            expect(kafkaMessages[1].topic).toBe('clickhouse_person_distinct_id_test')
-            expect(kafkaMessages[2].topic).toBe('clickhouse_person_distinct_id_test')
+            expect(kafkaMessages[0].output).toBe(PERSONS_OUTPUT)
+            expect(kafkaMessages[1].output).toBe(PERSON_DISTINCT_IDS_OUTPUT)
+            expect(kafkaMessages[2].output).toBe(PERSON_DISTINCT_IDS_OUTPUT)
 
             const distinctIds = await fetchDistinctIdValues(hub.postgres, person)
             expect(distinctIds).toHaveLength(2)
@@ -327,7 +342,7 @@ describe('PostgresPersonRepository', () => {
             const messages = await repository.addDistinctId(person, newDistinctId, version)
 
             expect(messages).toHaveLength(1)
-            expect(messages[0].topic).toBe('clickhouse_person_distinct_id_test')
+            expect(messages[0].output).toBe(PERSON_DISTINCT_IDS_OUTPUT)
             expect(messages[0].messages).toHaveLength(1)
 
             const messageValue = parseJSON(messages[0].messages[0].value as string)
@@ -349,7 +364,7 @@ describe('PostgresPersonRepository', () => {
             const messages = await repository.addDistinctId(person, newDistinctId, version)
 
             expect(messages).toHaveLength(1)
-            expect(messages[0].topic).toBe('clickhouse_person_distinct_id_test')
+            expect(messages[0].output).toBe(PERSON_DISTINCT_IDS_OUTPUT)
             expect(messages[0].messages).toHaveLength(1)
 
             const messageValue = parseJSON(messages[0].messages[0].value as string)
@@ -376,7 +391,7 @@ describe('PostgresPersonRepository', () => {
             const person = result.person
             const kafkaMessages = result.messages
 
-            await hub.kafkaProducer.queueMessages(kafkaMessages)
+            await createTestPersonOutputs(hub).produceMessages(kafkaMessages)
 
             // Delete distinct IDs first to avoid FK constraint violation
             await hub.postgres.query(
@@ -394,7 +409,7 @@ describe('PostgresPersonRepository', () => {
 
             // Verify kafka messages are generated
             expect(deleteMessages).toHaveLength(1)
-            expect(deleteMessages[0].topic).toBe('clickhouse_person_test')
+            expect(deleteMessages[0].output).toBe(PERSONS_OUTPUT)
             expect(deleteMessages[0].messages).toHaveLength(1)
 
             const messageValue = parseJSON(deleteMessages[0].messages[0].value as string)
@@ -450,7 +465,7 @@ describe('PostgresPersonRepository', () => {
 
                 // Verify the messages have the correct structure
                 for (const message of result.messages) {
-                    expect(message.topic).toBe('clickhouse_person_distinct_id_test')
+                    expect(message.output).toBe(PERSON_DISTINCT_IDS_OUTPUT)
                     expect(message.messages).toHaveLength(1)
 
                     const messageValue = parseJSON(message.messages[0].value as string)
@@ -537,7 +552,7 @@ describe('PostgresPersonRepository', () => {
 
                 // Verify the messages have the correct structure
                 for (const message of result.messages) {
-                    expect(message.topic).toBe('clickhouse_person_distinct_id_test')
+                    expect(message.output).toBe(PERSON_DISTINCT_IDS_OUTPUT)
                     expect(message.messages).toHaveLength(1)
 
                     const messageValue = parseJSON(message.messages[0].value as string)
@@ -668,7 +683,7 @@ describe('PostgresPersonRepository', () => {
 
                 // Verify the messages have the correct structure
                 for (const message of result.messages) {
-                    expect(message.topic).toBe('clickhouse_person_distinct_id_test')
+                    expect(message.output).toBe(PERSON_DISTINCT_IDS_OUTPUT)
                     expect(message.messages).toHaveLength(1)
 
                     const messageValue = parseJSON(message.messages[0].value as string)
@@ -1702,7 +1717,7 @@ describe('PostgresPersonRepository', () => {
             }
             const targetPerson = result2.person
 
-            await hub.kafkaProducer.queueMessages(kafkaMessagesSourcePerson)
+            await createTestPersonOutputs(hub).produceMessages(kafkaMessagesSourcePerson)
             sourcePersonID = sourcePerson.id
             targetPersonID = targetPerson.id
         })

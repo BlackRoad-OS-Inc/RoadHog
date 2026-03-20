@@ -2,12 +2,18 @@ import { KafkaProducerWrapper } from '../../kafka/producer'
 import { MessageSizeTooLarge } from '../../utils/db/error'
 import { BatchWritingGroupStore } from '../../worker/ingestion/groups/batch-writing-group-store'
 import { FlushResult, PersonsStore } from '../../worker/ingestion/persons/persons-store'
-import { captureIngestionWarning } from '../../worker/ingestion/utils'
+import { produceIngestionWarning } from '../../worker/ingestion/utils'
 import { PipelineResultType } from '../pipelines/results'
 import { createFlushBatchStoresStep } from './flush-batch-stores-step'
+import {
+    INGESTION_WARNINGS_OUTPUT,
+    IngestionOutputs,
+    PERSONS_OUTPUT,
+    PERSON_DISTINCT_IDS_OUTPUT,
+} from './ingestion-outputs'
 
 jest.mock('../../worker/ingestion/utils', () => ({
-    captureIngestionWarning: jest.fn(),
+    produceIngestionWarning: jest.fn(),
 }))
 
 describe('flush-batch-stores-step', () => {
@@ -43,7 +49,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             const batch = [{ id: 1 }, { id: 2 }]
@@ -60,7 +70,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             await step([{ id: 1 }])
@@ -76,7 +90,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             await step([{ id: 1 }])
@@ -89,7 +107,7 @@ describe('flush-batch-stores-step', () => {
             const personMessages: FlushResult[] = [
                 {
                     topicMessage: {
-                        topic: 'person_updates',
+                        output: PERSONS_OUTPUT,
                         messages: [
                             {
                                 key: 'key1',
@@ -111,13 +129,17 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             const results = await step([{ id: 1 }])
 
             expect(mockKafkaProducer.produce).toHaveBeenCalledWith({
-                topic: 'person_updates',
+                topic: 'persons_test',
                 key: Buffer.from('key1'),
                 value: Buffer.from('value1'),
                 headers: {},
@@ -132,7 +154,7 @@ describe('flush-batch-stores-step', () => {
             const personMessages: FlushResult[] = [
                 {
                     topicMessage: {
-                        topic: 'person_updates',
+                        output: PERSONS_OUTPUT,
                         messages: [
                             { key: 'key1', value: 'value1', headers: {} },
                             { key: 'key2', value: 'value2', headers: {} },
@@ -151,7 +173,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             const results = await step([{ id: 1 }])
@@ -167,7 +193,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             const batch = [{ id: 1 }, { id: 2 }, { id: 3 }]
@@ -183,7 +213,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             const results = await step([])
@@ -197,7 +231,7 @@ describe('flush-batch-stores-step', () => {
             const personMessages: FlushResult[] = [
                 {
                     topicMessage: {
-                        topic: 'person_updates',
+                        output: PERSONS_OUTPUT,
                         messages: [{ key: 'key1', value: 'value1', headers: {} }],
                     },
                     teamId: 1,
@@ -213,16 +247,26 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             const results = await step([{ id: 1 }])
 
-            expect(captureIngestionWarning).toHaveBeenCalledWith(mockKafkaProducer, 1, 'message_size_too_large', {
-                eventUuid: 'uuid1',
-                distinctId: 'user1',
-                step: 'flushBatchStoresStep',
-            })
+            expect(produceIngestionWarning).toHaveBeenCalledWith(
+                mockKafkaProducer,
+                'ingestion_warnings_test',
+                1,
+                'message_size_too_large',
+                {
+                    eventUuid: 'uuid1',
+                    distinctId: 'user1',
+                    step: 'flushBatchStoresStep',
+                }
+            )
 
             expect(results).toHaveLength(1)
             expect(results[0].type).toBe(PipelineResultType.OK)
@@ -232,7 +276,7 @@ describe('flush-batch-stores-step', () => {
             const personMessages: FlushResult[] = [
                 {
                     topicMessage: {
-                        topic: 'person_updates',
+                        output: PERSONS_OUTPUT,
                         messages: [{ key: 'key1', value: 'value1', headers: {} }],
                     },
                     teamId: 1,
@@ -250,7 +294,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             const results = await step([{ id: 1 }])
@@ -268,7 +316,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             await expect(step([{ id: 1 }])).rejects.toThrow('Database connection failed')
@@ -282,7 +334,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             await expect(step([{ id: 1 }])).rejects.toThrow('Database connection failed')
@@ -292,7 +348,7 @@ describe('flush-batch-stores-step', () => {
             const personMessages: FlushResult[] = [
                 {
                     topicMessage: {
-                        topic: 'person_updates',
+                        output: PERSONS_OUTPUT,
                         messages: [{ key: null, value: null, headers: {} }],
                     },
                     teamId: 1,
@@ -306,13 +362,17 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             await step([{ id: 1 }])
 
             expect(mockKafkaProducer.produce).toHaveBeenCalledWith({
-                topic: 'person_updates',
+                topic: 'persons_test',
                 key: null,
                 value: null,
                 headers: {},
@@ -323,7 +383,7 @@ describe('flush-batch-stores-step', () => {
             const personMessages: FlushResult[] = [
                 {
                     topicMessage: {
-                        topic: 'person_updates',
+                        output: PERSONS_OUTPUT,
                         messages: [{ key: 'key1', value: 'value1', headers: {} }],
                     },
                     teamId: 1,
@@ -337,7 +397,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             const batch = [{ id: 1 }, { id: 2 }, { id: 3 }]
@@ -377,7 +441,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             await step([{ id: 1 }])
@@ -397,7 +465,7 @@ describe('flush-batch-stores-step', () => {
             const personMessages: FlushResult[] = [
                 {
                     topicMessage: {
-                        topic: 'person_updates',
+                        output: PERSONS_OUTPUT,
                         messages: [
                             {
                                 key: 'string-key',
@@ -417,13 +485,17 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             await step([{ id: 1 }])
 
             expect(mockKafkaProducer.produce).toHaveBeenCalledWith({
-                topic: 'person_updates',
+                topic: 'persons_test',
                 key: Buffer.from('string-key'),
                 value: Buffer.from('string-value'),
                 headers: { header1: 'value1' },
@@ -434,7 +506,7 @@ describe('flush-batch-stores-step', () => {
             const personMessages: FlushResult[] = [
                 {
                     topicMessage: {
-                        topic: 'person_updates',
+                        output: PERSONS_OUTPUT,
                         messages: [
                             { key: 'key1', value: 'value1', headers: {} },
                             { key: 'key2', value: 'value2', headers: {} },
@@ -444,7 +516,7 @@ describe('flush-batch-stores-step', () => {
                 },
                 {
                     topicMessage: {
-                        topic: 'person_distinct_ids',
+                        output: PERSON_DISTINCT_IDS_OUTPUT,
                         messages: [{ key: 'key3', value: 'value3', headers: {} }],
                     },
                     teamId: 2,
@@ -458,7 +530,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             const results = await step([{ id: 1 }])
@@ -474,7 +550,11 @@ describe('flush-batch-stores-step', () => {
             const step = createFlushBatchStoresStep({
                 personsStore: mockPersonsStore,
                 groupStore: mockGroupStore,
-                kafkaProducer: mockKafkaProducer,
+                outputs: new IngestionOutputs({
+                    [PERSONS_OUTPUT]: { topic: 'persons_test', producer: mockKafkaProducer },
+                    [PERSON_DISTINCT_IDS_OUTPUT]: { topic: 'person_distinct_ids_test', producer: mockKafkaProducer },
+                    [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                }),
             })
 
             await expect(step([{ id: 1 }])).rejects.toThrow('DB error')

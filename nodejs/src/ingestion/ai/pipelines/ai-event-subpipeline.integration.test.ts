@@ -8,7 +8,14 @@ import { createTestPluginEvent } from '../../../../tests/helpers/plugin-event'
 import { createTestTeam } from '../../../../tests/helpers/team'
 import { InternalPerson, PropertyUpdateOperation } from '../../../types'
 import { parseJSON } from '../../../utils/json-parse'
-import { AI_EVENTS_OUTPUT, EVENTS_OUTPUT, IngestionOutputs } from '../../event-processing/ingestion-outputs'
+import {
+    AI_EVENTS_OUTPUT,
+    EVENTS_OUTPUT,
+    INGESTION_WARNINGS_OUTPUT,
+    IngestionOutputs,
+    PERSONS_OUTPUT,
+    PERSON_DISTINCT_IDS_OUTPUT,
+} from '../../event-processing/ingestion-outputs'
 import { newPipelineBuilder } from '../../pipelines/builders'
 import { createContext } from '../../pipelines/helpers'
 import { PipelineResultType, ok } from '../../pipelines/results'
@@ -82,6 +89,18 @@ function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) 
                 topic: 'ai_events_topic',
                 producer: { produce: mockProduce } as any,
             },
+            [PERSONS_OUTPUT]: {
+                topic: 'persons_topic',
+                producer: { produce: mockProduce } as any,
+            },
+            [PERSON_DISTINCT_IDS_OUTPUT]: {
+                topic: 'person_distinct_ids_topic',
+                producer: { produce: mockProduce } as any,
+            },
+            [INGESTION_WARNINGS_OUTPUT]: {
+                topic: 'ingestion_warnings_topic',
+                producer: { produce: mockProduce } as any,
+            },
         }),
         teamManager: {
             setTeamIngestedEvent: jest.fn().mockResolvedValue(undefined),
@@ -99,9 +118,6 @@ function buildPipeline(configOverrides: Partial<AiEventSubpipelineConfig> = {}) 
             updatePersonWithPropertiesDiffForUpdate: jest.fn().mockResolvedValue([existingPerson, [], false]),
         } as any,
         groupStore: {} as any,
-        kafkaProducer: {
-            queueMessages: jest.fn().mockResolvedValue(undefined),
-        } as any,
         splitAiEventsConfig: { enabled: false, enabledTeams: '*' },
         groupId: 'test-group',
         topHog: (step) => step,

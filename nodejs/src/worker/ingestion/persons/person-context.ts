@@ -2,10 +2,17 @@ import { DateTime } from 'luxon'
 
 import { PluginEvent, Properties } from '~/plugin-scaffold'
 
-import { KafkaProducerWrapper } from '../../../kafka/producer'
+import {
+    IngestionOutputs,
+    IngestionWarningsOutput,
+    PersonDistinctIdsOutput,
+    PersonsOutput,
+} from '../../../ingestion/event-processing/ingestion-outputs'
 import { Team } from '../../../types'
 import { MergeMode } from './person-merge-types'
 import { PersonsStore } from './persons-store'
+
+export type PersonOutputs = IngestionOutputs<PersonsOutput | PersonDistinctIdsOutput | IngestionWarningsOutput>
 
 /**
  * Lightweight data holder containing all the context needed for person processing.
@@ -21,7 +28,7 @@ export class PersonContext {
         public readonly distinctId: string,
         public readonly timestamp: DateTime,
         public readonly processPerson: boolean, // $process_person_profile flag from the event
-        public readonly kafkaProducer: KafkaProducerWrapper,
+        public readonly outputs: PersonOutputs,
         public readonly personStore: PersonsStore,
         public readonly measurePersonJsonbSize: number = 0,
         public readonly mergeMode: MergeMode,

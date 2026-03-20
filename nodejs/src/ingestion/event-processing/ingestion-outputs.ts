@@ -1,25 +1,9 @@
 import { KafkaProducerWrapper } from '../../kafka/producer'
+import { OutputMessage } from './output-message'
 
-export const EVENTS_OUTPUT = 'events' as const
-export type EventOutput = typeof EVENTS_OUTPUT
-
-export const AI_EVENTS_OUTPUT = 'ai_events' as const
-export type AiEventOutput = typeof AI_EVENTS_OUTPUT
-
-export const HEATMAPS_OUTPUT = 'heatmaps' as const
-export type HeatmapsOutput = typeof HEATMAPS_OUTPUT
-
-export const INGESTION_WARNINGS_OUTPUT = 'ingestion_warnings' as const
-export type IngestionWarningsOutput = typeof INGESTION_WARNINGS_OUTPUT
-
-export const DLQ_OUTPUT = 'dlq' as const
-export type DlqOutput = typeof DLQ_OUTPUT
-
-export const REDIRECT_OUTPUT = 'redirect' as const
-export type RedirectOutput = typeof REDIRECT_OUTPUT
-
-export const GROUPS_OUTPUT = 'groups' as const
-export type GroupsOutput = typeof GROUPS_OUTPUT
+// Re-export all constants, types, and OutputMessage
+export * from './output-types'
+export * from './output-message'
 
 export interface IngestionOutputConfig {
     topic: string
@@ -31,5 +15,28 @@ export class IngestionOutputs<O extends string> {
 
     resolve(output: O): IngestionOutputConfig {
         return this.outputs[output]
+    }
+
+    /** Produce OutputMessages by grouping by output, resolving each to {topic, producer}. */
+    async produceMessages(messages: OutputMessage<O> | OutputMessage<O>[]): Promise<void> {
+        const arr = Array.isArray(messages) ? messages : [messages]
+        const byOutput = new Map<O, OutputMessage<O>['messages']>()
+
+        for (const msg of arr) {
+            const existing = byOutput.get(msg.output)
+            if (existing) {
+                existing.push(...msg.messages)
+            } else {
+                byOutput.set(msg.output, [...msg.messages])
+            }
+        }
+
+        const promises: Promise<void>[] = []
+        for (const [output, msgs] of byOutput) {
+            const { topic, producer } = this.resolve(output)
+            promises.push(producer.queueMessages({ topic, messages: msgs }))
+        }
+
+        await Promise.all(promises)
     }
 }

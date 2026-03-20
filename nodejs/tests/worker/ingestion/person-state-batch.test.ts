@@ -9,7 +9,6 @@ import { Clickhouse } from '~/tests/helpers/clickhouse'
 import { fromInternalPerson } from '~/worker/ingestion/persons/person-update-batch'
 import { PersonsStore } from '~/worker/ingestion/persons/persons-store'
 
-import { TopicMessage } from '../../../src/kafka/producer'
 import {
     ClickHousePerson,
     ClickHousePersonDistinctId2,
@@ -37,6 +36,7 @@ import {
 import { PersonPropertyService } from '../../../src/worker/ingestion/persons/person-property-service'
 import { PostgresPersonRepository } from '../../../src/worker/ingestion/persons/repositories/postgres-person-repository'
 import { fetchDistinctIdValues } from '../../../src/worker/ingestion/persons/repositories/test-helpers'
+import { createTestIngestionOutputs } from '../../helpers/ingestion-outputs'
 import {
     createOrganization,
     createTeam,
@@ -77,13 +77,15 @@ async function createPerson(
     if (!result.success) {
         throw new Error('Failed to create person')
     }
-    await hub.kafkaProducer.queueMessages(result.messages)
+    await createTestIngestionOutputs(hub.kafkaProducer).produceMessages(result.messages)
     return result.person
 }
 
 async function flushPersonStoreToKafka(hub: Hub, personStore: PersonsStore, kafkaAcks: Promise<void>) {
     const kafkaMessages = await personStore.flush()
-    await hub.kafkaProducer.queueMessages(kafkaMessages.map((message) => message.topicMessage))
+    await createTestIngestionOutputs(hub.kafkaProducer).produceMessages(
+        kafkaMessages.map((message) => message.topicMessage)
+    )
     await hub.kafkaProducer.flush()
     await kafkaAcks
     return kafkaMessages
@@ -172,10 +174,12 @@ describe('PersonState.processEvent()', () => {
             ...event,
         }
 
-        const personsStore = new BatchWritingPersonsStore(
-            personRepository,
-            customHub ? customHub.kafkaProducer : hub.kafkaProducer
-        )
+        const producer = customHub ? customHub.kafkaProducer : hub.kafkaProducer
+        const personOutputs = createTestIngestionOutputs(producer)
+        const personsStore = new BatchWritingPersonsStore(personRepository, {
+            producer,
+            topic: 'ingestion_warnings_test',
+        })
 
         const context = new PersonContext(
             fullEvent as any,
@@ -183,7 +187,7 @@ describe('PersonState.processEvent()', () => {
             event.distinct_id!,
             timestampParam,
             processPerson,
-            customHub ? customHub.kafkaProducer : hub.kafkaProducer,
+            personOutputs,
             personsStore,
             0,
             createDefaultSyncMergeMode()
@@ -210,10 +214,12 @@ describe('PersonState.processEvent()', () => {
             ...event,
         }
 
-        const personsStore = new BatchWritingPersonsStore(
-            personRepository,
-            customHub ? customHub.kafkaProducer : hub.kafkaProducer
-        )
+        const producer = customHub ? customHub.kafkaProducer : hub.kafkaProducer
+        const personOutputs = createTestIngestionOutputs(producer)
+        const personsStore = new BatchWritingPersonsStore(personRepository, {
+            producer,
+            topic: 'ingestion_warnings_test',
+        })
 
         const context = new PersonContext(
             fullEvent as PluginEvent,
@@ -221,7 +227,7 @@ describe('PersonState.processEvent()', () => {
             event.distinct_id!,
             timestampParam,
             processPerson,
-            customHub ? customHub.kafkaProducer : hub.kafkaProducer,
+            personOutputs,
             personsStore,
             0,
             createDefaultSyncMergeMode()
@@ -245,9 +251,11 @@ describe('PersonState.processEvent()', () => {
             ...event,
         }
 
+        const producer = customHub ? customHub.kafkaProducer : hub.kafkaProducer
+        const personOutputs = createTestIngestionOutputs(producer)
         const personsStore = new BatchWritingPersonsStore(
             customPersonRepository ?? (customHub ? new PostgresPersonRepository(customHub.postgres) : personRepository),
-            customHub ? customHub.kafkaProducer : hub.kafkaProducer
+            { producer, topic: 'ingestion_warnings_test' }
         )
 
         const context = new PersonContext(
@@ -256,7 +264,7 @@ describe('PersonState.processEvent()', () => {
             event.distinct_id!,
             timestampParam,
             processPerson,
-            customHub ? customHub.kafkaProducer : hub.kafkaProducer,
+            personOutputs,
             personsStore,
             0,
             mergeMode
@@ -1306,7 +1314,10 @@ describe('PersonState.processEvent()', () => {
             // $identify events with different $set properties are processed in the same batch,
             // all $set properties from all events should be applied to the merged person.
 
-            const sharedPersonsStore = new BatchWritingPersonsStore(personRepository, hub.kafkaProducer)
+            const sharedPersonsStore = new BatchWritingPersonsStore(personRepository, {
+                producer: hub.kafkaProducer,
+                topic: 'ingestion_warnings_test',
+            })
 
             const createProcessorWithSharedStore = (event: Partial<PluginEvent>, distinctId: string) => {
                 const fullEvent = {
@@ -1320,7 +1331,7 @@ describe('PersonState.processEvent()', () => {
                     distinctId,
                     timestamp,
                     true,
-                    hub.kafkaProducer,
+                    createTestIngestionOutputs(hub.kafkaProducer),
                     sharedPersonsStore,
                     0,
                     createDefaultSyncMergeMode()
@@ -1426,7 +1437,9 @@ describe('PersonState.processEvent()', () => {
 
             // Flush all at once
             const kafkaMessages = await sharedPersonsStore.flush()
-            await hub.kafkaProducer.queueMessages(kafkaMessages.map((m) => m.topicMessage))
+            await createTestIngestionOutputs(hub.kafkaProducer).produceMessages(
+                kafkaMessages.map((m) => m.topicMessage)
+            )
             await hub.kafkaProducer.flush()
 
             // Verify Postgres person
@@ -1469,7 +1482,10 @@ describe('PersonState.processEvent()', () => {
             // person updates for that distinctId, causing pending property updates to be lost
             // when the batch is flushed.
 
-            const sharedPersonsStore = new BatchWritingPersonsStore(personRepository, hub.kafkaProducer)
+            const sharedPersonsStore = new BatchWritingPersonsStore(personRepository, {
+                producer: hub.kafkaProducer,
+                topic: 'ingestion_warnings_test',
+            })
 
             // Helper to create processor with shared store
             const createProcessorWithSharedStore = (event: Partial<PluginEvent>, distinctId: string) => {
@@ -1484,7 +1500,7 @@ describe('PersonState.processEvent()', () => {
                     distinctId,
                     timestamp,
                     true,
-                    hub.kafkaProducer,
+                    createTestIngestionOutputs(hub.kafkaProducer),
                     sharedPersonsStore,
                     0,
                     createDefaultSyncMergeMode()
@@ -1577,7 +1593,10 @@ describe('PersonState.processEvent()', () => {
             // by another concurrent operation before caching null. If the cache now has data,
             // it returns the cached person instead of overwriting with null.
 
-            const sharedPersonsStore = new BatchWritingPersonsStore(personRepository, hub.kafkaProducer)
+            const sharedPersonsStore = new BatchWritingPersonsStore(personRepository, {
+                producer: hub.kafkaProducer,
+                topic: 'ingestion_warnings_test',
+            })
 
             // Helper to create processor with shared store
             const createProcessorWithSharedStore = (event: Partial<PluginEvent>, distinctId: string) => {
@@ -1592,7 +1611,7 @@ describe('PersonState.processEvent()', () => {
                     distinctId,
                     timestamp,
                     true,
-                    hub.kafkaProducer,
+                    createTestIngestionOutputs(hub.kafkaProducer),
                     sharedPersonsStore,
                     0,
                     createDefaultSyncMergeMode()
@@ -2108,24 +2127,22 @@ describe('PersonState.processEvent()', () => {
             })
 
             // Fake the race by assuming createPerson was called before the addDistinctId creation above
-            jest.spyOn(personRepository, 'addDistinctId').mockImplementation(
-                async (person, distinctId): Promise<TopicMessage[]> => {
-                    await createPerson(
-                        hub,
-                        timestamp,
-                        {},
-                        {},
-                        {},
-                        teamId,
-                        null,
-                        false,
-                        uuidFromDistinctId(teamId, distinctId),
-                        { distinctId }
-                    )
+            jest.spyOn(personRepository, 'addDistinctId').mockImplementation(async (person, distinctId) => {
+                await createPerson(
+                    hub,
+                    timestamp,
+                    {},
+                    {},
+                    {},
+                    teamId,
+                    null,
+                    false,
+                    uuidFromDistinctId(teamId, distinctId),
+                    { distinctId }
+                )
 
-                    return await personRepository.addDistinctId(person, distinctId, 0) // this throws
-                }
-            )
+                return await personRepository.addDistinctId(person, distinctId, 0) // this throws
+            })
 
             const mergeService = personMergeService({
                 event: '$identify',
@@ -2786,7 +2803,8 @@ describe('PersonState.processEvent()', () => {
 
             // Batch mode uses updatePersonsBatch instead of updatePerson
             expect(personRepository.updatePersonsBatch).toHaveBeenCalledTimes(1)
-            expect(hub.kafkaProducer.queueMessages).toHaveBeenCalledTimes(2)
+            // produceMessages groups by output type, so each distinct output is a separate queueMessages call
+            expect(hub.kafkaProducer.queueMessages).toHaveBeenCalledTimes(3)
             // verify Postgres persons
             const persons = sortPersons(await fetchPostgresPersonsH())
             expect(persons.length).toEqual(1)
@@ -4240,7 +4258,10 @@ describe('PersonState.processEvent()', () => {
                         ...event,
                     }
 
-                    const personsStore = new BatchWritingPersonsStore(personRepository, hub.kafkaProducer)
+                    const personsStore = new BatchWritingPersonsStore(personRepository, {
+                        producer: hub.kafkaProducer,
+                        topic: 'ingestion_warnings_test',
+                    })
 
                     const context = new PersonContext(
                         fullEvent as any,
@@ -4248,7 +4269,7 @@ describe('PersonState.processEvent()', () => {
                         event.distinct_id!,
                         timestamp,
                         true, // processPerson
-                        hub.kafkaProducer,
+                        createTestIngestionOutputs(hub.kafkaProducer),
                         personsStore,
                         0,
                         mergeMode

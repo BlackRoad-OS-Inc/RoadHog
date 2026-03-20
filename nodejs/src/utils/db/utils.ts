@@ -1,10 +1,10 @@
 import { Counter } from 'prom-client'
 
-import { TopicMessage } from '~/kafka/producer'
 import { Properties } from '~/plugin-scaffold'
 
 import { defaultConfig } from '../../config/config'
-import { KAFKA_PERSON } from '../../config/kafka-topics'
+import { OutputMessage } from '../../ingestion/event-processing/output-message'
+import { PERSONS_OUTPUT, PersonsOutput } from '../../ingestion/event-processing/output-types'
 import { BasePerson, ClickHousePerson, InternalPerson, RawPerson, TimestampFormat } from '../../types'
 import { logger } from '../../utils/logger'
 import { castTimestampOrNow } from '../../utils/utils'
@@ -122,9 +122,12 @@ export function personInitialAndUTMProperties(properties: Properties): Propertie
     return properties
 }
 
-export function generateKafkaPersonUpdateMessage(person: InternalPerson, isDeleted = false): TopicMessage {
+export function generateKafkaPersonUpdateMessage(
+    person: InternalPerson,
+    isDeleted = false
+): OutputMessage<PersonsOutput> {
     return {
-        topic: KAFKA_PERSON,
+        output: PERSONS_OUTPUT,
         messages: [
             {
                 value: JSON.stringify({

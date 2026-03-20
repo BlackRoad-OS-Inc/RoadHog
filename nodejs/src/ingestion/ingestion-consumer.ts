@@ -5,7 +5,13 @@ import { instrumentFn } from '~/common/tracing/tracing-utils'
 
 import { HogTransformerService } from '../cdp/hog-transformations/hog-transformer.service'
 import { CommonConfig } from '../common/config'
-import { KAFKA_CLICKHOUSE_TOPHOG, KAFKA_GROUPS, KAFKA_INGESTION_WARNINGS } from '../config/kafka-topics'
+import {
+    KAFKA_CLICKHOUSE_TOPHOG,
+    KAFKA_GROUPS,
+    KAFKA_INGESTION_WARNINGS,
+    KAFKA_PERSON,
+    KAFKA_PERSON_DISTINCT_ID,
+} from '../config/kafka-topics'
 import { KafkaConsumer } from '../kafka/consumer'
 import { KafkaProducerWrapper } from '../kafka/producer'
 import { HealthCheckResult, HealthCheckResultError, PluginServerService, RedisPool } from '../types'
@@ -38,6 +44,8 @@ import {
     GROUPS_OUTPUT,
     HEATMAPS_OUTPUT,
     INGESTION_WARNINGS_OUTPUT,
+    PERSONS_OUTPUT,
+    PERSON_DISTINCT_IDS_OUTPUT,
     REDIRECT_OUTPUT,
 } from './event-processing/ingestion-outputs'
 import { parseSplitAiEventsConfig } from './event-processing/split-ai-events-step'
@@ -93,7 +101,7 @@ export class IngestionConsumer {
     private tokenDistinctIdsToDrop: string[] = []
     private tokenDistinctIdsToSkipPersons: string[] = []
     private tokenDistinctIdsToForceOverflow: string[] = []
-    private personsStore: PersonsStore
+    private personsStore!: PersonsStore
     public groupStore!: BatchWritingGroupStore
     private eventIngestionRestrictionManager: EventIngestionRestrictionManager
     private eventSchemaEnforcementManager: EventSchemaEnforcementManager
@@ -168,15 +176,6 @@ export class IngestionConsumer {
 
         this.hogTransformer = deps.hogTransformer
 
-        this.personsStore = new BatchWritingPersonsStore(this.deps.personRepository, this.deps.kafkaProducer, {
-            dbWriteMode: this.config.PERSON_BATCH_WRITING_DB_WRITE_MODE,
-            useBatchUpdates: this.config.PERSON_BATCH_WRITING_USE_BATCH_UPDATES,
-            maxConcurrentUpdates: this.config.PERSON_BATCH_WRITING_MAX_CONCURRENT_UPDATES,
-            maxOptimisticUpdateRetries: this.config.PERSON_BATCH_WRITING_MAX_OPTIMISTIC_UPDATE_RETRIES,
-            optimisticUpdateRetryInterval: this.config.PERSON_BATCH_WRITING_OPTIMISTIC_UPDATE_RETRY_INTERVAL_MS,
-            updateAllProperties: this.config.PERSON_PROPERTIES_UPDATE_ALL,
-        })
-
         this.kafkaConsumer = new KafkaConsumer({
             groupId: this.groupId,
             topic: this.topic,
@@ -236,15 +235,31 @@ export class IngestionConsumer {
             [GROUPS_OUTPUT]: {
                 topic: KAFKA_GROUPS,
             },
+            [PERSONS_OUTPUT]: {
+                topic: KAFKA_PERSON,
+            },
+            [PERSON_DISTINCT_IDS_OUTPUT]: {
+                topic: KAFKA_PERSON_DISTINCT_ID,
+            },
+        })
+
+        const ingestionWarningsOutput = outputs.resolve(INGESTION_WARNINGS_OUTPUT)
+
+        this.personsStore = new BatchWritingPersonsStore(this.deps.personRepository, ingestionWarningsOutput, {
+            dbWriteMode: this.config.PERSON_BATCH_WRITING_DB_WRITE_MODE,
+            useBatchUpdates: this.config.PERSON_BATCH_WRITING_USE_BATCH_UPDATES,
+            maxConcurrentUpdates: this.config.PERSON_BATCH_WRITING_MAX_CONCURRENT_UPDATES,
+            maxOptimisticUpdateRetries: this.config.PERSON_BATCH_WRITING_MAX_OPTIMISTIC_UPDATE_RETRIES,
+            optimisticUpdateRetryInterval: this.config.PERSON_BATCH_WRITING_OPTIMISTIC_UPDATE_RETRY_INTERVAL_MS,
+            updateAllProperties: this.config.PERSON_PROPERTIES_UPDATE_ALL,
         })
 
         const groupsOutput = outputs.resolve(GROUPS_OUTPUT)
-        const ingestionWarningsOutput = outputs.resolve(INGESTION_WARNINGS_OUTPUT)
         const clickhouseGroupRepository = new ClickhouseGroupRepository(groupsOutput.producer, groupsOutput.topic)
         this.groupStore = new BatchWritingGroupStore(
             this.deps.groupRepository,
             clickhouseGroupRepository,
-            { producer: ingestionWarningsOutput.producer, topic: ingestionWarningsOutput.topic },
+            ingestionWarningsOutput,
             {
                 maxConcurrentUpdates: this.config.GROUP_BATCH_WRITING_MAX_CONCURRENT_UPDATES,
                 maxOptimisticUpdateRetries: this.config.GROUP_BATCH_WRITING_MAX_OPTIMISTIC_UPDATE_RETRIES,
@@ -276,7 +291,6 @@ export class IngestionConsumer {
             },
         }
         const joinedPipelineDeps: JoinedIngestionPipelineDeps = {
-            kafkaProducer: this.kafkaProducer!,
             personsStore: this.personsStore,
             groupStore: this.groupStore,
             hogTransformer: this.hogTransformer,

@@ -1,7 +1,6 @@
 import { Message } from 'node-rdkafka'
 
 import { HogTransformerService } from '../../cdp/hog-transformations/hog-transformer.service'
-import { KafkaProducerWrapper } from '../../kafka/producer'
 import { Team } from '../../types'
 import { TeamManager } from '../../utils/team-manager'
 import { GroupTypeManager } from '../../worker/ingestion/group-type-manager'
@@ -10,7 +9,15 @@ import { PersonsStore } from '../../worker/ingestion/persons/persons-store'
 import { AI_EVENT_TYPES } from '../ai'
 import { AiEventSubpipelineInput, createAiEventSubpipeline } from '../ai/pipelines/ai-event-subpipeline'
 import { EventPipelineRunnerOptions } from '../event-processing/event-pipeline-options'
-import { AiEventOutput, EventOutput, HeatmapsOutput, IngestionOutputs } from '../event-processing/ingestion-outputs'
+import {
+    AiEventOutput,
+    EventOutput,
+    HeatmapsOutput,
+    IngestionOutputs,
+    IngestionWarningsOutput,
+    PersonDistinctIdsOutput,
+    PersonsOutput,
+} from '../event-processing/ingestion-outputs'
 import { SplitAiEventsStepConfig } from '../event-processing/split-ai-events-step'
 import { PipelineBuilder, StartPipelineBuilder } from '../pipelines/builders/pipeline-builders'
 import { TopHogWrapper } from '../pipelines/extensions/tophog'
@@ -28,14 +35,15 @@ export type PerDistinctIdPipelineInput = EventSubpipelineInput &
 
 export interface PerDistinctIdPipelineConfig {
     options: EventPipelineRunnerOptions
-    outputs: IngestionOutputs<EventOutput | AiEventOutput | HeatmapsOutput>
+    outputs: IngestionOutputs<
+        EventOutput | AiEventOutput | HeatmapsOutput | PersonsOutput | PersonDistinctIdsOutput | IngestionWarningsOutput
+    >
     splitAiEventsConfig: SplitAiEventsStepConfig
     teamManager: TeamManager
     groupTypeManager: GroupTypeManager
     hogTransformer: HogTransformerService
     personsStore: PersonsStore
     groupStore: BatchWritingGroupStore
-    kafkaProducer: KafkaProducerWrapper
     groupId: string
     topHog: TopHogWrapper
 }
@@ -70,7 +78,6 @@ export function createPerDistinctIdPipeline<TInput extends PerDistinctIdPipeline
         hogTransformer,
         personsStore,
         groupStore,
-        kafkaProducer,
         groupId,
         topHog,
     } = config
@@ -98,7 +105,6 @@ export function createPerDistinctIdPipeline<TInput extends PerDistinctIdPipeline
                             hogTransformer,
                             personsStore,
                             groupStore,
-                            kafkaProducer,
                             splitAiEventsConfig,
                             groupId,
                             topHog,
@@ -113,7 +119,6 @@ export function createPerDistinctIdPipeline<TInput extends PerDistinctIdPipeline
                             hogTransformer,
                             personsStore,
                             groupStore,
-                            kafkaProducer,
                             groupId,
                             topHog,
                         })
