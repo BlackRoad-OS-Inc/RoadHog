@@ -64,7 +64,7 @@ const VolumeColumn: QueryContextColumnComponent = (props) => {
                 </div>
                 <div
                     className={cn(
-                        'flex h-3 w-full items-center justify-between gap-1 px-px text-[9px] leading-none text-muted transition-opacity duration-75',
+                        'flex h-3 w-full items-center justify-between gap-1 px-px text-[9px] leading-none text-muted',
                         isBarHighlighted ? 'opacity-100' : 'opacity-0'
                     )}
                 >
@@ -117,7 +117,6 @@ const CountColumn = ({ record, columnName }: { record: unknown; columnName: stri
     )
 }
 
-/** Keeps count columns from expanding when the table has leftover width after error + volume. */
 const ISSUE_COUNT_COLUMN_WIDTH = 'clamp(4.75rem, 5vw, 5.5rem)'
 
 const defaultColumns: Record<string, QueryContextColumn> = {
@@ -131,7 +130,6 @@ const defaultColumns: Record<string, QueryContextColumn> = {
     users: { align: 'center', width: ISSUE_COUNT_COLUMN_WIDTH, render: CountColumn },
     volume: {
         align: 'center',
-        // Sparkline is w-56 (14rem); clamp keeps column ~chart-sized on small viewports without leaving a huge gap
         width: 'clamp(12rem, 20vw, 13rem)',
         renderTitle: VolumeColumnHeader,
         render: VolumeColumn,

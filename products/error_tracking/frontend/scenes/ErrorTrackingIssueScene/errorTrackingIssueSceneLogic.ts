@@ -287,7 +287,6 @@ export const errorTrackingIssueSceneLogic = kea<errorTrackingIssueSceneLogicType
             [] as ErrorTrackingSpikeEvent[],
             {
                 loadSpikeEvents: async () => {
-                    // Spike API expects ISO datetimes; dateRange uses relative strings (-24h) like HogQL queries.
                     const dr = values.dateRange
                     let dateFromIso: string | undefined
                     let dateToIso: string | undefined
