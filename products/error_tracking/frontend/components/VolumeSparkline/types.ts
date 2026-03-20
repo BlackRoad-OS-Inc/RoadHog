@@ -21,6 +21,17 @@ export type VolumeSparklineLayout = 'compact' | 'detailed'
 
 export type VolumeSparklineXAxisMode = 'none' | 'minimal' | 'full'
 
+/** Internal Kea reducer shape: at most one of bin or event is hovered. */
+export type VolumeSparklineHoverSelection =
+    | { kind: 'bin'; index: number; datum: SparklineDatum }
+    | { kind: 'event'; event: SparklineEvent<string> }
+
+/** Bar vs event marker hover — matches issue detail header / list footer consumers. */
+export type VolumeSparklineHoverPanel =
+    | { type: 'datum'; data: SparklineDatum }
+    | { type: 'event'; data: SparklineEvent<string> }
+    | null
+
 export type SparklineOptions = {
     onDatumMouseEnter?: (data: SparklineDatum) => void
     onDatumMouseLeave?: (data: SparklineDatum) => void

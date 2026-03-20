@@ -1,4 +1,4 @@
-import { useActions, useMountedLogic } from 'kea'
+import { useActions } from 'kea'
 import { useCallback, useEffect, useRef } from 'react'
 import { match } from 'ts-pattern'
 import useResizeObserver from 'use-resize-observer'
@@ -14,81 +14,25 @@ export type { VolumeSparklineXAxisMode } from './types'
 
 type VolumeSparklineLayout = 'compact' | 'detailed'
 
-type VolumeSparklineCoreProps = {
+export type VolumeSparklineProps = {
     data: SparklineData
     layout: VolumeSparklineLayout
+    // Keyed Kea store for bar / event hover
+    sparklineKey: string
     xAxis?: VolumeSparklineXAxisMode
     className?: string
-    interactive: boolean
-    onHoverChange?: (index: number | null, datum: SparklineDatum | null) => void
     events?: SparklineEvent<string>[]
-    onEventHoverChange?: (event: SparklineEvent<string> | null) => void
 }
 
-type BaseVolumeProps = {
-    data: SparklineData
-    layout: VolumeSparklineLayout
-    xAxis?: VolumeSparklineXAxisMode
-    className?: string
-}
-
-export type ErrorTrackingVolumeSparklineProps =
-    | (BaseVolumeProps & { interactive?: false; events?: SparklineEvent<string>[] })
-    | (BaseVolumeProps & {
-          interactive: true
-          sparklineKey: string
-          events?: SparklineEvent<string>[]
-          onEventHoverChange?: (event: SparklineEvent<string> | null) => void
-      })
-    | (BaseVolumeProps & {
-          interactive: true
-          onHoverChange: (index: number | null, datum: SparklineDatum | null) => void
-          events?: SparklineEvent<string>[]
-          onEventHoverChange?: (event: SparklineEvent<string> | null) => void
-      })
-
-export function ErrorTrackingVolumeSparkline(props: ErrorTrackingVolumeSparklineProps): JSX.Element {
-    if (props.interactive) {
-        if ('sparklineKey' in props && props.sparklineKey) {
-            return <VolumeSparklineWithLogic {...props} />
-        }
-        if ('onHoverChange' in props) {
-            return (
-                <VolumeSparklineCore
-                    data={props.data}
-                    layout={props.layout}
-                    xAxis={props.xAxis}
-                    className={props.className}
-                    interactive
-                    onHoverChange={props.onHoverChange}
-                    events={props.events}
-                    onEventHoverChange={props.onEventHoverChange}
-                />
-            )
-        }
-        throw new Error(
-            'ErrorTrackingVolumeSparkline: interactive requires sparklineKey (Kea) or onHoverChange (controlled)'
-        )
-    }
-    const { data, layout, xAxis, className, events } = props
-    return (
-        <VolumeSparklineCore
-            data={data}
-            layout={layout}
-            xAxis={xAxis}
-            className={className}
-            interactive={false}
-            events={events}
-        />
-    )
-}
-
-function VolumeSparklineWithLogic(
-    props: Extract<ErrorTrackingVolumeSparklineProps, { interactive: true; sparklineKey: string }>
-): JSX.Element {
-    const { sparklineKey, data, layout, xAxis, className, events, onEventHoverChange } = props
-    const mountedLogic = useMountedLogic(errorTrackingVolumeSparklineLogic({ sparklineKey }))
-    const { setHoveredBin } = useActions(mountedLogic)
+export function VolumeSparkline({
+    sparklineKey,
+    data,
+    layout,
+    xAxis,
+    className,
+    events,
+}: VolumeSparklineProps): JSX.Element {
+    const { setHoveredBin, setHoveredEvent } = useActions(errorTrackingVolumeSparklineLogic({ sparklineKey }))
 
     const onHoverChange = useCallback(
         (index: number | null, datum: SparklineDatum | null) => {
@@ -101,18 +45,34 @@ function VolumeSparklineWithLogic(
         [setHoveredBin]
     )
 
+    const onEventHoverChange = useCallback(
+        (e: SparklineEvent<string> | null) => {
+            setHoveredEvent(e)
+        },
+        [setHoveredEvent]
+    )
+
     return (
         <VolumeSparklineCore
             data={data}
             layout={layout}
             xAxis={xAxis}
             className={className}
-            interactive
-            onHoverChange={onHoverChange}
             events={events}
+            onHoverChange={onHoverChange}
             onEventHoverChange={onEventHoverChange}
         />
     )
+}
+
+type VolumeSparklineCoreProps = {
+    data: SparklineData
+    layout: VolumeSparklineLayout
+    xAxis?: VolumeSparklineXAxisMode
+    className?: string
+    events?: SparklineEvent<string>[]
+    onHoverChange: (index: number | null, datum: SparklineDatum | null) => void
+    onEventHoverChange: (event: SparklineEvent<string> | null) => void
 }
 
 function VolumeSparklineCore({
@@ -120,9 +80,8 @@ function VolumeSparklineCore({
     layout,
     xAxis = 'none',
     className,
-    interactive,
-    onHoverChange,
     events = [],
+    onHoverChange,
     onEventHoverChange,
 }: VolumeSparklineCoreProps): JSX.Element {
     const svgRef = useRef<SVGSVGElement>(null)
@@ -159,7 +118,7 @@ function VolumeSparklineCore({
             borderRadius: chartStyle.borderRadius,
             minBarHeight: chartStyle.minBarHeight,
             eventLabelHeight: chartStyle.eventLabelHeight,
-            interactive,
+            interactive: true,
             barWidthFraction,
             onHoverChange,
             events,
@@ -182,7 +141,6 @@ function VolumeSparklineCore({
         chartStyle.eventLabelPaddingX,
         chartStyle.eventLabelPaddingY,
         chartStyle.eventMinSpace,
-        interactive,
         barWidthFraction,
         onHoverChange,
         events,

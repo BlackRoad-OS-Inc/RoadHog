@@ -1,5 +1,5 @@
 import { useValues } from 'kea'
-import { PropsWithChildren, useState } from 'react'
+import { PropsWithChildren } from 'react'
 import { match } from 'ts-pattern'
 
 import { IconChevronRight, IconTrending } from '@posthog/icons'
@@ -15,23 +15,17 @@ import { useSparklineEvents } from '../hooks/use-sparkline-events'
 import { errorTrackingIssueSceneLogic } from '../scenes/ErrorTrackingIssueScene/errorTrackingIssueSceneLogic'
 import { cancelEvent } from '../utils'
 import { TimeBoundary } from './TimeBoundary'
-import { ErrorTrackingVolumeSparkline } from './VolumeSparkline/ErrorTrackingVolumeSparkline'
-import type { SparklineDatum, SparklineEvent } from './VolumeSparkline/types'
-
-type SelectedDataType =
-    | {
-          type: 'datum'
-          data: SparklineDatum
-      }
-    | {
-          type: 'event'
-          data: SparklineEvent<string>
-      }
-    | null
+import { errorTrackingVolumeSparklineLogic } from './VolumeSparkline/errorTrackingVolumeSparklineLogic'
+import type { SparklineDatum, SparklineEvent, VolumeSparklineHoverPanel } from './VolumeSparkline/types'
+import { VolumeSparkline } from './VolumeSparkline/VolumeSparkline'
 
 export const Metadata = ({ children, className }: PropsWithChildren<{ className?: string }>): JSX.Element => {
-    const { aggregations, summaryLoading, issueLoading, firstSeen, lastSeen } = useValues(errorTrackingIssueSceneLogic)
-    const [hoveredDatum, setHoveredDatum] = useState<SelectedDataType>(null)
+    const { aggregations, summaryLoading, issueLoading, firstSeen, lastSeen, issueId } =
+        useValues(errorTrackingIssueSceneLogic)
+    const sparklineKey = issueId || 'issue-unknown'
+    const { hoverPanel } = useValues(errorTrackingVolumeSparklineLogic({ sparklineKey })) as {
+        hoverPanel: VolumeSparklineHoverPanel
+    }
     const sparklineData = useSparklineDataIssueScene()
     const sparklineEvents = useSparklineEvents()
 
@@ -39,7 +33,7 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
         <div className={className}>
             <div className="flex justify-between items-center h-[40px] px-2 shrink-0">
                 <div className="flex justify-end items-center h-full">
-                    {match(hoveredDatum)
+                    {match(hoverPanel)
                         .when(
                             (data) => shouldRenderIssueMetrics(data),
                             () => <IssueMetrics aggregations={aggregations} summaryLoading={summaryLoading} />
@@ -49,7 +43,7 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
                         .otherwise(() => null)}
                 </div>
                 <div className="flex justify-end items-center h-full">
-                    {match(hoveredDatum)
+                    {match(hoverPanel)
                         .when(
                             (data) => shouldRenderIssueMetrics(data),
                             () => (
@@ -83,26 +77,12 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
             </div>
             <div onClick={cancelEvent} className="shrink-0 min-h-[200px] flex flex-col">
                 <div className="relative w-full flex-1 min-h-0 pt-4 pb-3">
-                    <ErrorTrackingVolumeSparkline
+                    <VolumeSparkline
                         data={sparklineData}
                         layout="detailed"
                         xAxis="full"
                         events={sparklineEvents}
-                        interactive
-                        onHoverChange={(_index, datum) => {
-                            if (datum == null) {
-                                setHoveredDatum(null)
-                            } else {
-                                setHoveredDatum({ type: 'datum', data: datum })
-                            }
-                        }}
-                        onEventHoverChange={(e) => {
-                            if (e == null) {
-                                setHoveredDatum(null)
-                            } else {
-                                setHoveredDatum({ type: 'event', data: e })
-                            }
-                        }}
+                        sparklineKey={sparklineKey}
                         className="!p-0 h-full min-h-[160px]"
                     />
                 </div>
@@ -112,7 +92,7 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
     )
 }
 
-function shouldRenderIssueMetrics(data: SelectedDataType): boolean {
+function shouldRenderIssueMetrics(data: VolumeSparklineHoverPanel): boolean {
     if (data == null) {
         return true
     }

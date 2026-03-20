@@ -21,12 +21,12 @@ import { InsightLogicProps } from '~/types'
 import { IssueActions } from 'products/error_tracking/frontend/components/IssueActions/IssueActions'
 import { IssueQueryOptions } from 'products/error_tracking/frontend/components/IssueQueryOptions/IssueQueryOptions'
 import { IssueListTitleColumn, IssueListTitleHeader } from 'products/error_tracking/frontend/components/TableColumns'
-import { ErrorTrackingVolumeSparkline } from 'products/error_tracking/frontend/components/VolumeSparkline/ErrorTrackingVolumeSparkline'
 import { errorTrackingVolumeSparklineLogic } from 'products/error_tracking/frontend/components/VolumeSparkline/errorTrackingVolumeSparklineLogic'
 import {
     formatCompactVolumeHoverDate,
     formatCompactVolumeHoverOccurrences,
 } from 'products/error_tracking/frontend/components/VolumeSparkline/formatCompactVolumeHover'
+import { VolumeSparkline } from 'products/error_tracking/frontend/components/VolumeSparkline/VolumeSparkline'
 import { applyVolumeSpikeHighlights, useSparklineData } from 'products/error_tracking/frontend/hooks/use-sparkline-data'
 import { batchSpikeEventsLogic } from 'products/error_tracking/frontend/logics/batchSpikeEventsLogic'
 import { bulkSelectLogic } from 'products/error_tracking/frontend/logics/bulkSelectLogic'
@@ -51,12 +51,11 @@ const VolumeColumn: QueryContextColumnComponent = (props) => {
         <div className="flex w-full min-w-0 justify-center">
             <div className="flex w-56 max-w-full min-w-0 flex-col">
                 <div className="h-12 min-h-12 w-full">
-                    <ErrorTrackingVolumeSparkline
+                    <VolumeSparkline
                         className="h-full"
                         data={data}
                         layout="compact"
                         xAxis="minimal"
-                        interactive
                         sparklineKey={sparklineKey}
                     />
                 </div>

@@ -1,24 +1,28 @@
-import { action } from '@storybook/addon-actions'
 import { Meta, StoryObj } from '@storybook/react'
 import * as d3 from 'd3'
 
 import { dayjs } from 'lib/dayjs'
 
-import { ErrorTrackingVolumeSparkline } from './ErrorTrackingVolumeSparkline'
 import type { SparklineData, SparklineEvent } from './types'
+import { VolumeSparkline } from './VolumeSparkline'
 
-const meta: Meta<typeof ErrorTrackingVolumeSparkline> = {
-    title: 'ErrorTracking/ErrorTrackingVolumeSparkline',
+const STORY_KEY = 'storybook-volume-sparkline'
+
+const meta: Meta<typeof VolumeSparkline> = {
+    title: 'ErrorTracking/VolumeSparkline',
     parameters: {
         layout: 'centered',
         viewMode: 'story',
     },
-    component: ErrorTrackingVolumeSparkline,
+    component: VolumeSparkline,
+    args: {
+        sparklineKey: STORY_KEY,
+    },
 }
 
 export default meta
 
-type Story = StoryObj<typeof ErrorTrackingVolumeSparkline>
+type Story = StoryObj<typeof VolumeSparkline>
 
 const resolution = 60
 
@@ -27,7 +31,6 @@ export const DetailedFullAxisWithEvents: Story = {
         data: buildData(),
         layout: 'detailed',
         xAxis: 'full',
-        interactive: false,
         events: buildEvents('2022-01-05', '2022-01-10'),
         className: 'w-[800px] h-[200px]',
     },
@@ -38,7 +41,6 @@ export const DetailedOverlappingEventDates: Story = {
         data: buildData(),
         layout: 'detailed',
         xAxis: 'full',
-        interactive: false,
         events: buildEvents('2022-01-05', '2022-01-05'),
         className: 'w-[800px] h-[200px]',
     },
@@ -49,7 +51,6 @@ export const DetailedMostlyZeros: Story = {
         data: buildData(0, 0),
         layout: 'detailed',
         xAxis: 'full',
-        interactive: false,
         className: 'w-[800px] h-[200px]',
     },
 }
@@ -59,7 +60,6 @@ export const DetailedZerosAndOnes: Story = {
         data: buildData(0, 1),
         layout: 'detailed',
         xAxis: 'full',
-        interactive: false,
         className: 'w-[800px] h-[200px]',
     },
 }
@@ -69,7 +69,6 @@ export const EventsBeforeDataRange: Story = {
         data: buildData(0, 1000, '2022-02-01', '2022-03-01'),
         layout: 'detailed',
         xAxis: 'full',
-        interactive: false,
         events: buildEvents('2022-01-01', '2022-01-02'),
         className: 'w-[800px] h-[200px]',
     },
@@ -80,21 +79,7 @@ export const CompactIssuesList: Story = {
         data: buildData(),
         layout: 'compact',
         xAxis: 'minimal',
-        interactive: false,
         className: 'w-[200px] h-10',
-    },
-}
-
-export const InteractiveControlled: Story = {
-    args: {
-        data: buildData(),
-        layout: 'detailed',
-        xAxis: 'full',
-        interactive: true,
-        onHoverChange: action('hover-bin'),
-        events: buildEvents('2022-01-05', '2022-01-10'),
-        onEventHoverChange: action('hover-event'),
-        className: 'w-[800px] h-[200px]',
     },
 }
 
