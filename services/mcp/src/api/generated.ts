@@ -22770,6 +22770,22 @@ export namespace Schemas {
     };
 
     /**
+     * * `30d` - 30 Days
+    * `90d` - 90 Days
+    * `1y` - 1 Year
+    * `5y` - 5 Years
+     */
+    export type SessionRecordingRetentionPeriodEnum = typeof SessionRecordingRetentionPeriodEnum[keyof typeof SessionRecordingRetentionPeriodEnum];
+
+
+    export const SessionRecordingRetentionPeriodEnum = {
+      '30d': '30d',
+      '90d': '90d',
+      '1y': '1y',
+      '5y': '5y',
+    } as const;
+
+    /**
      * * `0` - Sunday
     * `1` - Monday
      */
@@ -22855,6 +22871,20 @@ export namespace Schemas {
       session_recording_linked_flag?: unknown | null;
       session_recording_network_payload_capture_config?: unknown | null;
       session_recording_masking_config?: unknown | null;
+      /** @nullable */
+      session_recording_url_trigger_config?: (unknown | null)[] | null;
+      /** @nullable */
+      session_recording_url_blocklist_config?: (unknown | null)[] | null;
+      /** @nullable */
+      session_recording_event_trigger_config?: (string | null)[] | null;
+      /**
+       * @maxLength 24
+       * @nullable
+       */
+      session_recording_trigger_match_type_config?: string | null;
+      /** V2 trigger groups configuration for session recording. If present, takes precedence over legacy trigger fields. */
+      session_recording_trigger_groups?: unknown | null;
+      session_recording_retention_period?: SessionRecordingRetentionPeriodEnum;
       session_replay_config?: unknown | null;
       survey_config?: unknown | null;
       access_control?: boolean;
@@ -23521,22 +23551,6 @@ export namespace Schemas {
     export type PatchedTeamProductIntentsItem = {[key: string]: unknown};
 
     export type PatchedTeamManagedViewsets = {[key: string]: boolean};
-
-    /**
-     * * `30d` - 30 Days
-    * `90d` - 90 Days
-    * `1y` - 1 Year
-    * `5y` - 5 Years
-     */
-    export type SessionRecordingRetentionPeriodEnum = typeof SessionRecordingRetentionPeriodEnum[keyof typeof SessionRecordingRetentionPeriodEnum];
-
-
-    export const SessionRecordingRetentionPeriodEnum = {
-      '30d': '30d',
-      '90d': '90d',
-      '1y': '1y',
-      '5y': '5y',
-    } as const;
 
     export interface TeamRevenueAnalyticsConfig {
       base_currency?: BaseCurrencyEnum;
@@ -24227,6 +24241,20 @@ export namespace Schemas {
       session_recording_linked_flag?: unknown | null;
       session_recording_network_payload_capture_config?: unknown | null;
       session_recording_masking_config?: unknown | null;
+      /** @nullable */
+      session_recording_url_trigger_config?: (unknown | null)[] | null;
+      /** @nullable */
+      session_recording_url_blocklist_config?: (unknown | null)[] | null;
+      /** @nullable */
+      session_recording_event_trigger_config?: (string | null)[] | null;
+      /**
+       * @maxLength 24
+       * @nullable
+       */
+      session_recording_trigger_match_type_config?: string | null;
+      /** V2 trigger groups configuration for session recording. If present, takes precedence over legacy trigger fields. */
+      session_recording_trigger_groups?: unknown | null;
+      session_recording_retention_period?: SessionRecordingRetentionPeriodEnum;
       session_replay_config?: unknown | null;
       survey_config?: unknown | null;
       access_control?: boolean;
