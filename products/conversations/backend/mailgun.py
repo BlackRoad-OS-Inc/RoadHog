@@ -78,6 +78,10 @@ def add_domain(domain: str) -> dict[str, Any]:
             error_msg = resp.json().get("message", "")
             if "already exists" in error_msg.lower():
                 return get_domain_dns_records(domain)
+            if "already taken" in error_msg.lower():
+                raise ValueError(f"Domain {domain} is already registered by another Mailgun account")
+        except ValueError:
+            raise
         except Exception:
             pass
 

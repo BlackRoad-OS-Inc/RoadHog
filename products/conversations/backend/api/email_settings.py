@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from posthog.models.instance_setting import get_instance_setting
 from posthog.models.user import User
+from posthog.rate_limit import EmailSendTestThrottle, EmailVerifyDomainThrottle
 
 from products.conversations.backend.mailgun import (
     add_domain as mailgun_add_domain,
@@ -93,8 +94,8 @@ class EmailConnectView(APIView):
         dns_records: dict = {}
         try:
             dns_records = mailgun_add_domain(domain)
-        except ValueError:
-            logger.info("email_connect_no_mailgun_key", team_id=team.id, domain=domain)
+        except ValueError as e:
+            logger.info("email_connect_mailgun_domain_error", team_id=team.id, domain=domain, error=str(e))
         except Exception:
             logger.exception("email_connect_mailgun_add_domain_failed", team_id=team.id, domain=domain)
 
@@ -157,6 +158,7 @@ class EmailVerifyDomainView(APIView):
     """Trigger Mailgun DNS verification and update local config."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [EmailVerifyDomainThrottle]
 
     def post(self, request: Request, *args, **kwargs) -> Response:
         user = request.user
@@ -205,6 +207,7 @@ class EmailSendTestView(APIView):
     """Send a test email to verify the outbound pipeline works."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [EmailSendTestThrottle]
 
     def post(self, request: Request, *args, **kwargs) -> Response:
         user = request.user
@@ -238,14 +241,20 @@ class EmailSendTestView(APIView):
         )
         email_message.attach_alternative(html_body, "text/html")
 
+        connection = None
         try:
             connection = get_smtp_connection()
             connection.open()
             connection.send_messages([email_message])
-            connection.close()
         except Exception:
             logger.exception("email_send_test_failed", team_id=team.id)
             return Response({"error": "Failed to send test email. Check SMTP settings."}, status=502)
+        finally:
+            if connection:
+                try:
+                    connection.close()
+                except Exception:
+                    pass
 
         logger.info("email_test_sent", team_id=team.id, to=user.email, user_id=user.id)
 
