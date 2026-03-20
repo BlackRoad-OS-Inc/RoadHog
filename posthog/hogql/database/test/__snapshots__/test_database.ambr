@@ -4822,7 +4822,7 @@
                   "name": "pinned",
                   "schema_valid": true,
                   "table": null,
-                  "type": "boolean"
+                  "type": "expression"
               },
               "deleted": {
                   "chain": null,
@@ -4832,7 +4832,7 @@
                   "name": "deleted",
                   "schema_valid": true,
                   "table": null,
-                  "type": "boolean"
+                  "type": "expression"
               },
               "filters": {
                   "chain": null,
@@ -5060,7 +5060,7 @@
                   "name": "deleted",
                   "schema_valid": true,
                   "table": null,
-                  "type": "boolean"
+                  "type": "expression"
               },
               "created_at": {
                   "chain": null,
@@ -9440,7 +9440,7 @@
                   "name": "pinned",
                   "schema_valid": true,
                   "table": null,
-                  "type": "boolean"
+                  "type": "expression"
               },
               "deleted": {
                   "chain": null,
@@ -9450,7 +9450,7 @@
                   "name": "deleted",
                   "schema_valid": true,
                   "table": null,
-                  "type": "boolean"
+                  "type": "expression"
               },
               "filters": {
                   "chain": null,
@@ -9678,7 +9678,7 @@
                   "name": "deleted",
                   "schema_valid": true,
                   "table": null,
-                  "type": "boolean"
+                  "type": "expression"
               },
               "created_at": {
                   "chain": null,
