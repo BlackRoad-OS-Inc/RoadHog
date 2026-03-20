@@ -2906,6 +2906,7 @@ export interface TraceSpansQuery extends DataNode<TraceSpansQueryResponse> {
     serviceNames?: string[]
     statusCodes?: integer[]
     traceId?: string
+    rootSpans?: boolean
     /** Cursor for fetching the next page of results */
     after?: string
 }
