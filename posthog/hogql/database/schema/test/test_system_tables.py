@@ -12,6 +12,9 @@ from posthog.hogql.query import execute_hogql_query
 from posthog.models import (
     Action,
     Annotation,
+    BatchExport,
+    BatchExportBackfill,
+    BatchExportDestination,
     Cohort,
     Dashboard,
     ExportedAsset,
@@ -100,6 +103,17 @@ def _create_cohort(team: Team, label: str) -> Cohort:
 
 def _create_annotation(team: Team, label: str) -> Annotation:
     return Annotation.objects.create(team=team, content=f"annotation_{label}")
+
+
+def _create_batch_export(team: Team, label: str) -> BatchExport:
+    destination = BatchExportDestination.objects.create(type="S3", config={"bucket_name": f"test_{label}"})
+    return BatchExport.objects.create(team=team, name=f"export_{label}", destination=destination, interval="hour")
+
+
+def _create_batch_export_backfill(team: Team, label: str) -> BatchExportBackfill:
+    destination = BatchExportDestination.objects.create(type="S3", config={"bucket_name": f"test_bf_{label}"})
+    export = BatchExport.objects.create(team=team, name=f"export_bf_{label}", destination=destination, interval="hour")
+    return BatchExportBackfill.objects.create(team=team, batch_export=export, status="Running")
 
 
 def _create_cohort_calculation_history(team: Team, label: str) -> CohortCalculationHistory:
@@ -257,6 +271,8 @@ SYSTEM_TABLE_FACTORIES = [
     ("actions", _create_action),
     ("alerts", _create_alert),
     ("annotations", _create_annotation),
+    ("batch_export_backfills", _create_batch_export_backfill),
+    ("batch_exports", _create_batch_export),
     ("cohorts", _create_cohort),
     ("cohort_calculation_history", _create_cohort_calculation_history),
     ("dashboards", _create_dashboard),
