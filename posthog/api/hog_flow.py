@@ -2,7 +2,6 @@ import json
 import uuid as uuid_mod
 from typing import Optional, cast
 
-from django.db import transaction
 from django.db.models import QuerySet
 
 import structlog
@@ -41,9 +40,8 @@ from posthog.models.hog_function_template import HogFunctionTemplate
 from posthog.plugins.plugin_server_api import create_hog_flow_invocation_test
 
 from products.workflows.backend.models.hog_flow_batch_job import HogFlowBatchJob
-from products.workflows.backend.models.hog_flow_schedule import HogFlowSchedule
-from products.workflows.backend.models.hog_flow_schedule.rrule_utils import compute_next_occurrences, validate_rrule
 from products.workflows.backend.models.hog_flow_scheduled_run import HogFlowScheduledRun
+from products.workflows.backend.utils.rrule_utils import compute_next_occurrences, validate_rrule
 
 logger = structlog.get_logger(__name__)
 
@@ -108,38 +106,6 @@ class HogFlowActionSerializer(serializers.Serializer):
                     if properties is not None and not isinstance(properties, list):
                         raise serializers.ValidationError({"filters": {"properties": "Properties must be an array."}})
 
-                # Validate schedule if present
-                schedule = data.get("config", {}).get("schedule")
-                if schedule:
-                    rrule_str = schedule.get("rrule")
-                    if not rrule_str:
-                        raise serializers.ValidationError({"schedule": {"rrule": "RRULE string is required."}})
-                    try:
-                        validate_rrule(rrule_str)
-                    except (ValueError, TypeError) as e:
-                        logger.warning("Invalid RRULE encountered during validation", rrule=rrule_str, error=str(e))
-                        raise serializers.ValidationError({"schedule": {"rrule": "Invalid RRULE."}})
-
-                    # Enforce minimum interval of 1 hour for batch triggers
-                    from dateutil.rrule import (
-                        HOURLY,
-                        MINUTELY,
-                        SECONDLY,
-                        rrulestr as rrulestr_parse,
-                    )
-
-                    parsed_rule = rrulestr_parse(rrule_str)
-                    if parsed_rule._freq in (MINUTELY, SECONDLY):
-                        raise serializers.ValidationError(
-                            {"schedule": {"rrule": "Batch schedules must run at most once per hour."}}
-                        )
-                    if parsed_rule._freq == HOURLY and (parsed_rule._interval or 1) < 1:
-                        raise serializers.ValidationError(
-                            {"schedule": {"rrule": "Batch schedules must run at most once per hour."}}
-                        )
-
-                    if not schedule.get("starts_at"):
-                        raise serializers.ValidationError({"schedule": {"starts_at": "Start date is required."}})
             else:
                 if not is_draft:
                     raise serializers.ValidationError({"config": "Invalid trigger type"})
@@ -230,19 +196,12 @@ class HogFlowMaskingSerializer(serializers.Serializer):
         return super().validate(attrs)
 
 
-class HogFlowScheduleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = HogFlowSchedule
-        fields = ["id", "rrule", "starts_at", "timezone", "status", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at"]
-
-
 class HogFlowScheduledRunSerializer(serializers.ModelSerializer):
     class Meta:
         model = HogFlowScheduledRun
         fields = [
             "id",
-            "scheduled_at",
+            "run_at",
             "status",
             "batch_job",
             "started_at",
@@ -255,95 +214,38 @@ class HogFlowScheduledRunSerializer(serializers.ModelSerializer):
 
 def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
     """
-    Sync HogFlowSchedule and pending runs based on the trigger config's `schedule` object.
-    One-time schedules use COUNT=1 in the RRULE, same code path as recurring.
+    Manage the next pending HogFlowScheduledRun based on schedule_config.
+    Deletes any existing pending run and creates a new one if the workflow is active.
     """
-    trigger = hog_flow.trigger or {}
-    schedule_config = trigger.get("schedule")
+    schedule_config = hog_flow.schedule_config
 
-    existing_schedule = (
-        HogFlowSchedule.objects.filter(hog_flow=hog_flow, team_id=team_id)
-        .exclude(status=HogFlowSchedule.Status.COMPLETED)
-        .first()
-    )
+    # Always clean up existing pending run
+    HogFlowScheduledRun.objects.filter(hog_flow=hog_flow, status=HogFlowScheduledRun.Status.PENDING).delete()
 
-    if not schedule_config:
-        # No schedule: mark existing as completed and delete pending runs
-        if existing_schedule:
-            existing_schedule.status = HogFlowSchedule.Status.COMPLETED
-            existing_schedule.save(update_fields=["status", "updated_at"])
-            HogFlowScheduledRun.objects.filter(
-                schedule=existing_schedule, status=HogFlowScheduledRun.Status.PENDING
-            ).delete()
+    if not schedule_config or hog_flow.status != HogFlow.State.ACTIVE:
         return
 
-    rrule_str = schedule_config["rrule"]
-    starts_at = isoparse(schedule_config["starts_at"])
+    rrule_str = schedule_config.get("rrule")
+    starts_at_str = schedule_config.get("starts_at")
     tz = schedule_config.get("timezone", "UTC")
 
-    schedule_status = (
-        HogFlowSchedule.Status.ACTIVE if hog_flow.status == HogFlow.State.ACTIVE else HogFlowSchedule.Status.PAUSED
-    )
-
-    if existing_schedule:
-        existing_schedule.rrule = rrule_str
-        existing_schedule.starts_at = starts_at
-        existing_schedule.timezone = tz
-        existing_schedule.status = schedule_status
-        existing_schedule.save(update_fields=["rrule", "starts_at", "timezone", "status", "updated_at"])
-        # Delete old pending runs, they'll be regenerated below
-        HogFlowScheduledRun.objects.filter(
-            schedule=existing_schedule, status=HogFlowScheduledRun.Status.PENDING
-        ).delete()
-        schedule = existing_schedule
-    else:
-        schedule = HogFlowSchedule.objects.create(
-            team_id=team_id,
-            hog_flow=hog_flow,
-            rrule=rrule_str,
-            starts_at=starts_at,
-            timezone=tz,
-            status=schedule_status,
-        )
-
-    if schedule.status == HogFlowSchedule.Status.ACTIVE:
-        _replenish_scheduled_runs(schedule, team_id)
-
-
-def _replenish_scheduled_runs(schedule: HogFlowSchedule, team_id: int) -> None:
-    """Generate the next window of pending HogFlowScheduledRun rows."""
-    # Find the last scheduled_at among existing pending/completed runs
-    last_run = (
-        HogFlowScheduledRun.objects.filter(schedule=schedule)
-        .exclude(status=HogFlowScheduledRun.Status.CANCELLED)
-        .order_by("-scheduled_at")
-        .first()
-    )
-
-    after = last_run.scheduled_at if last_run else None
-    occurrences = compute_next_occurrences(
-        rrule_string=schedule.rrule,
-        starts_at=schedule.starts_at,
-        timezone_str=schedule.timezone,
-        after=after,
-    )
-
-    if not occurrences:
-        # RRULE is exhausted
-        schedule.status = HogFlowSchedule.Status.COMPLETED
-        schedule.save(update_fields=["status", "updated_at"])
+    if not rrule_str or not starts_at_str:
         return
 
-    runs_to_create = [
-        HogFlowScheduledRun(
+    starts_at = isoparse(starts_at_str)
+    occurrences = compute_next_occurrences(
+        rrule_string=rrule_str,
+        starts_at=starts_at,
+        timezone_str=tz,
+        count=1,
+    )
+    if occurrences:
+        HogFlowScheduledRun.objects.create(
             team_id=team_id,
-            schedule=schedule,
-            scheduled_at=dt,
+            hog_flow=hog_flow,
+            run_at=occurrences[0],
             status=HogFlowScheduledRun.Status.PENDING,
         )
-        for dt in occurrences
-    ]
-    HogFlowScheduledRun.objects.bulk_create(runs_to_create)
 
 
 class HogFlowMinimalSerializer(serializers.ModelSerializer):
@@ -369,6 +271,7 @@ class HogFlowMinimalSerializer(serializers.ModelSerializer):
             "abort_action",
             "variables",
             "billable_action_types",
+            "schedule_config",
         ]
         read_only_fields = fields
 
@@ -406,6 +309,7 @@ class HogFlowSerializer(HogFlowMinimalSerializer):
             "abort_action",
             "variables",
             "billable_action_types",
+            "schedule_config",
         ]
         read_only_fields = [
             "id",
@@ -459,6 +363,40 @@ class HogFlowSerializer(HogFlowMinimalSerializer):
                     data["conversion"]["bytecode"] = compiled_filters.get("bytecode", [])
             if "bytecode" not in data["conversion"]:
                 data["conversion"]["bytecode"] = []
+
+        # Validate schedule_config if present
+        schedule_config = data.get("schedule_config")
+        if schedule_config:
+            is_draft = self.context.get("is_draft")
+            if not is_draft:
+                rrule_str = schedule_config.get("rrule")
+                if not rrule_str:
+                    raise serializers.ValidationError({"schedule_config": {"rrule": "RRULE string is required."}})
+                try:
+                    validate_rrule(rrule_str)
+                except (ValueError, TypeError) as e:
+                    logger.warning("Invalid RRULE encountered during validation", rrule=rrule_str, error=str(e))
+                    raise serializers.ValidationError({"schedule_config": {"rrule": "Invalid RRULE."}})
+
+                from dateutil.rrule import (
+                    HOURLY,
+                    MINUTELY,
+                    SECONDLY,
+                    rrulestr as rrulestr_parse,
+                )
+
+                parsed_rule = rrulestr_parse(rrule_str)
+                if parsed_rule._freq in (MINUTELY, SECONDLY):
+                    raise serializers.ValidationError(
+                        {"schedule_config": {"rrule": "Batch schedules must run at most once per hour."}}
+                    )
+                if parsed_rule._freq == HOURLY and (parsed_rule._interval or 1) < 1:
+                    raise serializers.ValidationError(
+                        {"schedule_config": {"rrule": "Batch schedules must run at most once per hour."}}
+                    )
+
+                if not schedule_config.get("starts_at"):
+                    raise serializers.ValidationError({"schedule_config": {"starts_at": "Start date is required."}})
 
         return data
 
@@ -666,65 +604,11 @@ class HogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, vie
             return Response(serializer.data)
 
     @action(detail=True, methods=["GET"])
-    def schedules(self, request: Request, *args, **kwargs):
-        hog_flow = self.get_object()
-        schedules = HogFlowSchedule.objects.filter(hog_flow=hog_flow, team=self.team).order_by("-created_at")
-        serializer = HogFlowScheduleSerializer(schedules, many=True)
-        return Response(serializer.data)
-
-    @action(detail=True, methods=["PATCH"], url_path="schedules/(?P<schedule_id>[^/.]+)")
-    def schedule_detail(self, request: Request, *args, schedule_id: str = "", **kwargs):
-        hog_flow = self.get_object()
-        try:
-            schedule = HogFlowSchedule.objects.get(id=schedule_id, hog_flow=hog_flow, team=self.team)
-        except (HogFlowSchedule.DoesNotExist, ValueError):
-            raise exceptions.NotFound("Schedule not found")
-
-        new_status = request.data.get("status")
-        if new_status not in (HogFlowSchedule.Status.ACTIVE, HogFlowSchedule.Status.PAUSED):
-            raise exceptions.ValidationError({"status": "Status must be 'active' or 'paused'"})
-
-        if new_status == HogFlowSchedule.Status.ACTIVE and hog_flow.status != HogFlow.State.ACTIVE:
-            raise exceptions.ValidationError({"status": "Cannot activate schedule on an inactive workflow"})
-
-        with transaction.atomic():
-            schedule.status = new_status
-            schedule.save(update_fields=["status", "updated_at"])
-
-            if new_status == HogFlowSchedule.Status.PAUSED:
-                HogFlowScheduledRun.objects.filter(schedule=schedule, status=HogFlowScheduledRun.Status.PENDING).update(
-                    status=HogFlowScheduledRun.Status.CANCELLED
-                )
-            elif new_status == HogFlowSchedule.Status.ACTIVE:
-                _replenish_scheduled_runs(schedule, self.team_id)
-
-        return Response(HogFlowScheduleSerializer(schedule).data)
-
-    @action(detail=True, methods=["GET"])
     def scheduled_runs(self, request: Request, *args, **kwargs):
         hog_flow = self.get_object()
-        runs = (
-            HogFlowScheduledRun.objects.filter(schedule__hog_flow=hog_flow, team=self.team)
-            .select_related("schedule")
-            .order_by("-scheduled_at")[:100]
-        )
+        runs = HogFlowScheduledRun.objects.filter(hog_flow=hog_flow, team=self.team).order_by("-run_at")[:100]
         serializer = HogFlowScheduledRunSerializer(runs, many=True)
         return Response(serializer.data)
-
-    @action(detail=True, methods=["DELETE"], url_path="scheduled_runs/(?P<run_id>[^/.]+)")
-    def cancel_scheduled_run(self, request: Request, *args, run_id: str = "", **kwargs):
-        hog_flow = self.get_object()
-        try:
-            run = HogFlowScheduledRun.objects.get(id=run_id, schedule__hog_flow=hog_flow, team=self.team)
-        except (HogFlowScheduledRun.DoesNotExist, ValueError):
-            raise exceptions.NotFound("Scheduled run not found")
-
-        if run.status != HogFlowScheduledRun.Status.PENDING:
-            raise exceptions.ValidationError({"status": "Only pending runs can be cancelled"})
-
-        run.status = HogFlowScheduledRun.Status.CANCELLED
-        run.save(update_fields=["status", "updated_at"])
-        return Response(HogFlowScheduledRunSerializer(run).data)
 
 
 class InternalHogFlowViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, AppMetricsMixin, viewsets.ModelViewSet):

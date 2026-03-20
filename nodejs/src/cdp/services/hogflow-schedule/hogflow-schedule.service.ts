@@ -15,13 +15,19 @@ import { logger } from '~/utils/logger'
 
 interface DueRun {
     id: string
-    schedule_id: string
-    scheduled_at: Date
-    rrule: string
-    starts_at: Date
-    timezone: string
+    run_at: Date
     hog_flow_id: string
     team_id: number
+}
+
+interface HogFlowRow {
+    status: string
+    trigger: Record<string, unknown>
+    schedule_config: {
+        rrule: string
+        starts_at: string
+        timezone: string
+    } | null
 }
 
 export class HogFlowScheduleService {
@@ -30,7 +36,6 @@ export class HogFlowScheduleService {
     private intervalHandle: ReturnType<typeof setInterval> | null = null
     private readonly pollIntervalMs: number
     private readonly batchSize: number
-    private readonly windowSize: number
 
     constructor(private config: PluginsServerConfig) {
         this.pool = new Pool({
@@ -38,17 +43,14 @@ export class HogFlowScheduleService {
             max: 5,
             idleTimeoutMillis: 30000,
         })
-        this.pollIntervalMs = 60_000 // 1 minute
+        this.pollIntervalMs = 60_000
         this.batchSize = 100
-        this.windowSize = 10
     }
 
     async start(): Promise<void> {
-        // Validate DB connection
         const client = await this.pool.connect()
         client.release()
 
-        // Create Kafka producer
         this.kafkaProducer = await KafkaProducerWrapper.create(this.config.KAFKA_CLIENT_RACK)
 
         this.intervalHandle = setInterval(() => {
@@ -57,7 +59,6 @@ export class HogFlowScheduleService {
             })
         }, this.pollIntervalMs)
 
-        // Run immediately on start
         await this.pollAndDispatch()
     }
 
@@ -66,44 +67,30 @@ export class HogFlowScheduleService {
         try {
             await client.query('BEGIN')
 
-            // Query due runs with FOR UPDATE SKIP LOCKED
+            // Query due runs directly from HogFlowScheduledRun
             const result = await client.query<DueRun>(
-                `SELECT r.id, r.schedule_id, r.scheduled_at,
-                        s.rrule, s.starts_at, s.timezone,
-                        s.hog_flow_id::text as hog_flow_id, s.team_id
+                `SELECT r.id, r.run_at, r.hog_flow_id::text as hog_flow_id, r.team_id
                  FROM workflows_hogflowscheduledrun r
-                 JOIN workflows_hogflowschedule s ON r.schedule_id = s.id
                  WHERE r.status = 'pending'
-                   AND r.scheduled_at <= NOW()
-                   AND s.status = 'active'
-                 ORDER BY r.scheduled_at ASC
+                   AND r.run_at <= NOW()
+                 ORDER BY r.run_at ASC
                  LIMIT $1
                  FOR UPDATE OF r SKIP LOCKED`,
                 [this.batchSize]
             )
 
-            const scheduleIdsToReplenish = new Set<string>()
-
             for (const run of result.rows) {
                 try {
-                    // Mark as queued
-                    await client.query(
-                        `UPDATE workflows_hogflowscheduledrun
-                         SET status = 'queued', started_at = NOW(), updated_at = NOW()
-                         WHERE id = $1`,
-                        [run.id]
+                    // Fetch the HogFlow to check it's active and get trigger type + schedule config
+                    const hogFlowResult = await client.query<HogFlowRow>(
+                        `SELECT status, trigger, schedule_config FROM posthog_hogflow WHERE id = $1`,
+                        [run.hog_flow_id]
                     )
-
-                    // Fetch the HogFlow to check it's active and get trigger type
-                    const hogFlowResult = await client.query<{
-                        status: string
-                        trigger: Record<string, unknown>
-                    }>(`SELECT status, trigger FROM posthog_hogflow WHERE id = $1`, [run.hog_flow_id])
 
                     if (!hogFlowResult.rows.length || hogFlowResult.rows[0].status !== 'active') {
                         await client.query(
                             `UPDATE workflows_hogflowscheduledrun
-                             SET status = 'skipped', completed_at = NOW(), updated_at = NOW(),
+                             SET status = 'failed', completed_at = NOW(), updated_at = NOW(),
                                  failure_reason = 'Workflow not active'
                              WHERE id = $1`,
                             [run.id]
@@ -117,11 +104,6 @@ export class HogFlowScheduleService {
                     if (triggerType === 'batch') {
                         await this.dispatchBatchTrigger(run, hogFlow.trigger as Record<string, unknown>)
                     } else {
-                        // Future trigger types will add their dispatch path here
-                        logger.warn('HogFlowScheduleService: unsupported trigger type', {
-                            triggerType,
-                            runId: run.id,
-                        })
                         await client.query(
                             `UPDATE workflows_hogflowscheduledrun
                              SET status = 'failed', completed_at = NOW(), updated_at = NOW(),
@@ -140,7 +122,10 @@ export class HogFlowScheduleService {
                         [run.id]
                     )
 
-                    scheduleIdsToReplenish.add(run.schedule_id)
+                    // Create the next pending run from schedule_config
+                    if (hogFlow.schedule_config) {
+                        await this.createNextPendingRun(client, run, hogFlow.schedule_config)
+                    }
                 } catch (err) {
                     logger.error('HogFlowScheduleService: failed to process run', {
                         runId: run.id,
@@ -157,18 +142,6 @@ export class HogFlowScheduleService {
             }
 
             await client.query('COMMIT')
-
-            // Replenish window for consumed schedules (outside the transaction)
-            for (const scheduleId of scheduleIdsToReplenish) {
-                try {
-                    await this.replenishWindow(scheduleId)
-                } catch (err) {
-                    logger.error('HogFlowScheduleService: failed to replenish window', {
-                        scheduleId,
-                        error: String(err),
-                    })
-                }
-            }
         } catch (err) {
             await client.query('ROLLBACK')
             throw err
@@ -207,95 +180,40 @@ export class HogFlowScheduleService {
         })
     }
 
-    private async replenishWindow(scheduleId: string): Promise<void> {
-        // Fetch schedule details
-        const schedResult = await this.pool.query<{
-            rrule: string
-            starts_at: Date
-            timezone: string
-            team_id: number
-            status: string
-        }>(
-            `SELECT rrule, starts_at, timezone, team_id, status
-             FROM workflows_hogflowschedule WHERE id = $1`,
-            [scheduleId]
+    private async createNextPendingRun(
+        client: any,
+        completedRun: DueRun,
+        scheduleConfig: { rrule: string; starts_at: string; timezone: string }
+    ): Promise<void> {
+        const nextRunAt = this.computeNextOccurrence(
+            scheduleConfig.rrule,
+            new Date(scheduleConfig.starts_at),
+            new Date(completedRun.run_at),
+            scheduleConfig.timezone
         )
 
-        if (!schedResult.rows.length || schedResult.rows[0].status !== 'active') {
+        if (!nextRunAt) {
+            // RRULE exhausted, clear schedule_config
+            await client.query(`UPDATE posthog_hogflow SET schedule_config = NULL, updated_at = NOW() WHERE id = $1`, [
+                completedRun.hog_flow_id,
+            ])
             return
         }
 
-        const sched = schedResult.rows[0]
-
-        // Find the last scheduled_at among non-cancelled runs
-        const lastRunResult = await this.pool.query<{ scheduled_at: Date }>(
-            `SELECT scheduled_at FROM workflows_hogflowscheduledrun
-             WHERE schedule_id = $1 AND status != 'cancelled'
-             ORDER BY scheduled_at DESC LIMIT 1`,
-            [scheduleId]
-        )
-
-        // Count existing pending runs
-        const pendingCountResult = await this.pool.query<{ count: string }>(
-            `SELECT COUNT(*) as count FROM workflows_hogflowscheduledrun
-             WHERE schedule_id = $1 AND status = 'pending'`,
-            [scheduleId]
-        )
-
-        const pendingCount = parseInt(pendingCountResult.rows[0]?.count || '0', 10)
-        if (pendingCount >= this.windowSize) {
-            return // Window is already full
-        }
-
-        const needed = this.windowSize - pendingCount
-        const after = lastRunResult.rows[0]?.scheduled_at || null
-        const afterDate = after ? new Date(after) : new Date()
-        const occurrences = this.computeOccurrences(
-            sched.rrule,
-            new Date(sched.starts_at),
-            afterDate,
-            needed,
-            sched.timezone
-        )
-
-        if (occurrences.length === 0) {
-            // RRULE is exhausted
-            await this.pool.query(
-                `UPDATE workflows_hogflowschedule SET status = 'completed', updated_at = NOW() WHERE id = $1`,
-                [scheduleId]
-            )
-            return
-        }
-
-        // Insert new pending runs
-        const values: unknown[] = []
-        const placeholders: string[] = []
-        let paramIndex = 1
-
-        for (const dt of occurrences) {
-            placeholders.push(
-                `(gen_random_uuid(), $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, 'pending', NOW(), NOW())`
-            )
-            values.push(sched.team_id, scheduleId, dt)
-            paramIndex += 3
-        }
-
-        await this.pool.query(
-            `INSERT INTO workflows_hogflowscheduledrun (id, team_id, schedule_id, scheduled_at, status, created_at, updated_at)
-             VALUES ${placeholders.join(', ')}`,
-            values
+        await client.query(
+            `INSERT INTO workflows_hogflowscheduledrun (id, team_id, hog_flow_id, run_at, status, created_at, updated_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, 'pending', NOW(), NOW())`,
+            [completedRun.team_id, completedRun.hog_flow_id, nextRunAt]
         )
     }
 
-    private computeOccurrences(
+    private computeNextOccurrence(
         rruleStr: string,
         startsAt: Date,
         after: Date,
-        count: number,
         timezone: string = 'UTC'
-    ): Date[] {
+    ): Date | null {
         // Convert startsAt to the schedule's timezone for RRULE expansion
-        // so that "9 AM Europe/Prague" stays at 9 AM local across DST changes
         const startsAtLocal = DateTime.fromJSDate(startsAt, { zone: 'utc' }).setZone(timezone)
         const dtstart = new Date(
             Date.UTC(
@@ -311,7 +229,7 @@ export class HogFlowScheduleService {
         const parsed = RRule.fromString(rruleStr)
         const rule = new RRule({ ...parsed.origOptions, dtstart })
 
-        // Convert after to the same "fake UTC" representation for comparison
+        // Convert after to the same "fake UTC" representation
         const afterLocal = DateTime.fromJSDate(after, { zone: 'utc' }).setZone(timezone)
         const afterFakeUtc = new Date(
             Date.UTC(
@@ -326,23 +244,26 @@ export class HogFlowScheduleService {
 
         // Use between() which respects COUNT/UNTIL
         const upperBound = new Date(afterFakeUtc.getTime() + 365 * 24 * 60 * 60 * 1000 * 10)
-        const fakeUtcOccurrences = rule.between(afterFakeUtc, upperBound, false)
+        const occurrences = rule.between(afterFakeUtc, upperBound, false)
 
-        // Convert back from "fake UTC" (really local times) to actual UTC
-        return fakeUtcOccurrences.slice(0, count).map((d) => {
-            const localDt = DateTime.fromObject(
-                {
-                    year: d.getUTCFullYear(),
-                    month: d.getUTCMonth() + 1,
-                    day: d.getUTCDate(),
-                    hour: d.getUTCHours(),
-                    minute: d.getUTCMinutes(),
-                    second: d.getUTCSeconds(),
-                },
-                { zone: timezone }
-            )
-            return localDt.toUTC().toJSDate()
-        })
+        if (occurrences.length === 0) {
+            return null
+        }
+
+        // Convert back from "fake UTC" to actual UTC
+        const next = occurrences[0]
+        const localDt = DateTime.fromObject(
+            {
+                year: next.getUTCFullYear(),
+                month: next.getUTCMonth() + 1,
+                day: next.getUTCDate(),
+                hour: next.getUTCHours(),
+                minute: next.getUTCMinutes(),
+                second: next.getUTCSeconds(),
+            },
+            { zone: timezone }
+        )
+        return localDt.toUTC().toJSDate()
     }
 
     isRunning(): boolean {

@@ -489,7 +489,8 @@ function StepTriggerConfigurationBatch({
     action: Extract<HogFlowAction, { type: 'trigger' }>
     config: Extract<HogFlowAction['config'], { type: 'batch' }>
 }): JSX.Element {
-    const { partialSetWorkflowActionConfig } = useActions(workflowLogic)
+    const { partialSetWorkflowActionConfig, setWorkflowInfo } = useActions(workflowLogic)
+    const { workflow } = useValues(workflowLogic)
     const { featureFlags } = useValues(featureFlagLogic)
 
     return (
@@ -538,12 +539,8 @@ function StepTriggerConfigurationBatch({
 
                     <LemonLabel>Schedule</LemonLabel>
                     <RecurringSchedulePicker
-                        schedule={config.schedule ?? null}
-                        onChange={(schedule) =>
-                            partialSetWorkflowActionConfig(action.id, {
-                                schedule: schedule,
-                            })
-                        }
+                        schedule={workflow.schedule_config ?? null}
+                        onChange={(schedule) => setWorkflowInfo({ schedule_config: schedule })}
                     />
                 </>
             )}
