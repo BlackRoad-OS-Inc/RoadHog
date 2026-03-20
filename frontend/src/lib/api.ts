@@ -398,6 +398,10 @@ export class ApiConfig {
         return this._currentTeamId
     }
 
+    static hasCurrentTeamId(): boolean {
+        return !!this._currentTeamId
+    }
+
     static setCurrentTeamId(id: TeamType['id']): void {
         this._currentTeamId = id
     }

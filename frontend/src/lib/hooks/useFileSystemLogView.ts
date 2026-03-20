@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-import api from 'lib/api'
+import api, { ApiConfig } from 'lib/api'
 
 type FileSystemLogViewType =
     | 'experiment'
@@ -25,6 +25,10 @@ interface TrackFileSystemLogViewOptions {
 
 export function trackFileSystemLogView({ type, ref, enabled = true }: TrackFileSystemLogViewOptions): void {
     if (!enabled || window.IMPERSONATED_SESSION || ref === null || ref === undefined) {
+        return
+    }
+
+    if (!ApiConfig.hasCurrentTeamId()) {
         return
     }
 
