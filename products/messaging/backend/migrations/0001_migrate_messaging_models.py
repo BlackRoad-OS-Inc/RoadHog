@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("posthog", "1056_migrate_experiments_models"),
+        ("posthog", "1059_add_button_tile"),
     ]
 
     operations = [

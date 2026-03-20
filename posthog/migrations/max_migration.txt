@@ -1,1 +1,1 @@
-1057_migrate_messaging_models
+1060_migrate_messaging_models

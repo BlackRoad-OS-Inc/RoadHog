@@ -442,6 +442,7 @@ export const FEATURE_FLAGS = {
     WEB_ANALYTICS_SESSION_PROPERTY_CHARTS: 'web-analytics-session-property-charts', // owner: @lricoy #team-web-analytics
     WEB_ANALYTICS_TILE_TOGGLES: 'web-analytics-tile-toggles', // owner: @lricoy #team-web-analytics
     WEB_ANALYTICS_REGIONS_MAP: 'web-analytics-regions-map', // owner: @jordanm-posthog #team-web-analytics
+    WEB_ANALYTICS_TOOLTIP_COMPARISON_LABELS: 'web-analytics-tooltip-comparison-labels', // owner: @lricoy #team-web-analytics
     WORKFLOWS_BATCH_TRIGGERS: 'workflows-batch-triggers', // owner: #team-workflows
     WORKFLOWS_INTERNAL_EVENT_FILTERS: 'workflows-internal-event-filters', // owner: @haven #team-workflows
     WORKFLOWS_PERSON_TIMEZONE: 'workflows-person-timezone', // owner: #team-workflows
@@ -450,6 +451,7 @@ export const FEATURE_FLAGS = {
     EXPERIMENTS_SAMPLE_RATIO_MISMATCH: 'experiments-sample-ratio-mismatch', // owner: @jurajmajerik #team-experiments
     NEW_TAB_PROJECT_EXPLORER: 'new-tab-project-explorer', // owner: #team-platform-ux
     REAL_TIME_NOTIFICATIONS: 'real-time-notifications', // owner: #team-platform-features
+    TAXONOMIC_FILTER_RECENTS: 'taxonomic-filter-recents', // owner: @pauldambra #team-paul
     // PLEASE KEEP THIS ALPHABETICALLY ORDERED
 } as const
 export type FeatureFlagLookupKey = keyof typeof FEATURE_FLAGS
