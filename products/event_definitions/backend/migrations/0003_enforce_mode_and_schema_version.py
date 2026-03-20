@@ -25,12 +25,4 @@ class Migration(migrations.Migration):
             model_name="eventdefinition",
             name="posthog_eventdef_enforce_idx",
         ),
-        migrations.AddIndex(
-            model_name="eventdefinition",
-            index=models.Index(
-                condition=models.Q(("enforcement_mode__in", ["reject", "enforce"])),
-                fields=["team_id"],
-                name="posthog_eventdef_enforce_idx",
-            ),
-        ),
     ]
