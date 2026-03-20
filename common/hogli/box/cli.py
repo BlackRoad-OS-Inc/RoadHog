@@ -29,7 +29,7 @@ def _get_devenv_config() -> DevenvConfig:
         config = load_devenv_config(output_path)
         if config and config.intents:
             return config
-    except Exception:
+    except (FileNotFoundError, ImportError):
         pass
     return DevenvConfig(intents=["product_analytics"])
 
@@ -113,8 +113,12 @@ def box_start(
             if state == "Shutdown":
                 click.echo("Starting stopped codespace...")
                 cs.start_codespace(name)
+
+            if state != "Available":
+                click.echo(f"Waiting for codespace to be ready (state={state})...")
                 if not cs.wait_for_codespace(name):
-                    click.echo("Error: codespace failed to start", err=True)
+                    click.echo(f"Codespace is still not ready: {name}", err=True)
+                    click.echo("Reconnect later with: hogli box:start", err=True)
                     raise SystemExit(1)
 
             if code:
@@ -135,9 +139,10 @@ def box_start(
     )
     click.echo(f"Created: {name}")
 
-    click.echo("Waiting for codespace to be ready...")
+    click.echo("Waiting for codespace to be ready (cold builds can take 10+ min)...")
     if not cs.wait_for_codespace(name):
-        click.echo("Error: codespace creation timed out", err=True)
+        click.echo(f"Codespace is still provisioning: {name}", err=True)
+        click.echo("Reconnect later with: hogli box:start", err=True)
         raise SystemExit(1)
 
     try:

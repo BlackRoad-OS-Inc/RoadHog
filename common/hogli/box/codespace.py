@@ -17,6 +17,24 @@ import click
 REPO = "PostHog/posthog"
 
 
+def _gh_env() -> dict[str, str]:
+    """Return a copy of os.environ with GH_DEBUG suppressed."""
+    env = os.environ.copy()
+    env.pop("GH_DEBUG", None)
+    return env
+
+
+def _gh_json(cmd: list[str]) -> dict | list | None:
+    """Run a gh command and parse JSON stdout. Returns None on failure."""
+    result = subprocess.run(cmd, capture_output=True, text=True, env=_gh_env())
+    if result.returncode != 0:
+        return None
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
 def ensure_gh_authenticated() -> None:
     """Verify gh CLI is installed and authenticated. Exits on failure."""
     try:
@@ -24,6 +42,7 @@ def ensure_gh_authenticated() -> None:
             ["gh", "auth", "status"],
             capture_output=True,
             text=True,
+            env=_gh_env(),
         )
         if result.returncode != 0:
             click.echo("Error: GitHub CLI not authenticated.", err=True)
@@ -36,8 +55,12 @@ def ensure_gh_authenticated() -> None:
 
 
 def list_codespaces(repo: str = REPO) -> list[dict]:
-    """List codespaces for a repo, parsed from JSON."""
-    result = subprocess.run(
+    """List codespaces for a repo, parsed from JSON.
+
+    Normalizes gh output so each entry has a top-level "branch" key
+    (extracted from gitStatus.ref).
+    """
+    entries = _gh_json(
         [
             "gh",
             "codespace",
@@ -45,26 +68,23 @@ def list_codespaces(repo: str = REPO) -> list[dict]:
             "--repo",
             repo,
             "--json",
-            "name,state,branch,machineName,lastUsedAt,displayName",
-        ],
-        capture_output=True,
-        text=True,
+            "name,state,gitStatus,machineName,lastUsedAt,displayName",
+        ]
     )
-    if result.returncode != 0:
+    if not isinstance(entries, list):
         return []
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return []
+    for entry in entries:
+        entry["branch"] = entry.get("gitStatus", {}).get("ref", "")
+    return entries
 
 
 def find_codespace(repo: str, branch: str) -> dict | None:
     """Find an existing codespace for repo+branch. Prefers running over stopped."""
-    codespaces = [cs for cs in list_codespaces(repo) if cs.get("branch") == branch]
-    if not codespaces:
+    matches = [e for e in list_codespaces(repo) if e.get("branch") == branch]
+    if not matches:
         return None
-    running = [cs for cs in codespaces if cs.get("state") == "Available"]
-    return running[0] if running else codespaces[0]
+    running = [e for e in matches if e.get("state") == "Available"]
+    return running[0] if running else matches[0]
 
 
 def create_codespace(
@@ -90,12 +110,11 @@ def create_codespace(
         idle_timeout,
         "--retention-period",
         retention,
-        "--default-permissions",
     ]
     if display_name:
         cmd.extend(["--display-name", display_name])
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, env=_gh_env())
     if result.returncode != 0:
         click.echo(f"Error creating codespace: {result.stderr.strip()}", err=True)
         raise SystemExit(1)
@@ -105,12 +124,20 @@ def create_codespace(
 
 def start_codespace(name: str) -> None:
     """Start a stopped codespace."""
-    subprocess.run(["gh", "codespace", "start", "-c", name], check=True)
+    subprocess.run(
+        ["gh", "codespace", "start", "-c", name],
+        env=_gh_env(),
+        check=False,
+    )
 
 
 def stop_codespace(name: str) -> None:
     """Stop a running codespace."""
-    subprocess.run(["gh", "codespace", "stop", "-c", name], check=True)
+    subprocess.run(
+        ["gh", "codespace", "stop", "-c", name],
+        env=_gh_env(),
+        check=False,
+    )
 
 
 def delete_codespace(name: str, force: bool = False) -> None:
@@ -118,28 +145,41 @@ def delete_codespace(name: str, force: bool = False) -> None:
     cmd = ["gh", "codespace", "delete", "-c", name]
     if force:
         cmd.append("--force")
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, env=_gh_env(), check=False)
 
 
-def wait_for_codespace(name: str, timeout: int = 300) -> bool:
-    """Wait for a codespace to become Available. Returns True on success."""
+def wait_for_codespace(name: str, timeout: int = 900) -> bool:
+    """Wait for a codespace to become Available. Returns True on success.
+
+    Polls state every 5 seconds and prints status updates, matching
+    the style of bin/wait-for-docker.
+    """
     start_time = time.time()
+    last_log = 0.0
     while time.time() - start_time < timeout:
-        result = subprocess.run(
-            ["gh", "codespace", "view", "-c", name, "--json", "state"],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            try:
-                if json.loads(result.stdout).get("state") == "Available":
-                    return True
-            except json.JSONDecodeError:
-                pass
-        elapsed = int(time.time() - start_time)
-        click.echo(f"  Waiting for codespace... ({elapsed}s)", err=True)
-        time.sleep(5)
+        state = _check_state(name)
+        if state == "Available":
+            elapsed = int(time.time() - start_time)
+            click.echo(f"Codespace ready after {elapsed}s.")
+            return True
+        if state in ("Failed", "Deleted"):
+            click.echo(f"Codespace entered state: {state}", err=True)
+            return False
+        now = time.time()
+        if now - last_log >= 5:
+            elapsed = int(now - start_time)
+            click.echo(f"Waiting for codespace: state={state} ({elapsed}s)")
+            last_log = now
+        time.sleep(3)
     return False
+
+
+def _check_state(name: str) -> str:
+    """Get the current state of a codespace."""
+    info = _gh_json(["gh", "codespace", "view", "-c", name, "--json", "state"])
+    if isinstance(info, dict):
+        return info.get("state", "")
+    return ""
 
 
 def ssh_into(name: str) -> NoReturn:
@@ -151,13 +191,14 @@ def ssh_into(name: str) -> NoReturn:
 def open_in_vscode(name: str) -> NoReturn:
     """Open codespace in VS Code. Replaces the current process."""
     os.execvp("gh", ["gh", "codespace", "code", "-c", name])
-    sys.exit(1)
+    sys.exit(1)  # unreachable, satisfies type checker
 
 
 def run_remote_command(name: str, command: str) -> None:
     """Execute a shell command inside a running codespace via SSH."""
     result = subprocess.run(
         ["gh", "codespace", "ssh", "-c", name, "--", "bash", "-lc", command],
+        env=_gh_env(),
         check=False,
     )
     if result.returncode != 0:
@@ -166,8 +207,8 @@ def run_remote_command(name: str, command: str) -> None:
 
 
 def view_codespace(name: str) -> dict:
-    """Get codespace details as a dict."""
-    result = subprocess.run(
+    """Get codespace details as a dict. Normalizes branch from gitStatus.ref."""
+    info = _gh_json(
         [
             "gh",
             "codespace",
@@ -175,17 +216,13 @@ def view_codespace(name: str) -> dict:
             "-c",
             name,
             "--json",
-            "name,state,branch,machineName,createdAt,lastUsedAt,displayName",
-        ],
-        capture_output=True,
-        text=True,
+            "name,state,gitStatus,machineName,createdAt,lastUsedAt,displayName",
+        ]
     )
-    if result.returncode != 0:
+    if not isinstance(info, dict):
         return {}
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return {}
+    info["branch"] = info.get("gitStatus", {}).get("ref", "")
+    return info
 
 
 def get_current_branch() -> str:
