@@ -62,6 +62,22 @@ describe('Query', () => {
         expect(insightVizQueryCalls[0]).toBe(query)
     })
 
+    it('syncs updated propsQuery via useEffect when uncontrolled', () => {
+        const originalQuery = makeInsightVizQuery()
+
+        const { rerender } = render(<Query query={originalQuery} uniqueKey="test" />)
+
+        insightVizQueryCalls.length = 0
+
+        const updatedQuery = makeInsightVizQuery({
+            personsOnEventsMode: 'person_id_override_properties_joined',
+        })
+        rerender(<Query query={updatedQuery} uniqueKey="test" />)
+
+        const lastCall = insightVizQueryCalls[insightVizQueryCalls.length - 1]
+        expect(lastCall).toBe(updatedQuery)
+    })
+
     it('returns null for null query', () => {
         const { container } = render(<Query query={null} uniqueKey="test" />)
         expect(container.innerHTML).toBe('')
