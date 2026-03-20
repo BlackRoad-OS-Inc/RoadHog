@@ -39,8 +39,7 @@ from posthog.hogql_queries.experiments.exposure_query_logic import (
 from posthog.hogql_queries.experiments.utils import (
     aggregate_variants_across_breakdowns,
     get_bayesian_experiment_result,
-    get_experiment_query_hogql,
-    get_experiment_query_sql,
+    get_experiment_query_debug,
     get_experiment_stats_method,
     get_frequentist_experiment_result,
     get_variant_results,
@@ -244,8 +243,9 @@ class ExperimentQueryRunner(QueryRunner):
         )
 
         experiment_query_ast = self._get_experiment_query()
-        self.hogql = get_experiment_query_hogql(experiment_query_ast, self.team)
-        self.clickhouse_sql = get_experiment_query_sql(experiment_query_ast, self.team)
+        experiment_query_debug = get_experiment_query_debug(experiment_query_ast, self.team)
+        self.hogql = experiment_query_debug[0]
+        self.clickhouse_sql = experiment_query_debug[1]
 
         response = execute_hogql_query(
             query_type="ExperimentQuery",
