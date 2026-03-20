@@ -2,9 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use base64::Engine;
-use posthog_symbol_data::{
-    read_symbol_data_with_byte_count, write_symbol_data, SourceAndMap,
-};
+use posthog_symbol_data::{read_symbol_data_with_byte_count, write_symbol_data, SourceAndMap};
 use reqwest::Url;
 use symbolic::sourcemapcache::{SourceMapCache, SourceMapCacheWriter};
 use tracing::{info, warn};
