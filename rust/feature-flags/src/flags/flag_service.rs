@@ -207,6 +207,7 @@ impl FlagService {
 #[cfg(test)]
 mod tests {
     use common_cache::NegativeCache;
+    use rstest::rstest;
     use serde_json::json;
 
     use crate::{
@@ -963,8 +964,11 @@ mod tests {
         );
     }
 
+    #[rstest]
+    #[case::skip_enabled_rejects(true)]
+    #[case::skip_disabled_falls_back_to_pg(false)]
     #[tokio::test]
-    async fn test_skip_pg_fallback_rejects_unknown_token_without_pg() {
+    async fn test_skip_pg_fallback_with_pg_only_token(#[case] skip_pg: bool) {
         use common_redis::MockRedisClient;
 
         let mock_client = MockRedisClient::new();
@@ -974,7 +978,7 @@ mod tests {
         let hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
         let context = TestContext::new(None).await;
 
-        // Insert a team in PG (but not in HyperCache) to prove PG is skipped
+        // Team exists in PG but not in HyperCache
         let team = context
             .insert_new_team(None)
             .await
@@ -988,56 +992,26 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             negative_cache.clone(),
-            true, // skip PG fallback
+            skip_pg,
         );
 
-        // Token exists in PG but not in HyperCache — with skip enabled, it should fail
         let result = flag_service
             .verify_token_and_get_team(&team.api_token)
             .await;
-        assert!(matches!(result, Err(FlagError::TokenValidationError)));
-        assert!(
-            negative_cache.contains(&team.api_token),
-            "Token should be added to negative cache when PG fallback is skipped"
-        );
-    }
 
-    #[tokio::test]
-    async fn test_skip_pg_fallback_disabled_still_finds_team_in_pg() {
-        use common_redis::MockRedisClient;
-
-        let mock_client = MockRedisClient::new();
-        let mock_redis: Arc<dyn RedisClient + Send + Sync> = Arc::new(mock_client.clone());
-        let team_hypercache_reader =
-            setup_team_hypercache_reader_with_mock_redis(mock_redis.clone());
-        let hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
-        let context = TestContext::new(None).await;
-
-        let team = context
-            .insert_new_team(None)
-            .await
-            .expect("Failed to insert team in PG");
-
-        let negative_cache = NegativeCache::new(100, 300);
-
-        let flag_service = FlagService::new(
-            mock_redis,
-            context.non_persons_reader.clone(),
-            team_hypercache_reader,
-            hypercache_reader,
-            negative_cache.clone(),
-            false, // PG fallback enabled
-        );
-
-        // Token exists in PG but not in HyperCache — with fallback enabled, PG should find it
-        let result = flag_service
-            .verify_token_and_get_team(&team.api_token)
-            .await;
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().api_token, team.api_token);
-        assert!(
-            !negative_cache.contains(&team.api_token),
-            "Valid token should not be in negative cache"
-        );
+        if skip_pg {
+            assert!(matches!(result, Err(FlagError::TokenValidationError)));
+            assert!(
+                negative_cache.contains(&team.api_token),
+                "Token should be negative-cached when PG fallback is skipped"
+            );
+        } else {
+            let resolved_team = result.expect("Should resolve via PG fallback");
+            assert_eq!(resolved_team.api_token, team.api_token);
+            assert!(
+                !negative_cache.contains(&team.api_token),
+                "Valid token should not be in negative cache"
+            );
+        }
     }
 }
