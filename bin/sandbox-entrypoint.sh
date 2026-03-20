@@ -27,6 +27,7 @@ pnpm install --frozen-lockfile --prefer-offline 2>&1 || pnpm install 2>&1
 echo "==> Running database migrations..."
 python manage.py migrate --noinput
 python manage.py migrate_clickhouse
+python manage.py apply_persons_migrations --database=persons_db_writer --ensure-database
 
 echo "==> Downloading GeoIP database..."
 bin/download-mmdb || true
