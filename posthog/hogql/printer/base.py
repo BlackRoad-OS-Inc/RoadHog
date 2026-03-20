@@ -43,7 +43,7 @@ from posthog.hogql.printer.types import (
     PrintableMaterializedPropertyGroupItem,
 )
 from posthog.hogql.resolver_utils import lookup_field_by_name
-from posthog.hogql.visitor import Visitor, clone_expr
+from posthog.hogql.visitor import CloningVisitor, Visitor, clone_expr
 
 from posthog.clickhouse.materialized_columns import (
     MaterializedColumn,
@@ -57,6 +57,20 @@ from posthog.models.team.team import WeekStartDay
 from posthog.models.utils import UUIDT
 
 MAX_PLACEHOLDER_MACRO_EXPANSION_DEPTH = 8
+
+
+class _PredicateFieldTypeSetter(CloningVisitor):
+    """Clones predicate AST expressions and sets FieldType on Field nodes to reference the given table."""
+
+    def __init__(self, table_type: ast.TableOrSelectType | None):
+        super().__init__()
+        self._table_type = table_type
+
+    def visit_field(self, node: ast.Field):
+        cloned = ast.Field(chain=list(node.chain))
+        if len(cloned.chain) == 1 and self._table_type is not None:
+            cloned.type = ast.FieldType(name=cloned.chain[0], table_type=self._table_type)
+        return cloned
 
 
 def get_channel_definition_dict():
@@ -338,21 +352,9 @@ class HogQLPrinter(Visitor[str]):
     ) -> list[ast.Expr]:
         """Return predicate expressions from the table definition, with field types set for proper alias prefixing."""
         from posthog.hogql.database.postgres_table import PostgresTable
-        from posthog.hogql.visitor import CloningVisitor
 
         if not isinstance(table_type.table, PostgresTable) or not table_type.table.predicates:
             return []
-
-        class _PredicateFieldTypeSetter(CloningVisitor):
-            def __init__(self, ttype: ast.TableOrSelectType | None):
-                super().__init__()
-                self._table_type = ttype
-
-            def visit_field(self, node: ast.Field):
-                cloned = ast.Field(chain=list(node.chain))
-                if len(cloned.chain) == 1 and self._table_type is not None:
-                    cloned.type = ast.FieldType(name=cloned.chain[0], table_type=self._table_type)
-                return cloned
 
         setter = _PredicateFieldTypeSetter(node_type)
         return [setter.visit(predicate) for predicate in table_type.table.predicates]
@@ -392,12 +394,20 @@ class HogQLPrinter(Visitor[str]):
             else:
                 extra_where = team_id_expr
 
-            # Apply table-level predicates (e.g., date filters on PostgresTable)
-            for pred in self._get_table_predicates(table_type, node.type):
-                if extra_where is None:
-                    extra_where = pred
+            # Apply table-level predicates (e.g., date filters on PostgresTable).
+            # For LEFT JOINs, predicates go in ON clause to preserve NULL rows.
+            predicate_exprs = self._get_table_predicates(table_type, node.type)
+            for pred in predicate_exprs:
+                if is_left_join and node.constraint is not None:
+                    if team_id_for_on_clause is None:
+                        team_id_for_on_clause = pred
+                    else:
+                        team_id_for_on_clause = ast.And(exprs=[team_id_for_on_clause, pred])
                 else:
-                    extra_where = ast.And(exprs=[extra_where, pred])
+                    if extra_where is None:
+                        extra_where = pred
+                    else:
+                        extra_where = ast.And(exprs=[extra_where, pred])
 
             sql = self._print_table_ref(table_type, node)
 
