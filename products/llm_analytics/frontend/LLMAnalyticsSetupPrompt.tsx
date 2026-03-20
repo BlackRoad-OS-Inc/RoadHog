@@ -1,11 +1,14 @@
 import { useValues } from 'kea'
+import { useFeatureFlagPayload, useFeatureFlagVariantKey } from 'posthog-js/react'
 
 import { Spinner } from '@posthog/lemon-ui'
 
 import { ProductIntroduction } from 'lib/components/ProductIntroduction/ProductIntroduction'
+import { FEATURE_FLAGS } from 'lib/constants'
 
 import { ProductKey } from '~/queries/schema/schema-general'
 
+import { LLMAnalyticsEmptyStatePage, type LLMAnalyticsEmptyStateVideoPayload } from './LLMAnalyticsEmptyStatePage'
 import { llmAnalyticsSharedLogic } from './llmAnalyticsSharedLogic'
 
 type Thing = 'generation' | 'trace'
@@ -33,6 +36,13 @@ export function LLMAnalyticsSetupPrompt({
 }
 
 function IngestionStatusCheck({ className, thing }: { className?: string; thing: Thing }): JSX.Element {
+    const variant = useFeatureFlagVariantKey(FEATURE_FLAGS.LLMA_RICH_EMPTY_STATE)
+    const payload = useFeatureFlagPayload(FEATURE_FLAGS.LLMA_RICH_EMPTY_STATE) as LLMAnalyticsEmptyStateVideoPayload
+
+    if (variant === 'test') {
+        return <LLMAnalyticsEmptyStatePage className={className} video={payload} />
+    }
+
     return (
         <ProductIntroduction
             productName="LLM analytics"
