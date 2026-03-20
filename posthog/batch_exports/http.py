@@ -144,9 +144,23 @@ class BatchExportRunSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BatchExportRun
-        fields = "__all__"
-        # TODO: Why aren't all these read only?
-        read_only_fields = ["batch_export"]
+        fields = [
+            "id",
+            "batch_export",
+            "status",
+            "records_completed",
+            "latest_error",
+            "data_interval_start",
+            "data_interval_end",
+            "cursor",
+            "created_at",
+            "finished_at",
+            "last_updated_at",
+            "records_total_count",
+            "backfill",
+            "bytes_exported",
+        ]
+        read_only_fields = fields
 
 
 class RunsCursorPagination(CursorPagination):
@@ -233,10 +247,22 @@ class BatchExportRunViewSet(TeamAndOrgViewSetMixin, LogEntryMixin, viewsets.Read
 
 
 class BatchExportDestinationSerializer(serializers.ModelSerializer):
-    """Serializer for an BatchExportDestination model."""
+    """Serializer for a BatchExportDestination model."""
 
+    type = serializers.ChoiceField(
+        choices=BatchExportDestination.Destination.choices,
+        help_text="Destination type: 'S3', 'Snowflake', 'Postgres', 'Redshift', 'BigQuery', 'Databricks', 'AzureBlob', or 'HTTP'.",
+    )
+    config = serializers.JSONField(
+        help_text="Connection parameters for the destination. Required fields vary by destination type. Secret values are redacted in responses.",
+    )
     integration_id = TeamScopedPrimaryKeyRelatedField(
-        write_only=True, queryset=Integration.objects.all(), source="integration", required=False, allow_null=True
+        write_only=True,
+        queryset=Integration.objects.all(),
+        source="integration",
+        required=False,
+        allow_null=True,
+        help_text="Optional ID of a PostHog integration to use for authentication instead of manual credentials.",
     )
 
     class Meta:
@@ -490,13 +516,54 @@ def resolve_and_validate_host(host: str) -> None:
 class BatchExportSerializer(serializers.ModelSerializer):
     """Serializer for a BatchExport model."""
 
-    destination = BatchExportDestinationSerializer()
-    latest_runs = BatchExportRunSerializer(many=True, read_only=True)
-    interval = serializers.ChoiceField(choices=BATCH_EXPORT_INTERVALS)
-    hogql_query = HogQLSelectQueryField(required=False)
-    timezone = serializers.ChoiceField(choices=TIMEZONES, required=False, allow_null=True)
-    offset_day = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=6)
-    offset_hour = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=23)
+    destination = BatchExportDestinationSerializer(
+        help_text="Destination configuration including type and connection parameters.",
+    )
+    latest_runs = BatchExportRunSerializer(
+        many=True,
+        read_only=True,
+        help_text="The 10 most recent export runs with their status and record counts.",
+    )
+    name = serializers.CharField(
+        help_text="Human-readable name for this batch export.",
+    )
+    model = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Data model to export: 'events', 'persons', or 'sessions'. Defaults to 'events'.",
+    )
+    interval = serializers.ChoiceField(
+        choices=BATCH_EXPORT_INTERVALS,
+        help_text="Export frequency: 'hour', 'day', 'week', 'every 5 minutes', or 'every 15 minutes'.",
+    )
+    paused = serializers.BooleanField(
+        required=False,
+        help_text="Whether the export is currently paused. Use the pause/unpause endpoints to change this.",
+    )
+    hogql_query = HogQLSelectQueryField(
+        required=False,
+        help_text="HogQL SELECT query defining custom export fields. Advanced usage only.",
+    )
+    timezone = serializers.ChoiceField(
+        choices=TIMEZONES,
+        required=False,
+        allow_null=True,
+        help_text="IANA timezone for scheduling (e.g. 'America/New_York'). Defaults to 'UTC'.",
+    )
+    offset_day = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=0,
+        max_value=6,
+        help_text="Day offset for weekly exports (0=Sunday through 6=Saturday). Only applicable for weekly interval.",
+    )
+    offset_hour = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=0,
+        max_value=23,
+        help_text="Hour offset for daily and weekly exports (0-23). Only applicable for daily or weekly intervals.",
+    )
 
     class Meta:
         model = BatchExport
@@ -522,6 +589,17 @@ class BatchExportSerializer(serializers.ModelSerializer):
             "offset_hour",
         ]
         read_only_fields = ["id", "team_id", "created_at", "last_updated_at", "latest_runs", "schema"]
+        extra_kwargs = {
+            "id": {"help_text": "Unique identifier for this batch export."},
+            "team_id": {"help_text": "The project this batch export belongs to."},
+            "created_at": {"help_text": "When this batch export was created."},
+            "last_updated_at": {"help_text": "When this batch export was last modified."},
+            "last_paused_at": {"help_text": "When this batch export was last paused."},
+            "start_at": {"help_text": "Earliest datetime for runs. Runs will not be scheduled before this time."},
+            "end_at": {"help_text": "Latest datetime for runs. The export stops scheduling after this time."},
+            "schema": {"help_text": "Computed export schema derived from the HogQL query, if set."},
+            "filters": {"help_text": "Optional event or person property filters to narrow the exported data."},
+        }
 
     def validate(self, attrs: dict) -> dict:
         """Validate the batch export configuration."""
@@ -1186,11 +1264,28 @@ class BatchExportBackfillProgress:
 
 
 class BatchExportBackfillSerializer(serializers.ModelSerializer):
-    progress = serializers.SerializerMethodField(read_only=True)
+    progress = serializers.SerializerMethodField(
+        read_only=True,
+        help_text="Progress information with total_runs, finished_runs, and progress percentage. Only available for running backfills.",
+    )
 
     class Meta:
         model = BatchExportBackfill
-        fields = "__all__"
+        fields = [
+            "id",
+            "team",
+            "batch_export",
+            "start_at",
+            "end_at",
+            "status",
+            "created_at",
+            "finished_at",
+            "last_updated_at",
+            "total_records_count",
+            "adjusted_start_at",
+            "progress",
+        ]
+        read_only_fields = fields
 
     @extend_schema_field(
         {
@@ -1320,6 +1415,7 @@ def create_backfill(
         raise ValidationError("Backfilling a BatchExport with no end date is not allowed")
 
 
+@extend_schema(tags=["batch_exports"])
 class BatchExportBackfillViewSet(
     TeamAndOrgViewSetMixin,
     mixins.CreateModelMixin,
