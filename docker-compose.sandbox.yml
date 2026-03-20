@@ -50,6 +50,13 @@ services:
             # they're running inside a sandbox container
             POSTHOG_SANDBOX: '1'
             HOST_BIND: '0.0.0.0'
+            # Rust services read these directly (not via start-rust-service)
+            COOKIELESS_REDIS_HOST: 'redis7'
+            COOKIELESS_REDIS_PORT: '6379'
+            PERSONS_WRITE_DATABASE_URL: 'postgres://posthog:posthog@db:5432/posthog'
+            PERSONS_READ_DATABASE_URL: 'postgres://posthog:posthog@db:5432/posthog'
+            PERSONS_DATABASE_URL: 'postgres://posthog:posthog@db:5432/posthog'
+            BEHAVIORAL_COHORTS_DATABASE_URL: 'postgres://posthog:posthog@db:5432/posthog'
             # Tell Django where the browser can reach the Vite dev server
             JS_URL: 'http://localhost:${SANDBOX_VITE_PORT:-49001}'
             # DuckLake connects to Postgres — point at the compose service, not localhost

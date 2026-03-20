@@ -138,7 +138,11 @@ case "$RS_SVC" in
     export RUST_BACKTRACE=1
     export WRITE_DATABASE_URL="${WRITE_DATABASE_URL:-$DEFAULT_PG}"
     export READ_DATABASE_URL="${READ_DATABASE_URL:-$DEFAULT_PG}"
-    export MAXMIND_DB_PATH=../share/GeoLite2-City.mmdb
+    if [[ "${POSTHOG_SANDBOX:-}" == "1" ]]; then
+      export MAXMIND_DB_PATH=/workspace/share/GeoLite2-City.mmdb
+    else
+      export MAXMIND_DB_PATH=../share/GeoLite2-City.mmdb
+    fi
     export REDIS_URL="$DEFAULT_REDIS"
     export ADDRESS=0.0.0.0:3001
     export DEBUG=1
