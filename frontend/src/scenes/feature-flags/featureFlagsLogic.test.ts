@@ -33,6 +33,72 @@ describe('flagMatchesSearch', () => {
     ])('search=%p → %p', (search, expected) => {
         expect(flagMatchesSearch(flag, search)).toBe(expected)
     })
+
+    describe('regex-based search', () => {
+        const webAnalyticsFlag = {
+            ...NEW_FLAG,
+            id: 2,
+            key: 'web-analytics',
+            name: 'Web Analytics Feature',
+        } as FeatureFlagType
+        const webUnderscoreFlag = { ...NEW_FLAG, id: 3, key: 'web_dashboard', name: 'Test Flag' } as FeatureFlagType
+        const webSpaceFlag = { ...NEW_FLAG, id: 4, key: 'web analytics', name: 'Space Flag' } as FeatureFlagType
+        const flagWithExperiment = {
+            ...NEW_FLAG,
+            id: 5,
+            key: 'experiment-flag',
+            name: 'Experiment Flag',
+            experiment_set: [{ id: 1, name: 'My Experiment Test' }],
+        } as FeatureFlagType
+
+        it.each<[FeatureFlagType, string, boolean]>([
+            // Regex pattern searches - spaces match any separator
+            [webAnalyticsFlag, 'web ana', true], // "web ana" matches "web-analytics"
+            [webUnderscoreFlag, 'web dash', true], // "web dash" matches "web_dashboard"
+            [webSpaceFlag, 'web ana', true], // "web ana" matches "web analytics"
+            [webAnalyticsFlag, 'web analytics', true], // Should match name
+
+            // Experiment name searches
+            [flagWithExperiment, 'experiment test', true], // Should match experiment name
+            [flagWithExperiment, 'my experiment', true], // Should match experiment name
+            [flagWithExperiment, 'experiment', true], // Should match flag name
+
+            // Searches that shouldn't match
+            [webAnalyticsFlag, 'web mobile', false], // "mobile" not in "web-analytics"
+            [webUnderscoreFlag, 'web mobile', false], // "mobile" not in flag
+            [flagWithExperiment, 'mobile test', false], // "mobile" not in flag or experiment
+
+            // Single word searches (existing behavior)
+            [webAnalyticsFlag, 'web', true],
+            [webAnalyticsFlag, 'analytics', true],
+            [webAnalyticsFlag, 'mobile', false],
+            [flagWithExperiment, 'experiment', true],
+
+            // Test trimming
+            [webAnalyticsFlag, 'web ', true], // Trailing space should be trimmed
+            [webAnalyticsFlag, ' web', true], // Leading space should be trimmed
+            [webAnalyticsFlag, '  web  ', true], // Multiple spaces should be trimmed
+        ])('flag=%p search=%p → %p', (testFlag, search, expected) => {
+            expect(flagMatchesSearch(testFlag, search)).toBe(expected)
+        })
+
+        it('handles null experiment names safely', () => {
+            const flagWithNullExperimentName = {
+                ...NEW_FLAG,
+                id: 5,
+                key: 'null-test-flag',
+                name: 'Flag with Null Test',
+                experiment_set: [{ id: 2, name: null as any }],
+            } as FeatureFlagType
+
+            // Should not throw error and should still match by flag name
+            expect(flagMatchesSearch(flagWithNullExperimentName, 'flag')).toBe(true)
+            // Should not match by experiment name since it's null
+            expect(flagMatchesSearch(flagWithNullExperimentName, 'experiment')).toBe(false)
+            // Should not throw when searching for something that would only match the null experiment name
+            expect(flagMatchesSearch(flagWithNullExperimentName, 'nonexistent')).toBe(false)
+        })
+    })
 })
 
 describe('flagMatchesStatus', () => {

@@ -1587,11 +1587,11 @@ class FeatureFlagSerializer(
         representation["filters"] = filters
         return representation
 
-    def get_experiment_set(self, obj: FeatureFlag) -> list[int]:
+    def get_experiment_set(self, obj: FeatureFlag) -> list[dict]:
         # Use the prefetched active experiments
         if hasattr(obj, "_active_experiments"):
-            return [exp.id for exp in obj._active_experiments]
-        return [exp.id for exp in obj.experiment_set.filter(deleted=False)]
+            return [{"id": exp.id, "name": exp.name} for exp in obj._active_experiments]
+        return [{"id": exp.id, "name": exp.name} for exp in obj.experiment_set.filter(deleted=False)]
 
     def _update_super_groups_for_key_change(self, validated_key: str, old_key: str, filters: dict) -> dict:
         if not (validated_key and validated_key != old_key and "super_groups" in filters):
@@ -2597,11 +2597,15 @@ class FeatureFlagViewSet(
             elif key == "created_by_id":
                 queryset = queryset.filter(created_by_id=value)
             elif key == "search":
-                queryset = queryset.filter(
-                    Q(key__icontains=value)
-                    | Q(name__icontains=value)
-                    | Q(experiment__name__icontains=value, experiment__deleted=False)
-                ).distinct()
+                value = value.strip()
+                if value:
+                    # Replace spaces with word boundary pattern for regex
+                    regex_pattern = value.replace(" ", r"[\s\-_]*")
+                    queryset = queryset.filter(
+                        Q(key__iregex=regex_pattern)
+                        | Q(name__iregex=regex_pattern)
+                        | Q(experiment__name__iregex=regex_pattern, experiment__deleted=False)
+                    ).distinct()
             elif key == "type":
                 if value == "boolean":
                     queryset = queryset.filter(

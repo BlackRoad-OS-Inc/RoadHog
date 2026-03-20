@@ -960,7 +960,7 @@ export const featureFlagLogic = kea<featureFlagLogicType>([
                         // If there's an experiment, load it concurrently before returning to prevent UI flicker
                         if (retrievedFlag.experiment_set && retrievedFlag.experiment_set.length > 0) {
                             try {
-                                const experiment = await api.experiments.get(retrievedFlag.experiment_set[0])
+                                const experiment = await api.experiments.get(retrievedFlag.experiment_set[0].id)
                                 actions.loadExperimentSuccess(experiment)
                             } catch (error) {
                                 // If experiment load fails, don't block the flag from loading
@@ -1350,7 +1350,7 @@ export const featureFlagLogic = kea<featureFlagLogicType>([
         experiment: {
             loadExperiment: async () => {
                 if (values.featureFlag.experiment_set) {
-                    return await api.experiments.get(values.featureFlag.experiment_set[0])
+                    return await api.experiments.get(values.featureFlag.experiment_set[0].id)
                 }
                 return null
             },

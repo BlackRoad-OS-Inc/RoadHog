@@ -21,11 +21,26 @@ import type { featureFlagsLogicType } from './featureFlagsLogicType'
 export const FLAGS_PER_PAGE = 100
 
 export function flagMatchesSearch(flag: FeatureFlagType, search?: string): boolean {
-    if (!search) {
+    if (!search?.trim()) {
         return true
     }
-    const s = search.toLowerCase()
-    return flag.key.toLowerCase().includes(s) || !!flag.name?.toLowerCase().includes(s)
+
+    const searchValue = search.trim().toLowerCase()
+    const keyLower = flag.key.toLowerCase()
+    const nameLower = flag.name?.toLowerCase() || ''
+
+    // Get experiment names from experiment_set, filtering out null/undefined names
+    const experimentNames =
+        flag.experiment_set
+            ?.map((exp) => exp.name?.toLowerCase())
+            .filter(Boolean)
+            .join(' ') || ''
+
+    // Use regex pattern matching like the backend - replace spaces with word boundary pattern
+    const regexPattern = searchValue.replace(/\s+/g, '[\\s\\-_]*')
+    const regex = new RegExp(regexPattern, 'i')
+
+    return regex.test(keyLower) || regex.test(nameLower) || regex.test(experimentNames)
 }
 
 export function flagMatchesStatus(flag: FeatureFlagType, active?: string): boolean {

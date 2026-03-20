@@ -373,8 +373,10 @@ export function FeatureFlag({ id }: FeatureFlagLogicProps): JSX.Element {
                             {featureFlag.experiment_set && featureFlag.experiment_set.length > 0 && (
                                 <LemonBanner type="warning">
                                     This feature flag is linked to{' '}
-                                    <Link target="_blank" to={urls.experiment(featureFlag.experiment_set[0])}>
-                                        {experiment?.name || `experiment ${featureFlag.experiment_set[0]}`}
+                                    <Link target="_blank" to={urls.experiment(featureFlag.experiment_set[0].id)}>
+                                        {experiment?.name ||
+                                            featureFlag.experiment_set[0].name ||
+                                            `experiment ${featureFlag.experiment_set[0].id}`}
                                     </Link>
                                     . Make changes from the experiment page unless you need advanced flag settings.
                                 </LemonBanner>
@@ -1197,7 +1199,7 @@ function FeatureFlagRollout({
                                             <Link
                                                 target="_blank"
                                                 className="font-semibold"
-                                                to={urls.experiment(featureFlag.experiment_set[0])}
+                                                to={urls.experiment(featureFlag.experiment_set[0].id)}
                                             >
                                                 <IconOpenInNew fontSize="18" />
                                             </Link>
