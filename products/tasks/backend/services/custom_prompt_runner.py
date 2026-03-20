@@ -72,11 +72,9 @@ async def run_prompt(
     """Spawn a sandbox agent with the given prompt and return (last_message, full_log)."""
     task, task_run = await _create_task_and_trigger(prompt, context, branch, step_name)
     logger.info("custom_prompt: started task=%s run=%s step=%s", task.id, task_run.id, step_name or "unknown")
-    try:
-        last_message, full_log, _, _ = await _poll_for_turn(task_run, verbose=verbose, output_fn=output_fn)
-    except RuntimeError as e:
-        logger.warning("custom_prompt: run=%s error=%s", task_run.id, e)
-        return str(e), ""
+    # No try/catch, propagating to the caller, if it fails,
+    # to turn into a clear failure instead of JSON parse error
+    last_message, full_log, _, _ = await _poll_for_turn(task_run, verbose=verbose, output_fn=output_fn)
     logger.info("custom_prompt: finished run=%s", task_run.id)
     return last_message, full_log or ""
 
