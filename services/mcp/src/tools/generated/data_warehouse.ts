@@ -19,12 +19,12 @@ import {
 } from '@/generated/data_warehouse/api'
 import type { Context, ToolBase, ZodObjectAny } from '@/tools/types'
 
-const ViewsListSchema = WarehouseSavedQueriesListQueryParams
+const ViewListSchema = WarehouseSavedQueriesListQueryParams
 
-const viewsList = (): ToolBase<typeof ViewsListSchema, unknown> => ({
-    name: 'views-list',
-    schema: ViewsListSchema,
-    handler: async (context: Context, params: z.infer<typeof ViewsListSchema>) => {
+const viewList = (): ToolBase<typeof ViewListSchema, unknown> => ({
+    name: 'view-list',
+    schema: ViewListSchema,
+    handler: async (context: Context, params: z.infer<typeof ViewListSchema>) => {
         const projectId = await context.stateManager.getProjectId()
         const result = await context.api.request<Schemas.PaginatedDataWarehouseSavedQueryMinimalList>({
             method: 'GET',
@@ -282,7 +282,7 @@ const viewRunHistory = (): ToolBase<
 })
 
 export const GENERATED_TOOLS: Record<string, () => ToolBase<ZodObjectAny>> = {
-    'views-list': viewsList,
+    'view-list': viewList,
     'view-create': viewCreate,
     'view-get': viewGet,
     'view-update': viewUpdate,
