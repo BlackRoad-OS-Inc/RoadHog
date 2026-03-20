@@ -185,7 +185,10 @@ class Command(BaseCommand):
             )
         )
 
-        if result.repository is not None and result.repository not in candidate_repos:
+        if result.repository is not None:
+            result.repository = result.repository.strip().lower()
+        candidate_repos_lower = {r.lower() for r in candidate_repos}
+        if result.repository is not None and result.repository not in candidate_repos_lower:
             self.stdout.write(
                 self.style.WARNING(
                     f"Agent selected '{result.repository}' which is not in the candidate list, treating as no match."
