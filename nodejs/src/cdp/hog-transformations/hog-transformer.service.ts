@@ -7,7 +7,11 @@ import { PluginEvent } from '~/plugin-scaffold'
 import { CyclotronJobInvocationResult, HogFunctionInvocationGlobals, HogFunctionType } from '../../cdp/types'
 import { isLegacyPluginHogFunction } from '../../cdp/utils'
 import { InternalCaptureService } from '../../common/services/internal-capture'
-import { KafkaProducerWrapper } from '../../kafka/producer'
+import {
+    AppMetricsOutput,
+    IngestionOutputs,
+    LogEntriesOutput,
+} from '../../ingestion/event-processing/ingestion-outputs'
 import { PluginsServerConfig } from '../../types'
 import { PostgresRouter } from '../../utils/db/postgres'
 import { GeoIPService, GeoIp } from '../../utils/geoip'
@@ -416,8 +420,6 @@ export type HogTransformerServiceConfig = Pick<
     | 'SES_SECRET_ACCESS_KEY'
     | 'SES_REGION'
     | 'SES_ENDPOINT'
-    | 'HOG_FUNCTION_MONITORING_APP_METRICS_TOPIC'
-    | 'HOG_FUNCTION_MONITORING_LOG_ENTRIES_TOPIC'
     | 'CDP_WATCHER_HOG_COST_TIMING_LOWER_MS'
     | 'CDP_WATCHER_HOG_COST_TIMING'
     | 'CDP_WATCHER_ASYNC_COST_TIMING_LOWER_MS'
@@ -440,7 +442,7 @@ export interface HogTransformerServiceDeps {
     pubSub: PubSub
     encryptedFields: EncryptedFields
     integrationManager: IntegrationManagerService
-    kafkaProducer: KafkaProducerWrapper
+    monitoringOutputs: IngestionOutputs<AppMetricsOutput | LogEntriesOutput>
     teamManager: TeamManager
     internalCaptureService: InternalCaptureService
 }
@@ -489,11 +491,9 @@ export function createHogTransformerService(
     )
     const pluginExecutor = new LegacyPluginExecutorService(deps.postgres, deps.geoipService)
     const hogFunctionMonitoringService = new HogFunctionMonitoringService(
-        deps.kafkaProducer,
+        deps.monitoringOutputs,
         deps.internalCaptureService,
-        deps.teamManager,
-        config.HOG_FUNCTION_MONITORING_APP_METRICS_TOPIC,
-        config.HOG_FUNCTION_MONITORING_LOG_ENTRIES_TOPIC
+        deps.teamManager
     )
     const hogWatcher = new HogWatcherService(
         deps.teamManager,

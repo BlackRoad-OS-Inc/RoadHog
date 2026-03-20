@@ -19,6 +19,7 @@ import { waitForExpect } from '~/tests/helpers/expectations'
 import { resetKafka } from '~/tests/helpers/kafka'
 
 import { Clickhouse } from '../../tests/helpers/clickhouse'
+import { createTestIngestionOutputs } from '../../tests/helpers/ingestion-outputs'
 import { createUserTeamAndOrganization, resetTestDatabase } from '../../tests/helpers/sql'
 import { createHogTransformerService } from '../cdp/hog-transformations/hog-transformer.service'
 import { Hub, PersonBatchWritingDbWriteMode, PipelineEvent, ProjectId, Team } from '../types'
@@ -223,10 +224,12 @@ describe.each(FLAG_COMBINATIONS)('Person Updates E2E ($#)', (config) => {
         team = fetchedTeam
         currentToken = team.api_token
 
+        const outputs = createTestIngestionOutputs(hub.kafkaProducer)
         ingester = new IngestionConsumer(hub, {
             ...hub,
             kafkaMetricsProducer: hub.kafkaProducer,
-            hogTransformer: createHogTransformerService(hub, hub),
+            outputs,
+            hogTransformer: createHogTransformerService(hub, { ...hub, monitoringOutputs: outputs }),
         })
         ingester['kafkaConsumer'] = {
             connect: jest.fn(),

@@ -33,6 +33,10 @@ import {
     KAFKA_EVENTS_PLUGIN_INGESTION,
     KAFKA_EVENTS_PLUGIN_INGESTION_HISTORICAL,
     KAFKA_EVENTS_PLUGIN_INGESTION_OVERFLOW,
+    KAFKA_GROUPS,
+    KAFKA_INGESTION_WARNINGS,
+    KAFKA_PERSON,
+    KAFKA_PERSON_DISTINCT_ID,
 } from './config/kafka-topics'
 import {
     createCookielessRedisConnectionConfig,
@@ -42,8 +46,23 @@ import {
 import { startEvaluationScheduler } from './evaluation-scheduler/evaluation-scheduler'
 import { CookielessManager } from './ingestion/cookieless/cookieless-manager'
 import { ErrorTrackingConsumer } from './ingestion/error-tracking/error-tracking-consumer'
+import {
+    AI_EVENTS_OUTPUT,
+    APP_METRICS_OUTPUT,
+    DLQ_OUTPUT,
+    EVENTS_OUTPUT,
+    GROUPS_OUTPUT,
+    HEATMAPS_OUTPUT,
+    INGESTION_WARNINGS_OUTPUT,
+    LOG_ENTRIES_OUTPUT,
+    PERSONS_OUTPUT,
+    PERSON_DISTINCT_IDS_OUTPUT,
+    REDIRECT_OUTPUT,
+} from './ingestion/event-processing/ingestion-outputs'
 import { IngestionConsumer, IngestionConsumerDeps } from './ingestion/ingestion-consumer'
 import { IngestionTestingConsumer } from './ingestion/ingestion-testing-consumer'
+import { resolveOutputs } from './ingestion/kafka/output-resolver'
+import { KafkaProducerRegistry } from './ingestion/kafka/producer-registry'
 import { KafkaProducerWrapper } from './kafka/producer'
 import { onShutdown } from './lifecycle'
 import { LogsIngestionConsumer } from './logs-ingestion/logs-ingestion-consumer'
@@ -85,6 +104,7 @@ export class PluginServer {
     // Infrastructure resources (tracked for shutdown cleanup)
     private kafkaProducer?: KafkaProducerWrapper
     private kafkaMetricsProducer?: KafkaProducerWrapper
+    private ingestionProducerRegistry?: KafkaProducerRegistry
     private postgres?: PostgresRouter
     private redisPool?: RedisPool
     private posthogRedisPool?: RedisPool
@@ -193,6 +213,26 @@ export class PluginServer {
                   }
                 : undefined
 
+            this.ingestionProducerRegistry = needsIngestion
+                ? new KafkaProducerRegistry(this.config.KAFKA_CLIENT_RACK)
+                : undefined
+
+            const ingestionOutputs = this.ingestionProducerRegistry
+                ? await resolveOutputs(this.ingestionProducerRegistry, {
+                      [EVENTS_OUTPUT]: { topic: this.config.CLICKHOUSE_JSON_EVENTS_KAFKA_TOPIC },
+                      [AI_EVENTS_OUTPUT]: { topic: this.config.CLICKHOUSE_AI_EVENTS_KAFKA_TOPIC },
+                      [HEATMAPS_OUTPUT]: { topic: this.config.CLICKHOUSE_HEATMAPS_KAFKA_TOPIC },
+                      [INGESTION_WARNINGS_OUTPUT]: { topic: KAFKA_INGESTION_WARNINGS },
+                      [DLQ_OUTPUT]: { topic: this.config.INGESTION_CONSUMER_DLQ_TOPIC },
+                      [REDIRECT_OUTPUT]: { topic: '' },
+                      [GROUPS_OUTPUT]: { topic: KAFKA_GROUPS },
+                      [PERSONS_OUTPUT]: { topic: KAFKA_PERSON },
+                      [PERSON_DISTINCT_IDS_OUTPUT]: { topic: KAFKA_PERSON_DISTINCT_ID },
+                      [APP_METRICS_OUTPUT]: { topic: this.config.HOG_FUNCTION_MONITORING_APP_METRICS_TOPIC },
+                      [LOG_ENTRIES_OUTPUT]: { topic: this.config.HOG_FUNCTION_MONITORING_LOG_ENTRIES_TOPIC },
+                  })
+                : undefined
+
             const hogTransformerDeps: HogTransformerServiceDeps | undefined = needsIngestion
                 ? {
                       geoipService: ingestionCdpServices!.geoipService,
@@ -200,7 +240,7 @@ export class PluginServer {
                       pubSub: this.pubsub!,
                       encryptedFields: ingestionCdpServices!.encryptedFields,
                       integrationManager: ingestionCdpServices!.integrationManager,
-                      kafkaProducer: this.kafkaMetricsProducer!,
+                      monitoringOutputs: ingestionOutputs!,
                       teamManager,
                       internalCaptureService: ingestionCdpServices!.internalCaptureService,
                   }
@@ -214,8 +254,8 @@ export class PluginServer {
                 const ingestionDeps: IngestionConsumerDeps = {
                     postgres: this.postgres!,
                     redisPool: this.redisPool!,
-                    kafkaProducer: this.kafkaProducer!,
                     kafkaMetricsProducer: this.kafkaMetricsProducer!,
+                    outputs: ingestionOutputs!,
                     teamManager,
                     groupTypeManager: ingestionServices!.groupTypeManager,
                     groupRepository: ingestionCdpServices!.groupRepository,
@@ -252,8 +292,8 @@ export class PluginServer {
                 const ingestionDeps: IngestionConsumerDeps = {
                     postgres: this.postgres!,
                     redisPool: this.redisPool!,
-                    kafkaProducer: this.kafkaProducer!,
                     kafkaMetricsProducer: this.kafkaMetricsProducer!,
+                    outputs: ingestionOutputs!,
                     teamManager,
                     groupTypeManager: ingestionServices!.groupTypeManager,
                     groupRepository: ingestionCdpServices!.groupRepository,
@@ -725,6 +765,7 @@ export class PluginServer {
 
         logger.info('💤', ' Shutting down infrastructure...')
         await Promise.allSettled([
+            this.ingestionProducerRegistry?.disconnectAll(),
             this.kafkaProducer?.disconnect(),
             this.kafkaMetricsProducer?.disconnect(),
             this.redisPool?.drain(),

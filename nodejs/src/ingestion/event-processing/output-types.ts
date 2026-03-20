@@ -24,3 +24,9 @@ export type PersonsOutput = typeof PERSONS_OUTPUT
 
 export const PERSON_DISTINCT_IDS_OUTPUT = 'person_distinct_ids' as const
 export type PersonDistinctIdsOutput = typeof PERSON_DISTINCT_IDS_OUTPUT
+
+export const APP_METRICS_OUTPUT = 'app_metrics' as const
+export type AppMetricsOutput = typeof APP_METRICS_OUTPUT
+
+export const LOG_ENTRIES_OUTPUT = 'log_entries' as const
+export type LogEntriesOutput = typeof LOG_ENTRIES_OUTPUT
