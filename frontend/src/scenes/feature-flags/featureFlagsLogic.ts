@@ -29,18 +29,26 @@ export function flagMatchesSearch(flag: FeatureFlagType, search?: string): boole
     const keyLower = flag.key.toLowerCase()
     const nameLower = flag.name?.toLowerCase() || ''
 
-    // Get experiment names from experiment_set, filtering out null/undefined names
+    // Get experiment names from experiment_set_metadata, filtering out null/undefined names
     const experimentNames =
-        flag.experiment_set
+        flag.experiment_set_metadata
             ?.map((exp) => exp.name?.toLowerCase())
             .filter(Boolean)
             .join(' ') || ''
 
-    // Use regex pattern matching like the backend - replace spaces with word boundary pattern
-    const regexPattern = searchValue.replace(/\s+/g, '[\\s\\-_]*')
-    const regex = new RegExp(regexPattern, 'i')
+    // Use regex pattern matching like the backend - escape metacharacters then replace spaces with word boundary pattern
+    const escapedSearchValue = searchValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const regexPattern = escapedSearchValue.replace(/\s+/g, '[\\s\\-_]*')
 
-    return regex.test(keyLower) || regex.test(nameLower) || regex.test(experimentNames)
+    try {
+        const regex = new RegExp(regexPattern, 'i')
+        return regex.test(keyLower) || regex.test(nameLower) || regex.test(experimentNames)
+    } catch {
+        // Fallback to simple case-insensitive substring search if regex fails
+        return (
+            keyLower.includes(searchValue) || nameLower.includes(searchValue) || experimentNames.includes(searchValue)
+        )
+    }
 }
 
 export function flagMatchesStatus(flag: FeatureFlagType, active?: string): boolean {

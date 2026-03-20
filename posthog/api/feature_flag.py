@@ -577,6 +577,7 @@ class FeatureFlagSerializer(
     has_enriched_analytics = ClassicBehaviorBooleanFieldSerializer()
 
     experiment_set = serializers.SerializerMethodField()
+    experiment_set_metadata = serializers.SerializerMethodField()
     surveys: serializers.SerializerMethodField = serializers.SerializerMethodField()
     features: serializers.SerializerMethodField = serializers.SerializerMethodField()
     usage_dashboard: serializers.PrimaryKeyRelatedField = serializers.PrimaryKeyRelatedField(read_only=True)
@@ -620,6 +621,7 @@ class FeatureFlagSerializer(
             "last_modified_by",
             "ensure_experience_continuity",
             "experiment_set",
+            "experiment_set_metadata",
             "surveys",
             "features",
             "rollback_conditions",
@@ -1587,7 +1589,13 @@ class FeatureFlagSerializer(
         representation["filters"] = filters
         return representation
 
-    def get_experiment_set(self, obj: FeatureFlag) -> list[dict]:
+    def get_experiment_set(self, obj: FeatureFlag) -> list[int]:
+        # Use the prefetched active experiments
+        if hasattr(obj, "_active_experiments"):
+            return [exp.id for exp in obj._active_experiments]
+        return [exp.id for exp in obj.experiment_set.filter(deleted=False)]
+
+    def get_experiment_set_metadata(self, obj: FeatureFlag) -> list[dict]:
         # Use the prefetched active experiments
         if hasattr(obj, "_active_experiments"):
             return [{"id": exp.id, "name": exp.name} for exp in obj._active_experiments]
@@ -2597,15 +2605,19 @@ class FeatureFlagViewSet(
             elif key == "created_by_id":
                 queryset = queryset.filter(created_by_id=value)
             elif key == "search":
-                value = value.strip()
-                if value:
-                    # Replace spaces with word boundary pattern for regex
-                    regex_pattern = value.replace(" ", r"[\s\-_]*")
-                    queryset = queryset.filter(
-                        Q(key__iregex=regex_pattern)
-                        | Q(name__iregex=regex_pattern)
-                        | Q(experiment__name__iregex=regex_pattern, experiment__deleted=False)
-                    ).distinct()
+                if isinstance(value, str):
+                    value = value.strip()
+                    if value:
+                        # Escape regex metacharacters first, then replace spaces with word boundary pattern
+                        import re
+
+                        escaped_value = re.escape(value)
+                        regex_pattern = escaped_value.replace(r"\ ", r"[\s\-_]*")
+                        queryset = queryset.filter(
+                            Q(key__iregex=regex_pattern)
+                            | Q(name__iregex=regex_pattern)
+                            | Q(experiment__name__iregex=regex_pattern, experiment__deleted=False)
+                        ).distinct()
             elif key == "type":
                 if value == "boolean":
                     queryset = queryset.filter(

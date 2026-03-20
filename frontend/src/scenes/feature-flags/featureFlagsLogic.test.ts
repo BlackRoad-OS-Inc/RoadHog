@@ -48,7 +48,8 @@ describe('flagMatchesSearch', () => {
             id: 5,
             key: 'experiment-flag',
             name: 'Experiment Flag',
-            experiment_set: [{ id: 1, name: 'My Experiment Test' }],
+            experiment_set: [1],
+            experiment_set_metadata: [{ id: 1, name: 'My Experiment Test' }],
         } as FeatureFlagType
 
         it.each<[FeatureFlagType, string, boolean]>([
@@ -88,7 +89,8 @@ describe('flagMatchesSearch', () => {
                 id: 5,
                 key: 'null-test-flag',
                 name: 'Flag with Null Test',
-                experiment_set: [{ id: 2, name: null as any }],
+                experiment_set: [2],
+                experiment_set_metadata: [{ id: 2, name: null as any }],
             } as FeatureFlagType
 
             // Should not throw error and should still match by flag name
@@ -97,6 +99,20 @@ describe('flagMatchesSearch', () => {
             expect(flagMatchesSearch(flagWithNullExperimentName, 'experiment')).toBe(false)
             // Should not throw when searching for something that would only match the null experiment name
             expect(flagMatchesSearch(flagWithNullExperimentName, 'nonexistent')).toBe(false)
+        })
+
+        it('handles regex metacharacters safely', () => {
+            const testFlag = { ...NEW_FLAG, id: 6, key: 'test[flag]', name: 'Test (Flag)' } as FeatureFlagType
+
+            // Should not throw error and should match using escaped regex
+            expect(() => flagMatchesSearch(testFlag, '[flag]')).not.toThrow()
+            expect(() => flagMatchesSearch(testFlag, '(Flag)')).not.toThrow()
+            expect(() => flagMatchesSearch(testFlag, '*invalid')).not.toThrow()
+            expect(() => flagMatchesSearch(testFlag, '?invalid')).not.toThrow()
+
+            // Should match literal characters
+            expect(flagMatchesSearch(testFlag, '[flag]')).toBe(true)
+            expect(flagMatchesSearch(testFlag, '(Flag)')).toBe(true)
         })
     })
 })
