@@ -412,6 +412,23 @@ function JudgmentBlocks({ artefacts }: { artefacts: SignalReportArtefact[] }): J
                         </LemonTag>
                     </span>
                 )}
+                {priorityArtefact && (
+                    <span className="inline-flex items-center gap-1">
+                        Priority:{' '}
+                        <LemonTag
+                            size="small"
+                            type={
+                                priority === 'P0' || priority === 'P1'
+                                    ? 'danger'
+                                    : priority === 'P2'
+                                      ? 'caution'
+                                      : 'muted'
+                            }
+                        >
+                            {priority}
+                        </LemonTag>
+                    </span>
+                )}
                 {actionabilityArtefact && (
                     <span className="inline-flex items-center gap-1">
                         Actionability:{' '}
@@ -430,23 +447,6 @@ function JudgmentBlocks({ artefacts }: { artefacts: SignalReportArtefact[] }): J
                                 : actionability === 'requires_human_input'
                                   ? 'Requires human input'
                                   : 'Not actionable'}
-                        </LemonTag>
-                    </span>
-                )}
-                {priorityArtefact && (
-                    <span className="inline-flex items-center gap-1">
-                        Priority:{' '}
-                        <LemonTag
-                            size="small"
-                            type={
-                                priority === 'P0' || priority === 'P1'
-                                    ? 'danger'
-                                    : priority === 'P2'
-                                      ? 'caution'
-                                      : 'muted'
-                            }
-                        >
-                            {priority}
                         </LemonTag>
                     </span>
                 )}
