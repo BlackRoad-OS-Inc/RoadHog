@@ -8,6 +8,7 @@ use tracing::{info, warn};
 use crate::error::GatewayError;
 use crate::routing::Workload;
 use crate::state::AppState;
+use crate::tagging;
 use crate::validation;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -70,8 +71,19 @@ pub async fn handle_query(
             .or_insert_with(|| serde_json::Value::Number(max_execution_time.into()));
     }
 
-    // Build log_comment for ClickHouse query attribution
-    let log_comment = validation::build_log_comment(req.team_id, &req.ch_user, &req.query_tags);
+    // Check circuit breaker before forwarding to ClickHouse
+    state.circuit_breakers.get(workload.as_str()).check()?;
+
+    // Acquire per-team concurrency permit (RAII — released on drop)
+    let _team_permit = state.team_limits.try_acquire(req.team_id, &req.ch_user)?;
+
+    // Generate a gateway request ID for tracing
+    let gateway_request_id = uuid::Uuid::new_v4().to_string();
+
+    // Build log_comment for ClickHouse query attribution.
+    // The old validation::build_log_comment is kept for backward compat;
+    // the new tagging module adds gateway-specific fields.
+    let log_comment = tagging::build_log_comment(&req.query_tags, &gateway_request_id);
 
     // Route to the correct cluster host
     let host = state.router.route(&workload);
@@ -85,7 +97,8 @@ pub async fn handle_query(
     );
 
     // Forward to ClickHouse via HTTP POST
-    let response = execute_clickhouse_query(
+    let cb = state.circuit_breakers.get(workload.as_str());
+    let response = match execute_clickhouse_query(
         &state.http_client,
         host,
         &req.sql,
@@ -94,7 +107,17 @@ pub async fn handle_query(
         &log_comment,
         max_execution_time,
     )
-    .await?;
+    .await
+    {
+        Ok(resp) => {
+            cb.record_success();
+            resp
+        }
+        Err(e) => {
+            cb.record_failure();
+            return Err(e);
+        }
+    };
 
     let elapsed_ms = start.elapsed().as_millis() as u64;
 

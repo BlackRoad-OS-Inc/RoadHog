@@ -20,6 +20,16 @@ pub enum GatewayError {
     #[error("upstream timeout after {0}s")]
     Timeout(u32),
 
+    #[error("circuit breaker open for workload {0}")]
+    CircuitBreakerOpen(String),
+
+    #[error("team {team_id} ({ch_user}) has reached per-team concurrency limit of {limit}")]
+    TeamConcurrencyLimit {
+        team_id: u64,
+        ch_user: String,
+        limit: u32,
+    },
+
     #[error("internal error: {0}")]
     Internal(String),
 }
@@ -38,6 +48,8 @@ impl GatewayError {
             GatewayError::InvalidRequest(_) => "invalid_request",
             GatewayError::ClickHouseError(_) => "clickhouse_error",
             GatewayError::Timeout(_) => "timeout",
+            GatewayError::CircuitBreakerOpen(_) => "circuit_breaker_open",
+            GatewayError::TeamConcurrencyLimit { .. } => "team_concurrency_limit",
             GatewayError::Internal(_) => "internal_error",
         }
     }
@@ -49,6 +61,8 @@ impl GatewayError {
             GatewayError::InvalidRequest(_) => StatusCode::BAD_REQUEST,
             GatewayError::ClickHouseError(_) => StatusCode::BAD_GATEWAY,
             GatewayError::Timeout(_) => StatusCode::GATEWAY_TIMEOUT,
+            GatewayError::CircuitBreakerOpen(_) => StatusCode::SERVICE_UNAVAILABLE,
+            GatewayError::TeamConcurrencyLimit { .. } => StatusCode::TOO_MANY_REQUESTS,
             GatewayError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

@@ -1,6 +1,10 @@
+pub mod circuit_breaker;
+pub mod circuit_breaker_registry;
 pub mod config;
 pub mod error;
 pub mod query;
 pub mod routing;
 pub mod state;
+pub mod tagging;
+pub mod team_limits;
 pub mod validation;
