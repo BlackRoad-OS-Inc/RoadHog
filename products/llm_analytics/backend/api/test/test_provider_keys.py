@@ -904,7 +904,7 @@ class TestAssignKeyEndpoint(APIBaseTest):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         eval_obj.refresh_from_db()
-        self.assertIsNotNone(eval_obj.model_configuration)
+        assert eval_obj.model_configuration is not None
         self.assertEqual(eval_obj.model_configuration.provider_key, key)
 
     def test_rejects_empty_evaluation_ids(self):
