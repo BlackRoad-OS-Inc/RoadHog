@@ -29,6 +29,9 @@ class SupportAgentToolkit(AgentToolkit):
 SUPPORT_MODE = AgentModeDefinition(
     mode=AgentMode.PRODUCT_ANALYTICS,
     mode_description="Support agent mode",
+    # AgentToolkitManager merges agent toolkit + mode toolkit; tools live on the
+    # agent toolkit (SupportAgentToolkit) so the mode toolkit must be empty to
+    # avoid duplicate tool names sent to the LLM.
     toolkit_class=AgentToolkit,
 )
 

@@ -88,18 +88,19 @@ def format_conversation(ticket: Ticket, messages: Iterable[Comment]) -> str:
     return "\n".join(parts)
 
 
-def _fetch_session_events(team: Team, session_id: str, ticket_created_at: str | None) -> list[dict]:
-    """Fetch recent events for a session from ClickHouse."""
+def _parse_time_window(ticket_created_at: str | None) -> tuple[str, str | None]:
+    """Return (after, before) for a +/-5-minute window around ticket creation."""
     if ticket_created_at:
-        # Parse ISO format datetime safely
         created_at = parse_datetime(ticket_created_at)
         if not created_at:
             created_at = datetime.fromisoformat(ticket_created_at.replace("Z", "+00:00"))
-        after = (created_at - timedelta(minutes=5)).isoformat()
-        before = (created_at + timedelta(minutes=5)).isoformat()
-    else:
-        after = "-24h"
-        before = None
+        return (created_at - timedelta(minutes=5)).isoformat(), (created_at + timedelta(minutes=5)).isoformat()
+    return "-24h", None
+
+
+def _fetch_session_events(team: Team, session_id: str, ticket_created_at: str | None) -> list[dict]:
+    """Fetch recent events for a session from ClickHouse."""
+    after, before = _parse_time_window(ticket_created_at)
 
     query = create_session_batch_events_query(
         session_ids=[session_id],
@@ -125,15 +126,7 @@ def _fetch_session_events(team: Team, session_id: str, ticket_created_at: str | 
 
 def _fetch_session_exceptions(team: Team, session_id: str, ticket_created_at: str | None) -> list[dict]:
     """Fetch exceptions for a session from ClickHouse."""
-    if ticket_created_at:
-        created_at = parse_datetime(ticket_created_at)
-        if not created_at:
-            created_at = datetime.fromisoformat(ticket_created_at.replace("Z", "+00:00"))
-        after = (created_at - timedelta(minutes=5)).isoformat()
-        before = (created_at + timedelta(minutes=5)).isoformat()
-    else:
-        after = "-24h"
-        before = None
+    after, before = _parse_time_window(ticket_created_at)
 
     query = create_session_batch_events_query(
         session_ids=[session_id],
