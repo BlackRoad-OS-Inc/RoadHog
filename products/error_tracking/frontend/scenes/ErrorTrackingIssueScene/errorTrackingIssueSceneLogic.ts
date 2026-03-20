@@ -5,10 +5,15 @@ import { subscriptions } from 'kea-subscriptions'
 import posthog from 'posthog-js'
 
 import api from 'lib/api'
-import { ErrorEventProperties, ErrorEventType, ErrorTrackingFingerprint } from 'lib/components/Errors/types'
+import {
+    ErrorEventProperties,
+    ErrorEventType,
+    ErrorTrackingFingerprint,
+    ErrorTrackingSpikeEvent,
+} from 'lib/components/Errors/types'
 import { SetupTaskId, globalSetupLogic } from 'lib/components/ProductSetup'
 import { Dayjs, dayjs } from 'lib/dayjs'
-import { uuid } from 'lib/utils'
+import { dateStringToDayJs, uuid } from 'lib/utils'
 import { MaxContextInput, createMaxContextHelpers } from 'scenes/max/maxTypes'
 import { Scene } from 'scenes/sceneTypes'
 import { Params } from 'scenes/sceneTypes'
@@ -278,6 +283,40 @@ export const errorTrackingIssueSceneLogic = kea<errorTrackingIssueSceneLogicType
                 },
             },
         ],
+        spikeEvents: [
+            [] as ErrorTrackingSpikeEvent[],
+            {
+                loadSpikeEvents: async () => {
+                    // Spike API expects ISO datetimes; dateRange uses relative strings (-24h) like HogQL queries.
+                    const dr = values.dateRange
+                    let dateFromIso: string | undefined
+                    let dateToIso: string | undefined
+                    if (dr?.date_from) {
+                        const from = dateStringToDayJs(dr.date_from)
+                        if (from) {
+                            dateFromIso = from.toISOString()
+                        }
+                    }
+                    if (dr?.date_to) {
+                        const to = dateStringToDayJs(dr.date_to)
+                        if (to) {
+                            dateToIso = to.toISOString()
+                        }
+                    } else if (dr?.date_from) {
+                        const to = dateStringToDayJs(new Date().toISOString())
+                        if (to) {
+                            dateToIso = to.toISOString()
+                        }
+                    }
+                    const response = await api.errorTracking.getSpikeEvents({
+                        issueIds: [props.id],
+                        dateFrom: dateFromIso,
+                        dateTo: dateToIso,
+                    })
+                    return response.results
+                },
+            },
+        ],
     })),
 
     selectors(({ actions }) => ({
@@ -383,7 +422,10 @@ export const errorTrackingIssueSceneLogic = kea<errorTrackingIssueSceneLogicType
 
     listeners(({ props, values, actions }) => {
         return {
-            setDateRange: actions.loadSummary,
+            setDateRange: () => {
+                actions.loadSummary()
+                actions.loadSpikeEvents()
+            },
             setFilterGroup: actions.loadSummary,
             setFilterTestAccounts: actions.loadSummary,
             setSearchQuery: actions.loadSummary,
@@ -438,6 +480,7 @@ export const errorTrackingIssueSceneLogic = kea<errorTrackingIssueSceneLogicType
             actions.setInitialEventTimestamp(props.timestamp ?? null)
             actions.loadSummary()
             actions.loadIssueFingerprints()
+            actions.loadSpikeEvents()
             globalSetupLogic.findMounted()?.actions.markTaskAsCompleted(SetupTaskId.ViewFirstError)
         },
     })),

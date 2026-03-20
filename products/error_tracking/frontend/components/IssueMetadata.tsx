@@ -2,7 +2,7 @@ import { useValues } from 'kea'
 import { PropsWithChildren, useState } from 'react'
 import { match } from 'ts-pattern'
 
-import { IconChevronRight } from '@posthog/icons'
+import { IconChevronRight, IconTrending } from '@posthog/icons'
 import { LemonSkeleton, Tooltip } from '@posthog/lemon-ui'
 
 import { dayjs } from 'lib/dayjs'
@@ -12,11 +12,11 @@ import { ErrorTrackingIssueAggregations } from '~/queries/schema/schema-general'
 
 import { useSparklineDataIssueScene } from '../hooks/use-sparkline-data'
 import { useSparklineEvents } from '../hooks/use-sparkline-events'
-import { useSparklineOptions } from '../hooks/use-sparkline-options'
 import { errorTrackingIssueSceneLogic } from '../scenes/ErrorTrackingIssueScene/errorTrackingIssueSceneLogic'
 import { cancelEvent } from '../utils'
-import { SparklineChart, SparklineDatum, SparklineEvent } from './SparklineChart/SparklineChart'
 import { TimeBoundary } from './TimeBoundary'
+import { ErrorTrackingVolumeSparkline } from './VolumeSparkline/ErrorTrackingVolumeSparkline'
+import type { SparklineDatum, SparklineEvent } from './VolumeSparkline/types'
 
 type SelectedDataType =
     | {
@@ -34,23 +34,6 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
     const [hoveredDatum, setHoveredDatum] = useState<SelectedDataType>(null)
     const sparklineData = useSparklineDataIssueScene()
     const sparklineEvents = useSparklineEvents()
-    const sparklineOptions = useSparklineOptions(
-        {
-            onDatumMouseEnter: (d: SparklineDatum) => {
-                setHoveredDatum({ type: 'datum', data: d })
-            },
-            onDatumMouseLeave: () => {
-                setHoveredDatum(null)
-            },
-            onEventMouseEnter: (d: SparklineEvent<string>) => {
-                setHoveredDatum({ type: 'event', data: d })
-            },
-            onEventMouseLeave: () => {
-                setHoveredDatum(null)
-            },
-        },
-        [setHoveredDatum]
-    )
 
     return (
         <div className={className}>
@@ -98,13 +81,37 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
                         .otherwise(() => null)}
                 </div>
             </div>
-            <div onClick={cancelEvent} className="shrink-0">
-                <SparklineChart
-                    data={sparklineData}
-                    events={sparklineEvents}
-                    options={sparklineOptions}
-                    className="h-full pt-0"
-                />
+            <div onClick={cancelEvent} className="shrink-0 min-h-[200px] flex flex-col">
+                {sparklineData.length >= 2 ? (
+                    <div className="pb-3">
+                        <div className="relative w-full flex-1 min-h-0 pt-4">
+                            <ErrorTrackingVolumeSparkline
+                                data={sparklineData}
+                                layout="detailed"
+                                xAxis="full"
+                                events={sparklineEvents}
+                                interactive
+                                onHoverChange={(_index, datum) => {
+                                    if (datum == null) {
+                                        setHoveredDatum(null)
+                                    } else {
+                                        setHoveredDatum({ type: 'datum', data: datum })
+                                    }
+                                }}
+                                onEventHoverChange={(e) => {
+                                    if (e == null) {
+                                        setHoveredDatum(null)
+                                    } else {
+                                        setHoveredDatum({ type: 'event', data: e })
+                                    }
+                                }}
+                                className="!p-0 h-full min-h-[160px]"
+                            />
+                        </div>
+                    </div>
+                ) : (
+                    <LemonSkeleton className="h-40 w-full shrink-0" />
+                )}
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
         </div>
@@ -170,7 +177,17 @@ function renderDate(date: Date): JSX.Element {
 }
 
 function renderDataPoint(d: SparklineDatum): JSX.Element {
-    return renderMetric('Occurrences', d.value, false)
+    return (
+        <div className="flex items-center h-full gap-3">
+            {renderMetric('Occurrences', d.value, false)}
+            {d.animated && (
+                <div className="flex items-center gap-1.5 text-warning-dark">
+                    <IconTrending className="text-base" />
+                    <span className="text-xs font-semibold">Spike</span>
+                </div>
+            )}
+        </div>
+    )
 }
 
 function renderEventPoint(d: SparklineEvent<string>): JSX.Element {
