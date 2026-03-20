@@ -21,6 +21,7 @@ services:
         stdin_open: true
         ports:
             - "${SANDBOX_PORT:-48001}:8000"
+            - "${SANDBOX_VITE_PORT:-8234}:8234"
         volumes:
             # Mount worktree code only — no overlays from main repo
             - ${SANDBOX_CODE:-.}:/workspace
