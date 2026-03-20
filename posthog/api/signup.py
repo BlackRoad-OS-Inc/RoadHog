@@ -782,7 +782,9 @@ def social_create_user(
             user.save()
 
         if invite_id:
-            process_social_invite_signup(strategy, invite_id, user.email, user.first_name, user)
+            result = process_social_invite_signup(strategy, invite_id, user.email, user.first_name, user)
+            if isinstance(result, HttpResponseRedirect):
+                return result
         else:
             process_social_domain_jit_provisioning_signup(strategy, user.email, user.first_name, user)
 
@@ -808,7 +810,10 @@ def social_create_user(
 
     if invite_id:
         from_invite = True
-        user = process_social_invite_signup(strategy, invite_id, email, full_name)
+        result = process_social_invite_signup(strategy, invite_id, email, full_name)
+        if isinstance(result, HttpResponseRedirect):
+            return result
+        user = result
 
     else:
         # JIT Provisioning?
