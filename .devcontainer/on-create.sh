@@ -24,11 +24,11 @@ pnpm install --frozen-lockfile
 echo "Building phrocs..."
 (cd tools/phrocs && go build -o ../../bin/phrocs .) || echo "phrocs build skipped (Go may not be ready yet)"
 
-# Pre-pull Docker images for all profiles
-echo "Pulling Docker images..."
-docker compose -f docker-compose.dev.yml -f docker-compose.profiles.yml \
-    --profile temporal --profile replay --profile observability --profile dev_tools \
-    pull --quiet || echo "Some images failed to pull (non-fatal)"
+# Pull only core infrastructure images. Profile-specific images (temporal,
+# observability, dev_tools) are pulled on-demand by post-create.sh when
+# the intent system starts the requested services.
+echo "Pulling core Docker images..."
+docker compose -f docker-compose.dev.yml pull --quiet || echo "Some images failed to pull (non-fatal)"
 
 # Download GeoIP database
 echo "Downloading GeoIP database..."
