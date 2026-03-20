@@ -17,10 +17,12 @@ import {
     createTestingJoinedIngestionPipeline,
 } from './analytics/testing-joined-ingestion-pipeline'
 import {
+    DLQ_OUTPUT,
     EVENTS_OUTPUT,
     HEATMAPS_OUTPUT,
     INGESTION_WARNINGS_OUTPUT,
     IngestionOutputs,
+    REDIRECT_OUTPUT,
 } from './event-processing/ingestion-outputs'
 import { latestOffsetTimestampGauge } from './ingestion-consumer'
 import { BatchPipeline } from './pipelines/batch-pipeline.interface'
@@ -109,15 +111,21 @@ export class IngestionTestingConsumer {
                 topic: KAFKA_INGESTION_WARNINGS,
                 producer: this.kafkaProducer!,
             },
+            [DLQ_OUTPUT]: {
+                topic: this.dlqTopic,
+                producer: this.kafkaProducer!,
+            },
+            [REDIRECT_OUTPUT]: {
+                topic: '', // redirect topic comes from the pipeline result
+                producer: this.kafkaProducer!,
+            },
         })
 
         const joinedPipelineConfig: TestingJoinedIngestionPipelineConfig = {
-            dlqTopic: this.dlqTopic,
             groupId: this.groupId,
             outputs,
         }
         const joinedPipelineDeps: TestingJoinedIngestionPipelineDeps = {
-            kafkaProducer: this.kafkaProducer!,
             promiseScheduler: this.promiseScheduler,
             teamManager: this.deps.teamManager,
         }

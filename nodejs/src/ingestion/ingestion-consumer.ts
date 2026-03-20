@@ -33,9 +33,11 @@ import { IngestionConsumerConfig } from './config'
 import { CookielessManager } from './cookieless/cookieless-manager'
 import {
     AI_EVENTS_OUTPUT,
+    DLQ_OUTPUT,
     EVENTS_OUTPUT,
     HEATMAPS_OUTPUT,
     INGESTION_WARNINGS_OUTPUT,
+    REDIRECT_OUTPUT,
 } from './event-processing/ingestion-outputs'
 import { parseSplitAiEventsConfig } from './event-processing/split-ai-events-step'
 import { resolveOutputs } from './kafka/output-resolver'
@@ -236,13 +238,18 @@ export class IngestionConsumer {
             [INGESTION_WARNINGS_OUTPUT]: {
                 topic: KAFKA_INGESTION_WARNINGS,
             },
+            [DLQ_OUTPUT]: {
+                topic: this.dlqTopic,
+            },
+            [REDIRECT_OUTPUT]: {
+                topic: '', // redirect topic comes from the pipeline result
+            },
         })
 
         const joinedPipelineConfig: JoinedIngestionPipelineConfig = {
             eventSchemaEnforcementEnabled: this.config.EVENT_SCHEMA_ENFORCEMENT_ENABLED,
             overflowEnabled: this.overflowEnabled(),
             overflowTopic: this.overflowTopic || '',
-            dlqTopic: this.dlqTopic,
             preservePartitionLocality: this.config.INGESTION_OVERFLOW_PRESERVE_PARTITION_LOCALITY,
             personsPrefetchEnabled: this.config.PERSONS_PREFETCH_ENABLED,
             cdpHogWatcherSampleRate: this.config.CDP_HOG_WATCHER_SAMPLE_RATE,

@@ -2,7 +2,12 @@ import { Message } from 'node-rdkafka'
 import { v4 } from 'uuid'
 
 import { ProjectId, Team } from '../../types'
-import { INGESTION_WARNINGS_OUTPUT, IngestionOutputs } from '../event-processing/ingestion-outputs'
+import {
+    DLQ_OUTPUT,
+    INGESTION_WARNINGS_OUTPUT,
+    IngestionOutputs,
+    REDIRECT_OUTPUT,
+} from '../event-processing/ingestion-outputs'
 import { BatchProcessingStep } from './base-batch-pipeline'
 import { newBatchPipelineBuilder } from './builders'
 import { createBatch, createNewPipeline, createUnwrapper } from './helpers'
@@ -122,8 +127,11 @@ describe('Pipeline Integration Tests', () => {
         }
 
         pipelineConfig = {
-            kafkaProducer: mockKafkaProducer,
-            dlqTopic: 'test-dlq-topic',
+            outputs: new IngestionOutputs({
+                [DLQ_OUTPUT]: { topic: 'test-dlq-topic', producer: mockKafkaProducer },
+                [REDIRECT_OUTPUT]: { topic: '', producer: mockKafkaProducer },
+                [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+            }),
             promiseScheduler: mockPromiseScheduler,
         }
     })
@@ -992,8 +1000,11 @@ describe('Pipeline Integration Tests', () => {
                     builder.pipeConcurrently(preprocessingPipeline).gather().pipeBatch(batchStep4)
                 )
                 .handleResults({
-                    kafkaProducer: mockKafkaProducer,
-                    dlqTopic: 'dlq-topic',
+                    outputs: new IngestionOutputs({
+                        [DLQ_OUTPUT]: { topic: 'dlq-topic', producer: mockKafkaProducer },
+                        [REDIRECT_OUTPUT]: { topic: '', producer: mockKafkaProducer },
+                        [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                    }),
                     promiseScheduler: mockPromiseScheduler,
                 })
                 .handleSideEffects(mockPromiseScheduler, { await: true })
@@ -1157,8 +1168,11 @@ describe('Pipeline Integration Tests', () => {
                         .pipeBatch(batchStep3)
                 )
                 .handleResults({
-                    kafkaProducer: mockKafkaProducer,
-                    dlqTopic: 'dlq-topic',
+                    outputs: new IngestionOutputs({
+                        [DLQ_OUTPUT]: { topic: 'dlq-topic', producer: mockKafkaProducer },
+                        [REDIRECT_OUTPUT]: { topic: '', producer: mockKafkaProducer },
+                        [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                    }),
                     promiseScheduler: mockPromiseScheduler,
                 })
                 .handleSideEffects(mockPromiseScheduler, { await: true })
@@ -1251,8 +1265,11 @@ describe('Pipeline Integration Tests', () => {
             const pipeline = newBatchPipelineBuilder<{ message: Message }, { message: Message }>()
                 .messageAware((builder) => builder.pipeConcurrently(preprocessingPipeline).gather())
                 .handleResults({
-                    kafkaProducer: mockKafkaProducer,
-                    dlqTopic: 'dlq-topic',
+                    outputs: new IngestionOutputs({
+                        [DLQ_OUTPUT]: { topic: 'dlq-topic', producer: mockKafkaProducer },
+                        [REDIRECT_OUTPUT]: { topic: '', producer: mockKafkaProducer },
+                        [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                    }),
                     promiseScheduler: mockPromiseScheduler,
                 })
                 .handleSideEffects(mockPromiseScheduler, { await: true })
@@ -1366,8 +1383,11 @@ describe('Pipeline Integration Tests', () => {
             const pipeline = newBatchPipelineBuilder<{ message: Message }, { message: Message }>()
                 .messageAware((builder) => builder.pipeConcurrently(preprocessingPipeline).gather())
                 .handleResults({
-                    kafkaProducer: mockKafkaProducer,
-                    dlqTopic: 'dlq-topic',
+                    outputs: new IngestionOutputs({
+                        [DLQ_OUTPUT]: { topic: 'dlq-topic', producer: mockKafkaProducer },
+                        [REDIRECT_OUTPUT]: { topic: '', producer: mockKafkaProducer },
+                        [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockKafkaProducer },
+                    }),
                     promiseScheduler: mockPromiseScheduler,
                 })
                 .handleSideEffects(mockPromiseScheduler, { await: true })

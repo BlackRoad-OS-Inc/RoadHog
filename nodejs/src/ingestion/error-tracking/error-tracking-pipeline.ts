@@ -19,11 +19,15 @@ import { createCreateEventStep } from '../event-processing/create-event-step'
 import { createEmitEventStep } from '../event-processing/emit-event-step'
 import { createHogTransformEventStep } from '../event-processing/hog-transform-event-step'
 import {
+    DLQ_OUTPUT,
+    DlqOutput,
     EVENTS_OUTPUT,
     EventOutput,
     INGESTION_WARNINGS_OUTPUT,
     IngestionOutputs,
     IngestionWarningsOutput,
+    REDIRECT_OUTPUT,
+    RedirectOutput,
 } from '../event-processing/ingestion-outputs'
 import { createReadOnlyProcessGroupsStep } from '../event-processing/readonly-process-groups-step'
 import { BatchPipelineUnwrapper } from '../pipelines/batch-pipeline-unwrapper'
@@ -121,7 +125,7 @@ export function createErrorTrackingPipeline(
 
     const topHogWrapper = createTopHogWrapper(topHog)
 
-    const outputs = new IngestionOutputs<EventOutput | IngestionWarningsOutput>({
+    const outputs = new IngestionOutputs<EventOutput | IngestionWarningsOutput | DlqOutput | RedirectOutput>({
         [EVENTS_OUTPUT]: {
             topic: outputTopic,
             producer: kafkaProducer,
@@ -130,11 +134,18 @@ export function createErrorTrackingPipeline(
             topic: ingestionWarningsTopic,
             producer: ingestionWarningProducer,
         },
+        [DLQ_OUTPUT]: {
+            topic: dlqTopic,
+            producer: kafkaProducer,
+        },
+        [REDIRECT_OUTPUT]: {
+            topic: '', // redirect topic comes from the pipeline result
+            producer: kafkaProducer,
+        },
     })
 
     const pipelineConfig: PipelineConfig = {
-        kafkaProducer,
-        dlqTopic,
+        outputs,
         promiseScheduler,
     }
 

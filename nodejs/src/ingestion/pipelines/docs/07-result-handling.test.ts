@@ -55,6 +55,12 @@ import { Message } from 'node-rdkafka'
 
 import { createTestMessage } from '../../../../tests/helpers/kafka-message'
 import { PromiseScheduler } from '../../../utils/promise-scheduler'
+import {
+    DLQ_OUTPUT,
+    INGESTION_WARNINGS_OUTPUT,
+    IngestionOutputs,
+    REDIRECT_OUTPUT,
+} from '../../event-processing/ingestion-outputs'
 import { newBatchPipelineBuilder } from '../builders'
 import { createContext } from '../helpers'
 import { PipelineResult, dlq, drop, isDlqResult, isDropResult, isRedirectResult, ok, redirect } from '../results'
@@ -83,8 +89,11 @@ describe('Result Handling', () => {
         const promiseScheduler = new PromiseScheduler()
 
         const pipelineConfig = {
-            kafkaProducer: mockProducer as any,
-            dlqTopic: 'my-dlq-topic',
+            outputs: new IngestionOutputs({
+                [DLQ_OUTPUT]: { topic: 'my-dlq-topic', producer: mockProducer as any },
+                [REDIRECT_OUTPUT]: { topic: '', producer: mockProducer as any },
+                [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockProducer as any },
+            }),
             promiseScheduler: promiseScheduler,
         }
 
@@ -145,8 +154,11 @@ describe('Result Handling', () => {
         const promiseScheduler = new PromiseScheduler()
 
         const pipelineConfig = {
-            kafkaProducer: mockProducer as any,
-            dlqTopic: 'dlq-topic',
+            outputs: new IngestionOutputs({
+                [DLQ_OUTPUT]: { topic: 'dlq-topic', producer: mockProducer as any },
+                [REDIRECT_OUTPUT]: { topic: '', producer: mockProducer as any },
+                [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockProducer as any },
+            }),
             promiseScheduler: promiseScheduler,
         }
 
@@ -204,8 +216,11 @@ describe('Result Handling', () => {
         const promiseScheduler = new PromiseScheduler()
 
         const pipelineConfig = {
-            kafkaProducer: mockProducer as any,
-            dlqTopic: 'dlq-topic',
+            outputs: new IngestionOutputs({
+                [DLQ_OUTPUT]: { topic: 'dlq-topic', producer: mockProducer as any },
+                [REDIRECT_OUTPUT]: { topic: '', producer: mockProducer as any },
+                [INGESTION_WARNINGS_OUTPUT]: { topic: 'ingestion_warnings_test', producer: mockProducer as any },
+            }),
             promiseScheduler: promiseScheduler,
         }
 

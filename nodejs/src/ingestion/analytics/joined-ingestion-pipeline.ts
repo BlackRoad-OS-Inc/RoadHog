@@ -15,10 +15,12 @@ import { EventPipelineRunnerOptions } from '../event-processing/event-pipeline-o
 import { createFlushBatchStoresStep } from '../event-processing/flush-batch-stores-step'
 import {
     AiEventOutput,
+    DlqOutput,
     EventOutput,
     HeatmapsOutput,
     IngestionOutputs,
     IngestionWarningsOutput,
+    RedirectOutput,
 } from '../event-processing/ingestion-outputs'
 import { SplitAiEventsStepConfig } from '../event-processing/split-ai-events-step'
 import { BatchPipelineBuilder } from '../pipelines/builders/batch-pipeline-builders'
@@ -43,12 +45,13 @@ export interface JoinedIngestionPipelineConfig {
     eventSchemaEnforcementEnabled: boolean
     overflowEnabled: boolean
     overflowTopic: string
-    dlqTopic: string
     preservePartitionLocality: boolean
     personsPrefetchEnabled: boolean
     cdpHogWatcherSampleRate: number
     groupId: string
-    outputs: IngestionOutputs<EventOutput | AiEventOutput | HeatmapsOutput | IngestionWarningsOutput>
+    outputs: IngestionOutputs<
+        EventOutput | AiEventOutput | HeatmapsOutput | IngestionWarningsOutput | DlqOutput | RedirectOutput
+    >
     splitAiEventsConfig: SplitAiEventsStepConfig
     perDistinctIdOptions: EventPipelineRunnerOptions
 }
@@ -124,7 +127,6 @@ export function createJoinedIngestionPipeline<
         eventSchemaEnforcementEnabled,
         overflowEnabled,
         overflowTopic,
-        dlqTopic,
         preservePartitionLocality,
         personsPrefetchEnabled,
         cdpHogWatcherSampleRate,
@@ -153,8 +155,7 @@ export function createJoinedIngestionPipeline<
     const topHogWrapper = createTopHogWrapper(topHog)
 
     const pipelineConfig: PipelineConfig = {
-        kafkaProducer,
-        dlqTopic,
+        outputs,
         promiseScheduler,
     }
 

@@ -10,9 +10,13 @@ import { EventIngestionRestrictionManager } from '../../utils/event-ingestion-re
 import { PromiseScheduler } from '../../utils/promise-scheduler'
 import { createApplyEventRestrictionsStep, createParseHeadersStep } from '../event-preprocessing'
 import {
+    DLQ_OUTPUT,
+    DlqOutput,
     INGESTION_WARNINGS_OUTPUT,
     IngestionOutputs,
     IngestionWarningsOutput,
+    REDIRECT_OUTPUT,
+    RedirectOutput,
 } from '../event-processing/ingestion-outputs'
 import { BatchPipelineUnwrapper } from '../pipelines/batch-pipeline-unwrapper'
 import { newBatchPipelineBuilder } from '../pipelines/builders'
@@ -81,16 +85,23 @@ export function createSessionReplayPipeline(
         isDebugLoggingEnabled,
     } = config
 
-    const outputs = new IngestionOutputs<IngestionWarningsOutput>({
+    const outputs = new IngestionOutputs<IngestionWarningsOutput | DlqOutput | RedirectOutput>({
         [INGESTION_WARNINGS_OUTPUT]: {
             topic: ingestionWarningsTopic,
             producer: ingestionWarningProducer,
         },
+        [DLQ_OUTPUT]: {
+            topic: dlqTopic,
+            producer: kafkaProducer,
+        },
+        [REDIRECT_OUTPUT]: {
+            topic: '', // redirect topic comes from the pipeline result
+            producer: kafkaProducer,
+        },
     })
 
     const pipelineConfig: PipelineConfig = {
-        kafkaProducer,
-        dlqTopic,
+        outputs,
         promiseScheduler,
     }
 
