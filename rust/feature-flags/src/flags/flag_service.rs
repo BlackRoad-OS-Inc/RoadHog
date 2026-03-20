@@ -927,6 +927,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_skip_pg_fallback_still_resolves_token_from_hypercache() {
+        let redis_client = setup_redis_client(None).await;
+        let pg_client = setup_pg_reader_client(None);
+        let team_hypercache_reader = setup_team_hypercache_reader(redis_client.clone()).await;
+        let hypercache_reader = setup_hypercache_reader(redis_client.clone()).await;
+        let team = insert_new_team_in_redis(redis_client.clone())
+            .await
+            .expect("Failed to insert new team in Redis");
+
+        let negative_cache = NegativeCache::new(100, 300);
+
+        let flag_service = FlagService::new(
+            redis_client.clone(),
+            pg_client.clone(),
+            team_hypercache_reader,
+            hypercache_reader,
+            negative_cache.clone(),
+            true, // skip PG fallback
+        );
+
+        // Token is in HyperCache, so lookup should succeed even with PG fallback disabled
+        let result = flag_service
+            .verify_token_and_get_team(&team.api_token)
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().api_token, team.api_token);
+        assert!(
+            !negative_cache.contains(&team.api_token),
+            "Valid token found in HyperCache should not be in negative cache"
+        );
+    }
+
+    #[tokio::test]
     async fn test_skip_pg_fallback_rejects_unknown_token_without_pg() {
         use common_redis::MockRedisClient;
 
