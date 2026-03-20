@@ -279,7 +279,7 @@ const SortableCondition = ({
     group: FeatureFlagGroupType
     index: number
     totalGroups: number
-    affectedUsers: Record<string, number>
+    affectedUsers: Record<string, number | undefined>
     totalUsers: number | null
     aggregationTargetName: string
     onMoveUp: () => void
@@ -934,7 +934,7 @@ export function FeatureFlagReleaseConditionsCollapsible({
                                     openConditions={openConditions}
                                     handleOpenConditionsChange={handleOpenConditionsChange}
                                     flagId={flagId}
-                                    id={id}
+                                    id={id || 'feature-flag-conditions'}
                                     isAnyItemDragging={isAnyItemDragging}
                                 />
                             </React.Fragment>
