@@ -325,12 +325,13 @@ def sync_execute(
         )
 
     source_file, source_line = get_caller_source()
-    tags.source_file = source_file
-    tags.source_line = source_line
+    query_log_tags = tags.model_copy(deep=True)
+    query_log_tags.source_file = source_file
+    query_log_tags.source_line = source_line
 
     settings = {
         **core_settings,
-        "log_comment": tags.to_json(),
+        "log_comment": query_log_tags.to_json(),
     }
     if workload == Workload.OFFLINE:
         # disabling hedged requests for offline queries reduces the likelihood of these queries bleeding over into the
