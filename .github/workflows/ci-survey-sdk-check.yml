@@ -53,6 +53,7 @@ jobs:
 
     check-docs-generated:
         name: Check SDK docs are up to date
+        runs-on: ubuntu-24.04
         timeout-minutes: 5
         uses: ./.github/workflows/ci-docs-check.yml
         with:

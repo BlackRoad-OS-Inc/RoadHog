@@ -12,6 +12,7 @@ permissions:
 jobs:
     cleanup-hobby-preview:
         name: Cleanup hobby preview deployment
+        runs-on: ubuntu-24.04
         if: contains(github.event.pull_request.labels.*.name, 'hobby-preview')
         timeout-minutes: 5
         uses: ./.github/workflows/pr-cleanup.yml

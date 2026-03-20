@@ -621,6 +621,7 @@ jobs:
     # Cleanup preview when hobby-preview label is removed
     cleanup-on-label-removal:
         name: Cleanup preview on label removal
+        runs-on: ubuntu-latest
         needs: changes
         if: needs.changes.outputs.label_removed == 'true'
         timeout-minutes: 5
