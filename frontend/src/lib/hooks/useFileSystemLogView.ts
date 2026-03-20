@@ -24,11 +24,7 @@ interface TrackFileSystemLogViewOptions {
 }
 
 export function trackFileSystemLogView({ type, ref, enabled = true }: TrackFileSystemLogViewOptions): void {
-    if (!enabled || window.IMPERSONATED_SESSION || ref === null || ref === undefined) {
-        return
-    }
-
-    if (!ApiConfig.hasCurrentTeamId()) {
+    if (!enabled || window.IMPERSONATED_SESSION || ref === null || ref === undefined || !ApiConfig.hasCurrentTeamId()) {
         return
     }
 
