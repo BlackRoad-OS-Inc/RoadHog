@@ -6,7 +6,7 @@ import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/re
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react'
 
 import { IconArrowRight, IconCheck, IconX } from '@posthog/icons'
-import { LemonButton, Link } from '@posthog/lemon-ui'
+import { LemonButton } from '@posthog/lemon-ui'
 
 import { Logomark } from 'lib/brand/Logomark'
 import {
@@ -22,7 +22,6 @@ import {
     RobotHog,
 } from 'lib/components/hedgehogs'
 import { getFeatureFlagPayload } from 'lib/logic/featureFlagLogic'
-import { inviteLogic } from 'scenes/settings/organization/inviteLogic'
 
 import { ProductKey } from '~/queries/schema/schema-general'
 
@@ -57,7 +56,7 @@ const SWIPE_THRESHOLD = 120
 const SWIPE_VELOCITY_THRESHOLD = 500
 const MAX_ROTATION = 18
 const CARD_WIDTH = 340
-const CARD_HEIGHT = 440
+const CARD_HEIGHT = 380
 const FLY_OUT_X = 600
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -213,7 +212,11 @@ const SwipeableCard = forwardRef<
             className="absolute"
             initial={isTop ? { scale: 1, y: 0, opacity: 1 } : { scale: stackScale, y: stackY, opacity: stackOpacity }}
             animate={{ scale: stackScale, y: stackY, opacity: stackOpacity }}
-            exit={{ x: isTop ? FLY_OUT_X : 0, opacity: 0, rotate: isTop ? MAX_ROTATION : 0 }}
+            exit={(custom: 'left' | 'right') => ({
+                x: isTop ? (custom === 'left' ? -FLY_OUT_X : FLY_OUT_X) : 0,
+                opacity: 0,
+                rotate: isTop ? (custom === 'left' ? -MAX_ROTATION : MAX_ROTATION) : 0,
+            })}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             style={{
                 x: isTop ? x : 0,
@@ -269,7 +272,7 @@ const SwipeableCard = forwardRef<
                 )}
 
                 {/* Card content */}
-                <div className="flex flex-col h-[calc(100%-8px)] p-5">
+                <div className="flex flex-col h-[calc(100%-8px)] p-4">
                     {/* Header: icon + product name */}
                     <div className="flex items-center gap-2 mb-3">
                         {getProductIcon(product.icon, {
@@ -281,18 +284,18 @@ const SwipeableCard = forwardRef<
 
                     {/* Hedgehog illustration */}
                     <div
-                        className="relative w-full h-28 rounded-xl mb-4 flex items-end justify-center overflow-hidden"
+                        className="relative w-full h-20 rounded-xl mb-3 flex items-end justify-center overflow-hidden"
                         style={{ backgroundColor: `${product.iconColor}15` }}
                     >
-                        {HedgehogComponent && <HedgehogComponent className="relative z-10 w-24 h-24" />}
+                        {HedgehogComponent && <HedgehogComponent className="relative z-10 w-20 h-20" />}
                     </div>
 
                     {/* User-centric description */}
-                    <h2 className="text-lg font-bold mb-3 leading-snug">{description}</h2>
+                    <h2 className="text-base font-bold mb-2 leading-snug">{description}</h2>
 
                     {/* Capabilities */}
                     {product.capabilities && (
-                        <ul className="list-none p-0 m-0 flex flex-col gap-1.5 mb-3">
+                        <ul className="list-none p-0 m-0 flex flex-col gap-1 mb-2">
                             {product.capabilities.map((cap) => (
                                 <li key={cap} className="text-sm text-muted flex items-center gap-2">
                                     <span
@@ -392,8 +395,6 @@ function EndOfDeck({
 export function CardStackProductSelection(): JSX.Element {
     const { setSelectedProducts, setFirstProductOnboarding, setRecommendationSource, handleStartOnboarding } =
         useActions(productSelectionLogic)
-    const { showInviteModal } = useActions(inviteLogic)
-
     const allProducts = useMemo(() => Object.keys(availableOnboardingProducts) as AvailableOnboardingProductKey[], [])
 
     const [currentIndex, setCurrentIndex] = useState(0)
@@ -508,15 +509,15 @@ export function CardStackProductSelection(): JSX.Element {
 
             <div className="relative flex flex-col items-center justify-center flex-grow w-full max-w-2xl">
                 {/* Header */}
-                <div className="flex justify-center mb-4">
+                <div className="flex justify-center mb-2">
                     <Logomark />
                 </div>
-                <h1 className="text-4xl font-bold text-center mb-1">Build your stack</h1>
-                <p className="text-center text-muted mb-6">Swipe right to add a product, left to skip it.</p>
+                <h1 className="text-3xl font-bold text-center mb-1">Build your stack</h1>
+                <p className="text-center text-muted mb-4">Swipe right to add a product, left to skip it.</p>
 
                 {/* Card stack area */}
                 <div
-                    className="relative flex items-center justify-center mb-6"
+                    className="relative flex items-center justify-center mb-4"
                     style={{ width: CARD_WIDTH, height: CARD_HEIGHT + 20, isolation: 'isolate' }}
                 >
                     <AnimatePresence mode="popLayout" custom={exitDirectionRef.current}>
@@ -542,7 +543,7 @@ export function CardStackProductSelection(): JSX.Element {
                 {!isComplete && (
                     <div
                         className={clsx(
-                            'flex flex-col items-center gap-4 transition-opacity duration-300',
+                            'flex flex-col items-center gap-2 transition-opacity duration-300',
                             mounted ? 'opacity-100' : 'opacity-0'
                         )}
                     >
@@ -574,32 +575,8 @@ export function CardStackProductSelection(): JSX.Element {
                             <CardPile cards={swipedCards} type="rejected" />
                             <CardPile cards={swipedCards} type="accepted" />
                         </div>
-
-                        {/* Keyboard hint */}
-                        <div className="flex items-center gap-4 text-muted text-xs">
-                            <span className="flex items-center gap-1.5">
-                                <kbd className="px-1.5 py-0.5 rounded border border-primary bg-surface-primary text-[10px] font-mono">
-                                    &larr;
-                                </kbd>
-                                skip
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                                <kbd className="px-1.5 py-0.5 rounded border border-primary bg-surface-primary text-[10px] font-mono">
-                                    &rarr;
-                                </kbd>
-                                add
-                            </span>
-                        </div>
                     </div>
                 )}
-
-                {/* Footer */}
-                <div className="mt-6 flex flex-col items-center gap-2">
-                    <p className="text-muted text-xs">You can always add more from Settings.</p>
-                    <p className="text-muted text-sm">
-                        Need help from a team member? <Link onClick={() => showInviteModal()}>Invite them</Link>
-                    </p>
-                </div>
             </div>
         </div>
     )
