@@ -88,10 +88,6 @@ import {
 import { ReloadInsight } from './ReloadInsight'
 import { savedInsightsLogic } from './savedInsightsLogic'
 
-interface NewInsightButtonProps {
-    dataAttr: string
-}
-
 export interface InsightTypeMetadata {
     name: string
     description?: string
@@ -667,7 +663,7 @@ export function InsightIcon({
     return Icon ? <Icon className={className} /> : null
 }
 
-export function NewInsightButton({ dataAttr }: NewInsightButtonProps): JSX.Element {
+export function NewInsightButton(): JSX.Element {
     const { featureFlags } = useValues(featureFlagLogic)
     const useInsightOptionsPage = useFeatureFlag('INSIGHT_OPTIONS_PAGE', 'test')
     const useDropdownOnly = useFeatureFlag('INSIGHT_OPTIONS_PAGE', 'dropdown')
@@ -728,7 +724,7 @@ export function NewInsightButton({ dataAttr }: NewInsightButtonProps): JSX.Eleme
                     <LemonMenu items={menuItems} placement="bottom-end">
                         <LemonButton
                             type="primary"
-                            data-attr={dataAttr}
+                            data-attr="saved-insights-new-insight-button"
                             size="small"
                             icon={<IconPlusSmall />}
                             tooltip="New insight"
@@ -747,7 +743,7 @@ export function NewInsightButton({ dataAttr }: NewInsightButtonProps): JSX.Eleme
                             },
                             'data-attr': 'saved-insights-new-insight-dropdown',
                         }}
-                        data-attr={dataAttr}
+                        data-attr="saved-insights-new-insight-button"
                         size="small"
                         icon={<IconPlusSmall />}
                         tooltip="New insight"
@@ -983,7 +979,7 @@ export function SavedInsights(): JSX.Element {
                 resourceType={{
                     type: sceneConfigurations[Scene.SavedInsights].iconType || 'default_icon_type',
                 }}
-                actions={<NewInsightButton dataAttr="saved-insights-create-new-insight" />}
+                actions={<NewInsightButton />}
             />
             <LemonTabs
                 activeKey={tab}
