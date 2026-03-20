@@ -1932,9 +1932,9 @@ def list_recordings_from_query(
             recording.viewed = recording.session_id in viewed_session_recordings
             recording.viewers = other_viewers.get(recording.session_id, [])
             recording.has_summary = recording.session_id in default_summary_session_ids
-            person = distinct_id_to_person.get(recording.distinct_id) if recording.distinct_id else None
-            if person:
-                recording.person = person
+            matched_person = distinct_id_to_person.get(recording.distinct_id) if recording.distinct_id else None
+            if matched_person:
+                recording.person = matched_person
 
     return recordings, more_recordings_available, timer.to_header_string(hogql_timings), next_cursor
 
