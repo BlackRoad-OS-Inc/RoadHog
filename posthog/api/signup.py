@@ -782,9 +782,7 @@ def social_create_user(
             user.save()
 
         if invite_id:
-            result = process_social_invite_signup(strategy, invite_id, user.email, user.first_name, user)
-            if isinstance(result, HttpResponseRedirect):
-                return result
+            process_social_invite_signup(strategy, invite_id, user.email, user.first_name, user)
         else:
             process_social_domain_jit_provisioning_signup(strategy, user.email, user.first_name, user)
 
