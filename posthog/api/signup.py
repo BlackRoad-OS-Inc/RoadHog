@@ -807,9 +807,10 @@ def social_create_user(
 
     if invite_id:
         from_invite = True
-        user = process_social_invite_signup(strategy, invite_id, email, full_name)
-        if user is False:
+        invite_result = process_social_invite_signup(strategy, invite_id, email, full_name)
+        if invite_result is False:
             return redirect("/login?error_code=invalid_invite")
+        user = invite_result
 
     else:
         # JIT Provisioning?
