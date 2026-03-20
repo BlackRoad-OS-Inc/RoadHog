@@ -287,10 +287,11 @@ def _check_logs(task_run, skip_lines: int = 0) -> tuple[bool, str | None, str | 
     trailing_parts.reverse()
     latest_text = "".join(trailing_parts) if trailing_parts else None
 
-    # If we found end_turn but no agent message in the new lines, the agent
-    # message was in an earlier S3 chunk (before skip_lines). Re-scan all lines.
+    # If we found end_turn but no agent message in the new lines, keep polling rather than
+    # rescanning from line 0. A full rescan could pull a previous turn's agent message (if multi turns),
+    # and lead to duplicated results silently.
     if agent_finished and latest_text is None and skip_lines > 0:
-        return _check_logs(task_run, skip_lines=0)
+        return False, None, log_content, total_lines
 
     return agent_finished, latest_text, log_content, total_lines
 
