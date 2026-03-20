@@ -143,7 +143,7 @@ tools:
     warehouse-model-paths-list:
         operation: warehouse_model_paths_list
         enabled: false
-    views-list:
+    view-list:
         operation: warehouse_saved_queries_list
         enabled: true
         scopes:
