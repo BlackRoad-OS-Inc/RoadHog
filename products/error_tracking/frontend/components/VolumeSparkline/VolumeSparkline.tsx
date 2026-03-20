@@ -17,7 +17,7 @@ type VolumeSparklineLayout = 'compact' | 'detailed'
 export type VolumeSparklineProps = {
     data: SparklineData
     layout: VolumeSparklineLayout
-    // Keyed Kea store for bar / event hover
+    /** Keyed Kea store for bar / event hover */
     sparklineKey: string
     xAxis?: VolumeSparklineXAxisMode
     className?: string
@@ -28,11 +28,13 @@ export function VolumeSparkline({
     sparklineKey,
     data,
     layout,
-    xAxis,
+    xAxis = 'none',
     className,
-    events,
+    events = [],
 }: VolumeSparklineProps): JSX.Element {
     const { setHoveredBin, setHoveredEvent } = useActions(errorTrackingVolumeSparklineLogic({ sparklineKey }))
+    const svgRef = useRef<SVGSVGElement>(null)
+    const { height, width, ref: containerRef } = useResizeObserver({ box: 'content-box' })
 
     const onHoverChange = useCallback(
         (index: number | null, datum: SparklineDatum | null) => {
@@ -51,41 +53,6 @@ export function VolumeSparkline({
         },
         [setHoveredEvent]
     )
-
-    return (
-        <VolumeSparklineCore
-            data={data}
-            layout={layout}
-            xAxis={xAxis}
-            className={className}
-            events={events}
-            onHoverChange={onHoverChange}
-            onEventHoverChange={onEventHoverChange}
-        />
-    )
-}
-
-type VolumeSparklineCoreProps = {
-    data: SparklineData
-    layout: VolumeSparklineLayout
-    xAxis?: VolumeSparklineXAxisMode
-    className?: string
-    events?: SparklineEvent<string>[]
-    onHoverChange: (index: number | null, datum: SparklineDatum | null) => void
-    onEventHoverChange: (event: SparklineEvent<string> | null) => void
-}
-
-function VolumeSparklineCore({
-    data,
-    layout,
-    xAxis = 'none',
-    className,
-    events = [],
-    onHoverChange,
-    onEventHoverChange,
-}: VolumeSparklineCoreProps): JSX.Element {
-    const svgRef = useRef<SVGSVGElement>(null)
-    const { height, width, ref: containerRef } = useResizeObserver({ box: 'content-box' })
 
     const chartStyle = useSparklineOptions(
         match(layout)

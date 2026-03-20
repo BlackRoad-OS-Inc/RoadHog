@@ -21,11 +21,11 @@ import { InsightLogicProps } from '~/types'
 import { IssueActions } from 'products/error_tracking/frontend/components/IssueActions/IssueActions'
 import { IssueQueryOptions } from 'products/error_tracking/frontend/components/IssueQueryOptions/IssueQueryOptions'
 import { IssueListTitleColumn, IssueListTitleHeader } from 'products/error_tracking/frontend/components/TableColumns'
-import { errorTrackingVolumeSparklineLogic } from 'products/error_tracking/frontend/components/VolumeSparkline/errorTrackingVolumeSparklineLogic'
 import {
     formatCompactVolumeHoverDate,
     formatCompactVolumeHoverOccurrences,
 } from 'products/error_tracking/frontend/components/VolumeSparkline/formatCompactVolumeHover'
+import { useVolumeSparklineHoverValues } from 'products/error_tracking/frontend/components/VolumeSparkline/useVolumeSparklineHoverValues'
 import { VolumeSparkline } from 'products/error_tracking/frontend/components/VolumeSparkline/VolumeSparkline'
 import { applyVolumeSpikeHighlights, useSparklineData } from 'products/error_tracking/frontend/hooks/use-sparkline-data'
 import { batchSpikeEventsLogic } from 'products/error_tracking/frontend/logics/batchSpikeEventsLogic'
@@ -45,7 +45,7 @@ const VolumeColumn: QueryContextColumnComponent = (props) => {
     const spikeEvents = record.id ? (spikeEventsByIssueId[record.id] ?? []) : []
     const data = useMemo(() => applyVolumeSpikeHighlights(baseData, spikeEvents), [baseData, spikeEvents])
 
-    const { hoveredDatum, isBarHighlighted } = useValues(errorTrackingVolumeSparklineLogic({ sparklineKey }))
+    const { hoveredDatum, isBarHighlighted } = useVolumeSparklineHoverValues(sparklineKey)
 
     return (
         <div className="flex w-full min-w-0 justify-center">

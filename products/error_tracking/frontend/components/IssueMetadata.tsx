@@ -15,17 +15,15 @@ import { useSparklineEvents } from '../hooks/use-sparkline-events'
 import { errorTrackingIssueSceneLogic } from '../scenes/ErrorTrackingIssueScene/errorTrackingIssueSceneLogic'
 import { cancelEvent } from '../utils'
 import { TimeBoundary } from './TimeBoundary'
-import { errorTrackingVolumeSparklineLogic } from './VolumeSparkline/errorTrackingVolumeSparklineLogic'
 import type { SparklineDatum, SparklineEvent, VolumeSparklineHoverPanel } from './VolumeSparkline/types'
+import { useVolumeSparklineHoverValues } from './VolumeSparkline/useVolumeSparklineHoverValues'
 import { VolumeSparkline } from './VolumeSparkline/VolumeSparkline'
 
 export const Metadata = ({ children, className }: PropsWithChildren<{ className?: string }>): JSX.Element => {
     const { aggregations, summaryLoading, issueLoading, firstSeen, lastSeen, issueId } =
         useValues(errorTrackingIssueSceneLogic)
     const sparklineKey = issueId || 'issue-unknown'
-    const { hoverPanel } = useValues(errorTrackingVolumeSparklineLogic({ sparklineKey })) as {
-        hoverPanel: VolumeSparklineHoverPanel
-    }
+    const { hoverPanel } = useVolumeSparklineHoverValues(sparklineKey)
     const sparklineData = useSparklineDataIssueScene()
     const sparklineEvents = useSparklineEvents()
 

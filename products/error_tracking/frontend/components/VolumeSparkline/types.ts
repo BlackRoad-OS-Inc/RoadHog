@@ -32,12 +32,8 @@ export type VolumeSparklineHoverPanel =
     | { type: 'event'; data: SparklineEvent<string> }
     | null
 
+/** Visual + layout numbers from `useSparklineOptions` → D3 `renderVolumeSparkline`. */
 export type SparklineOptions = {
-    onDatumMouseEnter?: (data: SparklineDatum) => void
-    onDatumMouseLeave?: (data: SparklineDatum) => void
-    onEventMouseEnter?: (evt: SparklineEvent<string>) => void
-    onEventMouseLeave?: (evt: SparklineEvent<string>) => void
-    onEventClick?: (evt: SparklineEvent<string>) => void
     backgroundColor: string
     hoverBackgroundColor: string
     axisColor: string
