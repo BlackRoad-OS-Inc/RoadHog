@@ -64,6 +64,7 @@ rules:
                               |BatchExport
                               |BatchExportBackfill
                               |BatchImport
+                              |ButtonTile
                               |ChangeRequest
                               |ClusteringConfig
                               |ClusteringJob
@@ -90,17 +91,19 @@ rules:
                               |DataWarehouseTable
                               |DesktopRecording
                               |EarlyAccessFeature
+                              |EmailMessageMapping
+                              |EvaluationContext
                               |Edge
                               |Endpoint
                               |EnterpriseEventDefinition
                               |EnterprisePropertyDefinition
                               |ErrorTrackingAssignmentRule
-                              |ErrorTrackingAutoCaptureControls
                               |ErrorTrackingGroupingRule
                               |ErrorTrackingIssue
                               |ErrorTrackingIssueFingerprintV2
                               |ErrorTrackingRelease
                               |ErrorTrackingSpikeDetectionConfig
+                              |ErrorTrackingSpikeEvent
                               |ErrorTrackingStackFrame
                               |ErrorTrackingSuppressionRule
                               |ErrorTrackingSymbolSet
@@ -127,6 +130,7 @@ rules:
                               |Integration
                               |Link
                               |LiveDebuggerBreakpoint
+                              |LogsAlertConfiguration
                               |LLMModelConfiguration
                               |LLMPrompt
                               |LLMProviderKey
@@ -136,6 +140,7 @@ rules:
                               |MessageRecipientPreference
                               |MessageTemplate
                               |Node
+                              |NotificationEvent
                               |Notebook
                               |ObjectMediaPreview
                               |PluginConfig
@@ -144,8 +149,10 @@ rules:
                               |QueryTabState
                               |QuickFilter
                               |QuickFilterContext
+                              |Repo
                               |RepoRoutingRule
                               |SandboxEnvironment
+                              |ScoreDefinition
                               |SavedHeatmap
                               |ScheduledChange
                               |SessionGroupSummary
@@ -163,9 +170,14 @@ rules:
                               |Tag
                               |Task
                               |TaskRun
+                              |TeamConversationsEmailConfig
                               |Text
                               |Threshold
                               |Ticket
+                              |ReviewQueue
+                              |ReviewQueueItem
+                              |TraceReview
+                              |TraceReviewScore
                               |UploadedMedia
                               |UserInterview
                               |UserRepoPreference
@@ -231,6 +243,7 @@ rules:
                         |BatchExport
                         |BatchExportBackfill
                         |BatchImport
+                        |ButtonTile
                         |ChangeRequest
                         |ClusteringConfig
                         |ClusteringJob
@@ -257,17 +270,19 @@ rules:
                         |DataWarehouseTable
                         |DesktopRecording
                         |EarlyAccessFeature
+                        |EmailMessageMapping
+                        |EvaluationContext
                         |Edge
                         |Endpoint
                         |EnterpriseEventDefinition
                         |EnterprisePropertyDefinition
                         |ErrorTrackingAssignmentRule
-                        |ErrorTrackingAutoCaptureControls
                         |ErrorTrackingGroupingRule
                         |ErrorTrackingIssue
                         |ErrorTrackingIssueFingerprintV2
                         |ErrorTrackingRelease
                         |ErrorTrackingSpikeDetectionConfig
+                        |ErrorTrackingSpikeEvent
                         |ErrorTrackingStackFrame
                         |ErrorTrackingSuppressionRule
                         |ErrorTrackingSymbolSet
@@ -303,6 +318,7 @@ rules:
                         |MessageRecipientPreference
                         |MessageTemplate
                         |Node
+                        |NotificationEvent
                         |Notebook
                         |ObjectMediaPreview
                         |PluginConfig
@@ -311,8 +327,10 @@ rules:
                         |QueryTabState
                         |QuickFilter
                         |QuickFilterContext
+                        |Repo
                         |RepoRoutingRule
                         |SandboxEnvironment
+                        |ScoreDefinition
                         |SavedHeatmap
                         |ScheduledChange
                         |SessionGroupSummary
@@ -330,9 +348,14 @@ rules:
                         |Tag
                         |Task
                         |TaskRun
+                        |TeamConversationsEmailConfig
                         |Text
                         |Threshold
                         |Ticket
+                        |ReviewQueue
+                        |ReviewQueueItem
+                        |TraceReview
+                        |TraceReviewScore
                         |UploadedMedia
                         |UserInterview
                         |UserRepoPreference
@@ -578,6 +601,7 @@ rules:
                           (?x)(
                               DashboardPrivilege
                               |PersonalAPIKey
+                              |ScoreDefinitionVersion
                               |WebauthnCredential
                           )$
                 - focus-metavariable: $SINK
@@ -627,6 +651,7 @@ rules:
                     (?x)(
                         DashboardPrivilege
                         |PersonalAPIKey
+                        |ScoreDefinitionVersion
                         |WebauthnCredential
                     )$
           - pattern-not: $M.objects. ... .$METHOD2(..., user=$U, ...)

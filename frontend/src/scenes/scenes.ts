@@ -42,6 +42,13 @@ export const sceneConfigurations: Record<Scene | string, SceneConfig> = {
         description:
             'Track all changes and activities in your organization with detailed filtering and export capabilities.',
     },
+    [Scene.AgenticAuthorize]: {
+        name: 'Authorize Stripe',
+        layout: 'plain',
+        projectBased: false,
+        organizationBased: false,
+        allowUnauthenticated: true,
+    },
     [Scene.AsyncMigrations]: { instanceLevel: true },
     [Scene.MaterializedColumns]: {
         projectBased: true,
@@ -410,6 +417,7 @@ export const sceneConfigurations: Record<Scene | string, SceneConfig> = {
     [Scene.ProjectHomepage]: {
         projectBased: true,
         name: 'Homepage',
+        layout: 'app-raw-no-header',
     },
     [Scene.PropertyDefinitionEdit]: {
         projectBased: true,
@@ -686,7 +694,6 @@ export const redirects: Record<
     '/data-management': urls.eventDefinitions(),
     '/data-management/database': urls.sources(),
     '/data-pipelines': urls.sources(),
-    '/data-warehouse': urls.dataWarehouse(),
     '/data-warehouse/sources/:id': ({ id }) => urls.dataWarehouseSource(id, 'schemas'),
     '/data-warehouse/sources/:id/:tab': ({ id, tab }) =>
         urls.dataWarehouseSource(id, tab as DataWarehouseSourceSceneTab),
@@ -777,6 +784,7 @@ export const routes: Record<string, [Scene | string, string]> = {
     [urls.dashboards()]: [Scene.Dashboards, 'dashboards'],
     [urls.dashboard(':id')]: [Scene.Dashboard, 'dashboard'],
     [urls.dashboardTextTile(':id', ':textTileId')]: [Scene.Dashboard, 'dashboardTextTile'],
+    [urls.dashboardButtonTile(':id', ':buttonTileId')]: [Scene.Dashboard, 'dashboardButtonTile'],
     [urls.dashboardSharing(':id')]: [Scene.Dashboard, 'dashboardSharing'],
     [urls.dashboardSubscriptions(':id')]: [Scene.Dashboard, 'dashboardSubscriptions'],
     [urls.dashboardSubscription(':id', ':subscriptionId')]: [Scene.Dashboard, 'dashboardSubscription'],
@@ -942,10 +950,12 @@ export const routes: Record<string, [Scene | string, string]> = {
     [urls.exports()]: [Scene.Exports, 'exports'],
     [urls.startups()]: [Scene.StartupProgram, 'startupProgram'],
     [urls.startups(':referrer')]: [Scene.StartupProgram, 'startupProgramWithReferrer'],
+    [urls.agenticAuthorize()]: [Scene.AgenticAuthorize, 'agenticAuthorize'],
+    [`${urls.agenticAuthorize()}/`]: [Scene.AgenticAuthorize, 'agenticAuthorize'],
     [urls.oauthAuthorize()]: [Scene.OAuthAuthorize, 'oauthAuthorize'],
     [`${urls.oauthAuthorize()}/`]: [Scene.OAuthAuthorize, 'oauthAuthorize'],
     [urls.dataPipelinesNew(':kind' as any)]: [Scene.DataPipelinesNew, 'dataPipelinesNew'],
-    [urls.dataWarehouse()]: [Scene.DataWarehouse, 'dataWarehouse'],
+    [urls.dataOps()]: [Scene.DataOps, 'dataOps'],
     [urls.dataWarehouseSourceNew()]: [Scene.DataWarehouseSourceNew, 'dataWarehouseSourceNew'],
     [urls.dataWarehouseSource(':id', ':tab' as any)]: [Scene.DataWarehouseSource, 'dataWarehouseSource'],
     [urls.batchExportNew(':service')]: [Scene.BatchExportNew, 'batchExportNew'],
