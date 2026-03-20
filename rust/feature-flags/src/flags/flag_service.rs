@@ -112,16 +112,20 @@ impl FlagService {
     /// This is a read-only cache - Django handles cache writes.
     pub async fn get_team_from_cache_or_pg(&self, token: &str) -> Result<Team, FlagError> {
         let key = KeyType::string(token);
-        let pg_client = self.pg_client.clone();
-        let token_owned = token.to_string();
         let skip_pg = self.skip_pg_team_fallback;
+        let pg_client = self.pg_client.clone();
+        let token_owned = if skip_pg {
+            String::new()
+        } else {
+            token.to_string()
+        };
 
         let (data, source) = self
             .team_hypercache_reader
             .get_with_source_or_fallback(&key, || async move {
                 if skip_pg {
                     inc(PG_TEAM_FALLBACK_SKIPPED_COUNTER, &[], 1);
-                    return Err(FlagError::RowNotFound);
+                    return Err(FlagError::TokenValidationError);
                 }
 
                 // Fallback: load from PostgreSQL and convert to JSON Value
@@ -215,7 +219,8 @@ mod tests {
         utils::test_utils::{
             insert_new_team_in_redis, setup_hypercache_reader,
             setup_hypercache_reader_with_mock_redis, setup_pg_reader_client, setup_redis_client,
-            setup_team_hypercache_reader, TestContext,
+            setup_team_hypercache_reader, setup_team_hypercache_reader_with_mock_redis,
+            TestContext,
         },
     };
 
@@ -965,7 +970,8 @@ mod tests {
 
         let mock_client = MockRedisClient::new();
         let mock_redis: Arc<dyn RedisClient + Send + Sync> = Arc::new(mock_client.clone());
-        let team_hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
+        let team_hypercache_reader =
+            setup_team_hypercache_reader_with_mock_redis(mock_redis.clone());
         let hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
         let context = TestContext::new(None).await;
 
@@ -1003,7 +1009,8 @@ mod tests {
 
         let mock_client = MockRedisClient::new();
         let mock_redis: Arc<dyn RedisClient + Send + Sync> = Arc::new(mock_client.clone());
-        let team_hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
+        let team_hypercache_reader =
+            setup_team_hypercache_reader_with_mock_redis(mock_redis.clone());
         let hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
         let context = TestContext::new(None).await;
 

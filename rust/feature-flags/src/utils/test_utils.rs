@@ -220,6 +220,38 @@ pub async fn setup_team_hypercache_reader(
     )
 }
 
+/// Create a HyperCacheReader for team_metadata using a mock Redis client.
+/// Uses token_based=true and a dummy S3 client that always returns NotFound.
+#[cfg(test)]
+pub fn setup_team_hypercache_reader_with_mock_redis(
+    redis_client: Arc<dyn RedisClientTrait + Send + Sync>,
+) -> Arc<HyperCacheReader> {
+    use common_s3::{S3Client, S3Error};
+
+    struct DummyS3Client;
+
+    #[async_trait]
+    impl S3Client for DummyS3Client {
+        async fn get_string(&self, _bucket: &str, key: &str) -> Result<String, S3Error> {
+            Err(S3Error::NotFound(key.to_string()))
+        }
+    }
+
+    let mut config = HyperCacheConfig::new(
+        "team_metadata".to_string(),
+        "full_metadata.json".to_string(),
+        "us-east-1".to_string(),
+        "posthog".to_string(),
+    );
+    config.token_based = true;
+    let s3_client: Arc<dyn S3Client + Send + Sync> = Arc::new(DummyS3Client);
+    Arc::new(HyperCacheReader::new_with_s3_client(
+        redis_client,
+        s3_client,
+        config,
+    ))
+}
+
 /// Create a HyperCacheReader for remote config (array/config.json).
 /// Uses token_based=true for token-based lookups (api_token).
 /// Returns Arc<HyperCacheReader> to match the production pattern.

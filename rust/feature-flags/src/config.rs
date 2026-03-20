@@ -615,8 +615,10 @@ pub struct Config {
     pub team_negative_cache_ttl_seconds: u64,
 
     // When true, skip the PostgreSQL fallback for team token lookups.
-    // HyperCache (Redis/S3) is treated as the source of truth — a cache miss
-    // means the token is invalid. Gated for safe rollout.
+    // HyperCache (Redis/S3) is the only lookup: if it returns CacheMiss
+    // (including both "not found" and transient cache errors/timeouts),
+    // the token is treated as invalid. This trades availability during
+    // cache incidents for reduced PG load. Gated for safe rollout.
     #[envconfig(from = "SKIP_PG_TEAM_FALLBACK", default = "false")]
     pub skip_pg_team_fallback: FlexBool,
 
