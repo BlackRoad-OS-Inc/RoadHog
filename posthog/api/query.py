@@ -149,6 +149,9 @@ class QueryViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.ViewSet)
         The returned execution_mode may differ from the input: force_blocking followers
         are downgraded to blocking so they hit the cache populated by the leader.
         """
+        # Coalescing applies to both regular blocking queries and force_blocking queries.
+        # force_blocking followers are downgraded to RECENT_CACHE_CALCULATE_BLOCKING_IF_STALE
+        # on DONE so they read from the cache the leader just populated, rather than recalculating.
         if execution_mode not in (
             ExecutionMode.RECENT_CACHE_CALCULATE_BLOCKING_IF_STALE,
             ExecutionMode.CALCULATE_BLOCKING_ALWAYS,
