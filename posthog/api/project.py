@@ -239,6 +239,12 @@ class ProjectBackwardCompatSerializer(ProjectBackwardCompatBasicSerializer, User
             "session_recording_linked_flag",
             "session_recording_network_payload_capture_config",
             "session_recording_masking_config",
+            "session_recording_url_trigger_config",
+            "session_recording_url_blocklist_config",
+            "session_recording_event_trigger_config",
+            "session_recording_trigger_match_type_config",
+            "session_recording_trigger_groups",
+            "session_recording_retention_period",
             "session_replay_config",
             "survey_config",
             "access_control",
@@ -325,6 +331,10 @@ class ProjectBackwardCompatSerializer(ProjectBackwardCompatBasicSerializer, User
     @staticmethod
     def validate_session_recording_masking_config(value) -> dict | None:
         return TeamSerializer.validate_session_recording_masking_config(value)
+
+    @staticmethod
+    def validate_session_recording_trigger_groups(value) -> dict | None:
+        return TeamSerializer.validate_session_recording_trigger_groups(value)
 
     @staticmethod
     def validate_session_replay_config(value) -> dict | None:
