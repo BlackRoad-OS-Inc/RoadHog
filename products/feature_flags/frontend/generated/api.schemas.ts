@@ -112,7 +112,7 @@ export const BucketingIdentifierEnumApi = {
 
 export type FeatureFlagApiFilters = { [key: string]: unknown }
 
-export type FeatureFlagApiExperimentSetItem = { [key: string]: unknown }
+export type FeatureFlagApiExperimentSetMetadataItem = { [key: string]: unknown }
 
 export type FeatureFlagApiSurveys = { [key: string]: unknown }
 
@@ -138,7 +138,8 @@ export interface FeatureFlagApi {
     readonly last_modified_by: UserBasicApi
     /** @nullable */
     ensure_experience_continuity?: boolean | null
-    readonly experiment_set: readonly FeatureFlagApiExperimentSetItem[]
+    readonly experiment_set: readonly number[]
+    readonly experiment_set_metadata: readonly FeatureFlagApiExperimentSetMetadataItem[]
     readonly surveys: FeatureFlagApiSurveys
     readonly features: FeatureFlagApiFeatures
     rollback_conditions?: unknown | null
