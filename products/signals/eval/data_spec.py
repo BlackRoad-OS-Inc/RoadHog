@@ -88,7 +88,7 @@ class EvalSignalSpec:
             return SignalSourceTableConfig(
                 source_product="error_tracking",
                 source_type=self.source_type_override,
-                emitter=_noop_emitter,  # type: ignore[arg-type]
+                emitter=_noop_emitter,
                 partition_field="",
                 fields=(),
             )
