@@ -299,12 +299,14 @@ export function LLMAnalyticsEvaluation(): JSX.Element {
                                                     title={canEnableReason}
                                                     visible={canEnableReason ? undefined : false}
                                                 >
-                                                    <LemonSwitch
-                                                        checked={evaluation.enabled}
-                                                        onChange={setEvaluationEnabled}
-                                                        label="Enable evaluation"
-                                                        disabled={!canEnable && !evaluation.enabled}
-                                                    />
+                                                    <span>
+                                                        <LemonSwitch
+                                                            checked={evaluation.enabled}
+                                                            onChange={setEvaluationEnabled}
+                                                            label="Enable evaluation"
+                                                            disabled={!canEnable && !evaluation.enabled}
+                                                        />
+                                                    </span>
                                                 </Tooltip>
                                                 <span className="text-muted text-sm">
                                                     {!canEnable && !evaluation.enabled
