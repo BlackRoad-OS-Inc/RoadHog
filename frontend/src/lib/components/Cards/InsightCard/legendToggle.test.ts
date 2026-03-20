@@ -10,90 +10,100 @@ import {
 
 describe('legendToggle', () => {
     describe('canToggleLegendInInsightQuery', () => {
-        it('returns true for trends line graph', () => {
-            const query = {
-                kind: NodeKind.InsightVizNode,
-                source: {
-                    kind: NodeKind.TrendsQuery,
-                    trendsFilter: { display: ChartDisplayType.ActionsLineGraph },
+        it.each([
+            {
+                title: 'trends line graph',
+                query: {
+                    kind: NodeKind.InsightVizNode,
+                    source: {
+                        kind: NodeKind.TrendsQuery,
+                        trendsFilter: { display: ChartDisplayType.ActionsLineGraph },
+                    },
                 },
-            } as any
-
-            expect(canToggleLegendInInsightQuery(query)).toBe(true)
-        })
-
-        it('returns false for world map', () => {
-            const query = {
-                kind: NodeKind.InsightVizNode,
-                source: {
-                    kind: NodeKind.TrendsQuery,
-                    trendsFilter: { display: ChartDisplayType.WorldMap },
+                expected: true,
+            },
+            {
+                title: 'world map',
+                query: {
+                    kind: NodeKind.InsightVizNode,
+                    source: {
+                        kind: NodeKind.TrendsQuery,
+                        trendsFilter: { display: ChartDisplayType.WorldMap },
+                    },
                 },
-            } as any
-
-            expect(canToggleLegendInInsightQuery(query)).toBe(false)
-        })
-
-        it('returns false for funnels', () => {
-            const query = {
-                kind: NodeKind.InsightVizNode,
-                source: {
-                    kind: NodeKind.FunnelsQuery,
-                    funnelsFilter: { funnelVizType: 'steps' },
+                expected: false,
+            },
+            {
+                title: 'funnels steps',
+                query: {
+                    kind: NodeKind.InsightVizNode,
+                    source: {
+                        kind: NodeKind.FunnelsQuery,
+                        funnelsFilter: { funnelVizType: 'steps' },
+                    },
                 },
-            } as any
-
-            expect(canToggleLegendInInsightQuery(query)).toBe(false)
-        })
-
-        it('returns true for lifecycle', () => {
-            const query = {
-                kind: NodeKind.InsightVizNode,
-                source: {
-                    kind: NodeKind.LifecycleQuery,
+                expected: false,
+            },
+            {
+                title: 'lifecycle',
+                query: {
+                    kind: NodeKind.InsightVizNode,
+                    source: { kind: NodeKind.LifecycleQuery },
                 },
-            } as any
-
-            expect(canToggleLegendInInsightQuery(query)).toBe(true)
-        })
-
-        it('returns false for trends table display', () => {
-            const query = {
-                kind: NodeKind.InsightVizNode,
-                source: {
-                    kind: NodeKind.TrendsQuery,
-                    trendsFilter: { display: ChartDisplayType.ActionsTable },
+                expected: true,
+            },
+            {
+                title: 'trends table',
+                query: {
+                    kind: NodeKind.InsightVizNode,
+                    source: {
+                        kind: NodeKind.TrendsQuery,
+                        trendsFilter: { display: ChartDisplayType.ActionsTable },
+                    },
                 },
-            } as any
-
-            expect(canToggleLegendInInsightQuery(query)).toBe(false)
-        })
-
-        it('returns false for non-insight-viz query', () => {
-            const query = { kind: NodeKind.DataVisualizationNode } as any
-            expect(canToggleLegendInInsightQuery(query)).toBe(false)
+                expected: false,
+            },
+            {
+                title: 'non-insight-viz (SQL)',
+                query: { kind: NodeKind.DataVisualizationNode },
+                expected: false,
+            },
+        ])('returns $expected for $title', ({ query, expected }) => {
+            expect(canToggleLegendInInsightQuery(query as any)).toBe(expected)
         })
     })
 
     describe('toggleLegendInInsightQuery', () => {
-        it('sets showLegend true when unset', () => {
+        it.each([
+            {
+                kind: NodeKind.TrendsQuery,
+                filterKey: 'trendsFilter',
+                display: ChartDisplayType.ActionsLineGraph,
+            },
+            {
+                kind: NodeKind.StickinessQuery,
+                filterKey: 'stickinessFilter',
+                display: ChartDisplayType.ActionsLineGraph,
+            },
+            {
+                kind: NodeKind.LifecycleQuery,
+                filterKey: 'lifecycleFilter',
+                display: undefined,
+            },
+        ])('sets showLegend true when unset ($kind)', ({ kind, filterKey, display }) => {
             const query = {
                 kind: NodeKind.InsightVizNode,
                 source: {
-                    kind: NodeKind.TrendsQuery,
-                    trendsFilter: { display: ChartDisplayType.ActionsLineGraph },
+                    kind,
+                    [filterKey]: display ? { display } : {},
                 },
             } as any
 
-            const next = toggleLegendInInsightQuery(query) as InsightVizNode
-            const src = next.source
-            expect(src.kind).toBe(NodeKind.TrendsQuery)
-            if (src.kind === NodeKind.TrendsQuery) {
-                expect(src.trendsFilter?.showLegend).toBe(true)
-            }
+            const next = toggleLegendInInsightQuery(query) as any
+            expect(next.source[filterKey]?.showLegend).toBe(true)
         })
 
-        it('toggles showLegend off', () => {
+        it('toggles showLegend off for trends', () => {
             const query = {
                 kind: NodeKind.InsightVizNode,
                 source: {
@@ -107,40 +117,6 @@ describe('legendToggle', () => {
             expect(src.kind).toBe(NodeKind.TrendsQuery)
             if (src.kind === NodeKind.TrendsQuery) {
                 expect(src.trendsFilter?.showLegend).toBe(false)
-            }
-        })
-
-        it('updates stickiness filter', () => {
-            const query = {
-                kind: NodeKind.InsightVizNode,
-                source: {
-                    kind: NodeKind.StickinessQuery,
-                    stickinessFilter: { display: ChartDisplayType.ActionsLineGraph },
-                },
-            } as any
-
-            const next = toggleLegendInInsightQuery(query) as InsightVizNode
-            const src = next.source
-            expect(src.kind).toBe(NodeKind.StickinessQuery)
-            if (src.kind === NodeKind.StickinessQuery) {
-                expect(src.stickinessFilter?.showLegend).toBe(true)
-            }
-        })
-
-        it('updates lifecycle filter', () => {
-            const query = {
-                kind: NodeKind.InsightVizNode,
-                source: {
-                    kind: NodeKind.LifecycleQuery,
-                    lifecycleFilter: {},
-                },
-            } as any
-
-            const next = toggleLegendInInsightQuery(query) as InsightVizNode
-            const src = next.source
-            expect(src.kind).toBe(NodeKind.LifecycleQuery)
-            if (src.kind === NodeKind.LifecycleQuery) {
-                expect(src.lifecycleFilter?.showLegend).toBe(true)
             }
         })
     })
