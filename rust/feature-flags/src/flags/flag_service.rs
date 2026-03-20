@@ -3,8 +3,8 @@ use crate::{
     flags::flag_models::FeatureFlagList,
     handler::canonical_log::with_canonical_log,
     metrics::consts::{
-        DB_TEAM_READS_COUNTER, TEAM_CACHE_HIT_COUNTER, TEAM_NEGATIVE_CACHE_HIT_COUNTER,
-        TOKEN_VALIDATION_ERRORS_COUNTER,
+        DB_TEAM_READS_COUNTER, PG_TEAM_FALLBACK_SKIPPED_COUNTER, TEAM_CACHE_HIT_COUNTER,
+        TEAM_NEGATIVE_CACHE_HIT_COUNTER, TOKEN_VALIDATION_ERRORS_COUNTER,
     },
     team::team_models::Team,
 };
@@ -38,6 +38,8 @@ pub struct FlagService {
     flags_hypercache_reader: Arc<HyperCacheReader>,
     /// In-memory negative cache for invalid API tokens
     team_negative_cache: NegativeCache,
+    /// When true, skip PG fallback for team token lookups
+    skip_pg_team_fallback: bool,
 }
 
 impl FlagService {
@@ -47,6 +49,7 @@ impl FlagService {
         team_hypercache_reader: Arc<HyperCacheReader>,
         flags_hypercache_reader: Arc<HyperCacheReader>,
         team_negative_cache: NegativeCache,
+        skip_pg_team_fallback: bool,
     ) -> Self {
         Self {
             shared_redis_client,
@@ -54,6 +57,7 @@ impl FlagService {
             team_hypercache_reader,
             flags_hypercache_reader,
             team_negative_cache,
+            skip_pg_team_fallback,
         }
     }
 
@@ -104,15 +108,22 @@ impl FlagService {
     /// Fetches the team from HyperCache or the database.
     ///
     /// Uses team_metadata HyperCache (Redis → S3 → PostgreSQL fallback).
+    /// PostgreSQL fallback can be disabled via `skip_pg_team_fallback`.
     /// This is a read-only cache - Django handles cache writes.
     pub async fn get_team_from_cache_or_pg(&self, token: &str) -> Result<Team, FlagError> {
         let key = KeyType::string(token);
         let pg_client = self.pg_client.clone();
         let token_owned = token.to_string();
+        let skip_pg = self.skip_pg_team_fallback;
 
         let (data, source) = self
             .team_hypercache_reader
             .get_with_source_or_fallback(&key, || async move {
+                if skip_pg {
+                    inc(PG_TEAM_FALLBACK_SKIPPED_COUNTER, &[], 1);
+                    return Err(FlagError::RowNotFound);
+                }
+
                 // Fallback: load from PostgreSQL and convert to JSON Value
                 let team = Team::from_pg(pg_client, &token_owned).await?;
                 inc(DB_TEAM_READS_COUNTER, &[], 1);
@@ -226,6 +237,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             NegativeCache::new(100, 300),
+            false,
         );
 
         // Test valid token returns the team
@@ -258,6 +270,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             NegativeCache::new(100, 300),
+            false,
         );
 
         // Test fetching from HyperCache
@@ -287,6 +300,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             NegativeCache::new(100, 300),
+            false,
         );
 
         // Test fetching from PostgreSQL (cache miss)
@@ -415,6 +429,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             NegativeCache::new(100, 300),
+            false,
         );
 
         // Test fetching from hypercache
@@ -559,6 +574,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             NegativeCache::new(100, 300),
+            false,
         );
 
         let result = flag_service.get_flags_from_cache_or_pg(team.id).await;
@@ -618,6 +634,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             NegativeCache::new(100, 300),
+            false,
         );
 
         // Should fall back to PostgreSQL and succeed (returns empty list for new team)
@@ -660,6 +677,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             NegativeCache::new(100, 300),
+            false,
         );
 
         let result = flag_service.get_flags_from_cache_or_pg(team.id).await;
@@ -706,6 +724,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             NegativeCache::new(100, 300),
+            false,
         );
 
         let result = flag_service.get_flags_from_cache_or_pg(team.id).await;
@@ -755,6 +774,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             NegativeCache::new(100, 300),
+            false,
         );
 
         let result = flag_service.get_flags_from_cache_or_pg(team.id).await;
@@ -797,6 +817,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             negative_cache,
+            false,
         );
 
         let result = flag_service
@@ -821,6 +842,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             negative_cache.clone(),
+            false,
         );
 
         // First call should fail and populate the negative cache
@@ -849,6 +871,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             negative_cache.clone(),
+            false,
         );
 
         // Valid token should succeed and not be added to negative cache
@@ -880,6 +903,7 @@ mod tests {
             team_hypercache_reader,
             hypercache_reader,
             negative_cache.clone(),
+            false,
         );
 
         // First call: misses cache, hits Redis (mock) + PG fallback, fails, populates negative cache
@@ -899,6 +923,82 @@ mod tests {
         assert_eq!(
             calls_after_first, calls_after_second,
             "Second call should not make additional Redis calls (served from negative cache)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_skip_pg_fallback_rejects_unknown_token_without_pg() {
+        use common_redis::MockRedisClient;
+
+        let mock_client = MockRedisClient::new();
+        let mock_redis: Arc<dyn RedisClient + Send + Sync> = Arc::new(mock_client.clone());
+        let team_hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
+        let hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
+        let context = TestContext::new(None).await;
+
+        // Insert a team in PG (but not in HyperCache) to prove PG is skipped
+        let team = context
+            .insert_new_team(None)
+            .await
+            .expect("Failed to insert team in PG");
+
+        let negative_cache = NegativeCache::new(100, 300);
+
+        let flag_service = FlagService::new(
+            mock_redis,
+            context.non_persons_reader.clone(),
+            team_hypercache_reader,
+            hypercache_reader,
+            negative_cache.clone(),
+            true, // skip PG fallback
+        );
+
+        // Token exists in PG but not in HyperCache — with skip enabled, it should fail
+        let result = flag_service
+            .verify_token_and_get_team(&team.api_token)
+            .await;
+        assert!(matches!(result, Err(FlagError::TokenValidationError)));
+        assert!(
+            negative_cache.contains(&team.api_token),
+            "Token should be added to negative cache when PG fallback is skipped"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_skip_pg_fallback_disabled_still_finds_team_in_pg() {
+        use common_redis::MockRedisClient;
+
+        let mock_client = MockRedisClient::new();
+        let mock_redis: Arc<dyn RedisClient + Send + Sync> = Arc::new(mock_client.clone());
+        let team_hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
+        let hypercache_reader = setup_hypercache_reader_with_mock_redis(mock_redis.clone());
+        let context = TestContext::new(None).await;
+
+        let team = context
+            .insert_new_team(None)
+            .await
+            .expect("Failed to insert team in PG");
+
+        let negative_cache = NegativeCache::new(100, 300);
+
+        let flag_service = FlagService::new(
+            mock_redis,
+            context.non_persons_reader.clone(),
+            team_hypercache_reader,
+            hypercache_reader,
+            negative_cache.clone(),
+            false, // PG fallback enabled
+        );
+
+        // Token exists in PG but not in HyperCache — with fallback enabled, PG should find it
+        let result = flag_service
+            .verify_token_and_get_team(&team.api_token)
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().api_token, team.api_token);
+        assert!(
+            !negative_cache.contains(&team.api_token),
+            "Valid token should not be in negative cache"
         );
     }
 }
