@@ -250,9 +250,9 @@ export const ExperimentTypeEnumApi = {
  * `stopped_early` - Stopped Early
  * `invalid` - Invalid
  */
-export type ConclusionEnumApi = (typeof ConclusionEnumApi)[keyof typeof ConclusionEnumApi]
+export type ExperimentConclusionEnumApi = (typeof ExperimentConclusionEnumApi)[keyof typeof ExperimentConclusionEnumApi]
 
-export const ConclusionEnumApi = {
+export const ExperimentConclusionEnumApi = {
     Won: 'won',
     Lost: 'lost',
     Inconclusive: 'inconclusive',
@@ -315,7 +315,7 @@ export interface ExperimentApi {
     stats_config?: unknown | null
     scheduling_config?: unknown | null
     _create_in_folder?: string
-    conclusion?: ConclusionEnumApi | BlankEnumApi | NullEnumApi | null
+    conclusion?: ExperimentConclusionEnumApi | BlankEnumApi | NullEnumApi | null
     /** @nullable */
     conclusion_comment?: string | null
     primary_metrics_ordered_uuids?: unknown | null
@@ -380,7 +380,7 @@ export interface PatchedExperimentApi {
     stats_config?: unknown | null
     scheduling_config?: unknown | null
     _create_in_folder?: string
-    conclusion?: ConclusionEnumApi | BlankEnumApi | NullEnumApi | null
+    conclusion?: ExperimentConclusionEnumApi | BlankEnumApi | NullEnumApi | null
     /** @nullable */
     conclusion_comment?: string | null
     primary_metrics_ordered_uuids?: unknown | null

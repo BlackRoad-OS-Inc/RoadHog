@@ -16110,6 +16110,7 @@
                 "folder_open",
                 "conversations",
                 "toolbar",
+                "ci_monitoring",
                 "visual_review",
                 "settings",
                 "health",
@@ -24134,6 +24135,7 @@
                 "tracing",
                 "metrics",
                 "user_interviews",
+                "ci_monitoring",
                 "visual_review",
                 "web_analytics",
                 "workflows"

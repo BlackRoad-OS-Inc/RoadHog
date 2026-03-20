@@ -7,14 +7,12 @@
  * PostHog API - generated
  * OpenAPI spec version: 1.0.0
  */
-export type RepoApiBaselineFilePaths = { [key: string]: string }
-
 export interface RepoApi {
     id: string
     team_id: number
     repo_external_id: number
     repo_full_name: string
-    baseline_file_paths: RepoApiBaselineFilePaths
+    default_branch: string
     created_at: string
 }
 
@@ -28,9 +26,12 @@ export interface PaginatedRepoListApi {
 }
 
 export interface CreateRepoInputApi {
+    /** GitHub numeric repository ID (stable across renames) */
+    repo_external_id: number
+    /** Full repository name (e.g., 'PostHog/posthog') */
     repo_full_name: string
-    /** @nullable */
-    repo_external_id?: number | null
+    /** Default branch name */
+    default_branch?: string
 }
 
 /**
