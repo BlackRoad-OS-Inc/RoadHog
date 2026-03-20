@@ -200,8 +200,8 @@ const SwipeableCard = forwardRef<
     )
 
     // Stack depth: cards behind the top card are slightly scaled down and offset
-    const stackScale = isTop ? 1 : 1 - stackIndex * 0.04
-    const stackY = isTop ? 0 : stackIndex * 6
+    const stackScale = isTop ? 1 : 1 - stackIndex * 0.035
+    const stackY = isTop ? 0 : stackIndex * 12
     const stackOpacity = stackIndex <= 2 ? 1 : 0
 
     if (stackIndex > 2) {
