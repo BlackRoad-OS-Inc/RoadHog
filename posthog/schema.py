@@ -6923,36 +6923,6 @@ class SourceFieldInputConfig(BaseModel):
     type: SourceFieldInputConfigType
 
 
-class TraceSpansQueryResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    error: str | None = Field(
-        default=None,
-        description=(
-            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
-        ),
-    )
-    hasMore: bool | None = None
-    hogql: str | None = Field(default=None, description="Generated HogQL query.")
-    limit: int | None = None
-    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
-    nextCursor: str | None = Field(default=None, description="Cursor for fetching the next page of results")
-    offset: int | None = None
-    query_status: QueryStatus | None = Field(
-        default=None,
-        description=("Query status indicates whether next to the provided data, a query is still running."),
-    )
-    resolved_date_range: ResolvedDateRangeResponse | None = Field(
-        default=None, description="The date range used for the query"
-    )
-    results: Any
-    timings: list[QueryTiming] | None = Field(
-        default=None,
-        description=("Measured timings for different parts of the query generation process"),
-    )
-
-
 class StickinessCriteria(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -7240,6 +7210,36 @@ class TraceQueryResponse(BaseModel):
         default=None, description="The date range used for the query"
     )
     results: list[LLMTrace]
+    timings: list[QueryTiming] | None = Field(
+        default=None,
+        description=("Measured timings for different parts of the query generation process"),
+    )
+
+
+class TraceSpansQueryResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: str | None = Field(
+        default=None,
+        description=(
+            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
+        ),
+    )
+    hasMore: bool | None = None
+    hogql: str | None = Field(default=None, description="Generated HogQL query.")
+    limit: int | None = None
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    nextCursor: str | None = Field(default=None, description="Cursor for fetching the next page of results")
+    offset: int | None = None
+    query_status: QueryStatus | None = Field(
+        default=None,
+        description=("Query status indicates whether next to the provided data, a query is still running."),
+    )
+    resolved_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None, description="The date range used for the query"
+    )
+    results: Any
     timings: list[QueryTiming] | None = Field(
         default=None,
         description=("Measured timings for different parts of the query generation process"),
@@ -9546,47 +9546,6 @@ class CachedSessionsTimelineQueryResponse(BaseModel):
     )
 
 
-class CachedTraceSpansQueryResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    cache_key: str
-    cache_target_age: AwareDatetime | None = None
-    calculation_trigger: str | None = Field(
-        default=None,
-        description=("What triggered the calculation of the query, leave empty if user/immediate"),
-    )
-    error: str | None = Field(
-        default=None,
-        description=(
-            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
-        ),
-    )
-    hasMore: bool | None = None
-    hogql: str | None = Field(default=None, description="Generated HogQL query.")
-    is_cached: bool
-    last_refresh: AwareDatetime
-    limit: int | None = None
-    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
-    nextCursor: str | None = Field(default=None, description="Cursor for fetching the next page of results")
-    next_allowed_client_refresh: AwareDatetime
-    offset: int | None = None
-    query_metadata: dict[str, Any] | None = None
-    query_status: QueryStatus | None = Field(
-        default=None,
-        description=("Query status indicates whether next to the provided data, a query is still running."),
-    )
-    resolved_date_range: ResolvedDateRangeResponse | None = Field(
-        default=None, description="The date range used for the query"
-    )
-    results: Any
-    timezone: str
-    timings: list[QueryTiming] | None = Field(
-        default=None,
-        description=("Measured timings for different parts of the query generation process"),
-    )
-
-
 class CachedStickinessQueryResponse(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -9755,6 +9714,47 @@ class CachedTraceQueryResponse(BaseModel):
         default=None, description="The date range used for the query"
     )
     results: list[LLMTrace]
+    timezone: str
+    timings: list[QueryTiming] | None = Field(
+        default=None,
+        description=("Measured timings for different parts of the query generation process"),
+    )
+
+
+class CachedTraceSpansQueryResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    cache_key: str
+    cache_target_age: AwareDatetime | None = None
+    calculation_trigger: str | None = Field(
+        default=None,
+        description=("What triggered the calculation of the query, leave empty if user/immediate"),
+    )
+    error: str | None = Field(
+        default=None,
+        description=(
+            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
+        ),
+    )
+    hasMore: bool | None = None
+    hogql: str | None = Field(default=None, description="Generated HogQL query.")
+    is_cached: bool
+    last_refresh: AwareDatetime
+    limit: int | None = None
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    nextCursor: str | None = Field(default=None, description="Cursor for fetching the next page of results")
+    next_allowed_client_refresh: AwareDatetime
+    offset: int | None = None
+    query_metadata: dict[str, Any] | None = None
+    query_status: QueryStatus | None = Field(
+        default=None,
+        description=("Query status indicates whether next to the provided data, a query is still running."),
+    )
+    resolved_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None, description="The date range used for the query"
+    )
+    results: Any
     timezone: str
     timings: list[QueryTiming] | None = Field(
         default=None,
@@ -15262,27 +15262,6 @@ class SessionsTimelineQuery(BaseModel):
     version: float | None = Field(default=None, description="version of the node, used for schema migrations")
 
 
-class TraceSpansQuery(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    after: str | None = Field(default=None, description="Cursor for fetching the next page of results")
-    dateRange: DateRange
-    kind: Literal["TraceSpansQuery"] = "TraceSpansQuery"
-    limit: int | None = None
-    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
-    offset: int | None = None
-    orderBy: OrderBy3 | None = None
-    response: TraceSpansQueryResponse | None = None
-    searchTerm: str | None = None
-    serviceNames: list[str] | None = None
-    statusCodes: list[int] | None = None
-    tags: QueryLogTags | None = None
-    traceId: str | None = None
-    rootSpans: bool | None = None
-    version: float | None = Field(default=None, description="version of the node, used for schema migrations")
-
-
 class SurveyCreationSchema(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -15439,6 +15418,27 @@ class TraceQuery(BaseModel):
     response: TraceQueryResponse | None = None
     tags: QueryLogTags | None = None
     traceId: str
+    version: float | None = Field(default=None, description="version of the node, used for schema migrations")
+
+
+class TraceSpansQuery(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    after: str | None = Field(default=None, description="Cursor for fetching the next page of results")
+    dateRange: DateRange
+    kind: Literal["TraceSpansQuery"] = "TraceSpansQuery"
+    limit: int | None = None
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    offset: int | None = None
+    orderBy: OrderBy3 | None = None
+    response: TraceSpansQueryResponse | None = None
+    rootSpans: bool | None = None
+    searchTerm: str | None = None
+    serviceNames: list[str] | None = None
+    statusCodes: list[int] | None = None
+    tags: QueryLogTags | None = None
+    traceId: str | None = None
     version: float | None = Field(default=None, description="version of the node, used for schema migrations")
 
 
