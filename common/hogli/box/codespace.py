@@ -154,24 +154,15 @@ def open_in_vscode(name: str) -> NoReturn:
     sys.exit(1)
 
 
-def set_user_secret(name: str, value: str, repo: str = REPO) -> None:
-    """Set a user-scoped Codespace secret for the given repo."""
-    subprocess.run(
-        [
-            "gh",
-            "secret",
-            "set",
-            name,
-            "--user",
-            "--app",
-            "codespaces",
-            "--repos",
-            repo,
-            "--body",
-            value,
-        ],
-        check=True,
+def run_remote_command(name: str, command: str) -> None:
+    """Execute a shell command inside a running codespace via SSH."""
+    result = subprocess.run(
+        ["gh", "codespace", "ssh", "-c", name, "--", "bash", "-lc", command],
+        check=False,
     )
+    if result.returncode != 0:
+        click.echo(f"Error: remote command failed (exit {result.returncode})", err=True)
+        raise SystemExit(result.returncode)
 
 
 def view_codespace(name: str) -> dict:

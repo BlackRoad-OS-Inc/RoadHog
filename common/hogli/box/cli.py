@@ -12,7 +12,7 @@ from pathlib import Path
 
 import click
 from hogli.core.cli import cli
-from hogli.devenv import DevenvConfig, generate_saved_devenv_config
+from hogli.devenv import DevenvConfig
 
 from . import codespace as cs
 
@@ -180,9 +180,26 @@ def box_bootstrap(
         log_to_files=log_to_files,
     )
 
+    from hogli.devenv.generator import MprocsGenerator
+    from hogli.devenv.registry import create_mprocs_registry
+    from hogli.devenv.resolver import IntentResolver, load_intent_map
+
+    intent_map = load_intent_map()
+    registry = create_mprocs_registry()
+    resolver = IntentResolver(intent_map, registry)
+    resolved = resolver.resolve(
+        config.intents,
+        include_units=config.include_units,
+        exclude_units=config.exclude_units,
+        skip_autostart=config.skip_autostart,
+        enable_autostart=config.enable_autostart,
+    )
+
+    generator = MprocsGenerator(registry)
     generated_path = Path(REMOTE_WORKSPACE_ROOT) / ".posthog" / ".generated" / "mprocs.yaml"
-    output_path, _ = generate_saved_devenv_config(config, generated_path)
-    click.echo(f"Generated dev config: {output_path}")
+    generated_path.parent.mkdir(parents=True, exist_ok=True)
+    generator.generate_and_save(resolved, generated_path, config)
+    click.echo(f"Generated dev config: {generated_path}")
 
     def _run(description: str, cmd: list[str], *, check: bool = True) -> None:
         click.echo(f"{description}...")
@@ -284,10 +301,7 @@ def box_ports(branch: str | None, name: str | None) -> None:
     """Show forwarded ports for a codespace."""
     cs.ensure_gh_authenticated()
     resolved = _resolve_codespace_name(branch, name)
-    # Delegate to gh codespace ports which has its own formatting
-    import subprocess
-
-    subprocess.run(["gh", "codespace", "ports", "-c", resolved])
+    subprocess.run(["gh", "codespace", "ports", "-c", resolved], check=False)
 
 
 @cli.command(name="box:status", help="Show devbox status and details")

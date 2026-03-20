@@ -12,4 +12,4 @@ if ! docker compose -f docker-compose.dev.yml ps --status running --quiet 2>/dev
     timeout 120 bash -c 'until pg_isready -h localhost -U posthog 2>/dev/null; do sleep 2; done'
 fi
 
-echo "PostHog devbox attached. Run 'hogli start' to launch dev services."
+echo "🦔 PostHog devbox attached. Run 'hogli start' to launch dev services."
