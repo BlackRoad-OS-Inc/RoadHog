@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from django.conf import settings
+from django.db import models
 
 import structlog
 import temporalio
@@ -278,6 +279,17 @@ async def send_trial_usage_email_activity(inputs: SendTrialUsageEmailInputs) -> 
         if not config:
             return
 
+        # Find evaluations that will be affected (on trial, enabled, not deleted)
+        max_listed = 20
+        affected_qs = Evaluation.objects.filter(
+            team_id=inputs.team_id,
+            enabled=True,
+            deleted=False,
+        ).filter(models.Q(model_configuration__isnull=True) | models.Q(model_configuration__provider_key__isnull=True))
+        total_affected = affected_qs.count()
+        affected_evals = list(affected_qs.values_list("name", flat=True)[:max_listed])
+        affected_evals_overflow = max(0, total_affected - max_listed)
+
         settings_url = f"/project/{team.pk}/settings/environment-llm-analytics#llm-analytics-byok"
         campaign_key = f"llm_analytics_trial_{inputs.threshold_pct}pct_{team.id}"
         is_exhausted = inputs.threshold_pct >= 100
@@ -299,6 +311,8 @@ async def send_trial_usage_email_activity(inputs: SendTrialUsageEmailInputs) -> 
                 "trial_evals_remaining": config.trial_evals_remaining,
                 "threshold_pct": inputs.threshold_pct,
                 "settings_url": settings_url,
+                "affected_evals": affected_evals,
+                "affected_evals_overflow": affected_evals_overflow,
             },
         )
 

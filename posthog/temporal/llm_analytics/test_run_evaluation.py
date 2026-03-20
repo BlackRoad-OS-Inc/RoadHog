@@ -13,7 +13,9 @@ from temporalio.exceptions import ApplicationError
 from posthog.models import Organization, Team
 
 from products.llm_analytics.backend.llm.errors import StructuredOutputParseError
+from products.llm_analytics.backend.models.evaluation_config import EvaluationConfig
 from products.llm_analytics.backend.models.evaluations import Evaluation
+from products.llm_analytics.backend.models.model_configuration import LLMModelConfiguration
 
 from .run_evaluation import (
     BooleanEvalResult,
@@ -902,3 +904,55 @@ class TestSendTrialUsageEmailActivity:
 
             call_kwargs = mock_email_class.call_args[1]
             assert call_kwargs["campaign_key"] == f"llm_analytics_trial_{threshold_pct}pct_{team.id}"
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_includes_affected_eval_names_in_context(self, setup_data):
+        team = setup_data["team"]
+        await sync_to_async(EvaluationConfig.objects.get_or_create)(team_id=team.id)
+
+        # Trial eval (no provider_key) — should be included
+        mc_trial = await sync_to_async(LLMModelConfiguration.objects.create)(
+            team=team, provider="openai", model="gpt-4o-mini"
+        )
+        await sync_to_async(Evaluation.objects.create)(
+            team=team,
+            name="My Trial Eval",
+            evaluation_type="llm_judge",
+            output_type="boolean",
+            model_configuration=mc_trial,
+            enabled=True,
+        )
+        # Legacy eval (no model_configuration) — should be included
+        await sync_to_async(Evaluation.objects.create)(
+            team=team,
+            name="Legacy Eval",
+            evaluation_type="llm_judge",
+            output_type="boolean",
+            model_configuration=None,
+            enabled=True,
+        )
+        # Disabled eval — should NOT be included
+        await sync_to_async(Evaluation.objects.create)(
+            team=team,
+            name="Disabled Eval",
+            evaluation_type="llm_judge",
+            output_type="boolean",
+            model_configuration=mc_trial,
+            enabled=False,
+        )
+
+        with (
+            patch("posthog.email.is_email_available", return_value=True),
+            patch("posthog.email.EmailMessage") as mock_email_class,
+        ):
+            mock_message = MagicMock()
+            mock_email_class.return_value = mock_message
+
+            await send_trial_usage_email_activity(SendTrialUsageEmailInputs(team_id=team.id, threshold_pct=75))
+
+            call_kwargs = mock_email_class.call_args[1]
+            affected = call_kwargs["template_context"]["affected_evals"]
+            assert "My Trial Eval" in affected
+            assert "Legacy Eval" in affected
+            assert "Disabled Eval" not in affected

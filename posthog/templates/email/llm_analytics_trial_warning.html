@@ -5,8 +5,21 @@
 <p>
     Your team has used <strong>{{ trial_evals_used }}</strong> of <strong>{{ trial_eval_limit }}</strong> trial evaluations for LLM analytics, with <strong>{{ trial_evals_remaining }}</strong> remaining.
 </p>
+{% if affected_evals %}
 <p>
-    Once your trial evaluations run out, evaluations using trial credits will be disabled. To ensure uninterrupted evaluations, add your own provider API key in the <a href="{% absolute_uri settings_url %}">LLM analytics settings</a>.
+    Once your trial evaluations run out, the following evaluations will be disabled:
+</p>
+<ul>
+    {% for eval_name in affected_evals %}<li>{{ eval_name }}</li>{% endfor %}
+    {% if affected_evals_overflow %}<li><em>and {{ affected_evals_overflow }} more</em></li>{% endif %}
+</ul>
+{% else %}
+<p>
+    Once your trial evaluations run out, evaluations using trial credits will be disabled.
+</p>
+{% endif %}
+<p>
+    To ensure uninterrupted evaluations, add your own provider API key in the <a href="{% absolute_uri settings_url %}">LLM analytics settings</a>.
 </p>
 <div class="mb mt text-center">
     <a class="button" href="{% absolute_uri settings_url %}">Add your API key</a>

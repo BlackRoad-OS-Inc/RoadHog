@@ -2,9 +2,19 @@
 {% block preheader %}Your trial evaluations for LLM analytics have been used up{% endblock %}
 {% block heading %}Your trial evaluations have been used up{% endblock %}
 {% block section %}
+{% if affected_evals %}
+<p>
+    Your team has used all <strong>{{ trial_eval_limit }}</strong> trial evaluations for LLM analytics. The following evaluations have been disabled:
+</p>
+<ul>
+    {% for eval_name in affected_evals %}<li>{{ eval_name }}</li>{% endfor %}
+    {% if affected_evals_overflow %}<li><em>and {{ affected_evals_overflow }} more</em></li>{% endif %}
+</ul>
+{% else %}
 <p>
     Your team has used all <strong>{{ trial_eval_limit }}</strong> trial evaluations for LLM analytics. Evaluations using trial credits have been disabled.
 </p>
+{% endif %}
 <p>
     To continue running evaluations, add your own provider API key in the <a href="{% absolute_uri settings_url %}">LLM analytics settings</a>. Once added, you can re-enable your evaluations.
 </p>
