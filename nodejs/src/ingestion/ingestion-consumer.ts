@@ -5,7 +5,7 @@ import { instrumentFn } from '~/common/tracing/tracing-utils'
 
 import { HogTransformerService } from '../cdp/hog-transformations/hog-transformer.service'
 import { CommonConfig } from '../common/config'
-import { KAFKA_CLICKHOUSE_TOPHOG, KAFKA_INGESTION_WARNINGS } from '../config/kafka-topics'
+import { KAFKA_CLICKHOUSE_TOPHOG, KAFKA_GROUPS, KAFKA_INGESTION_WARNINGS } from '../config/kafka-topics'
 import { KafkaConsumer } from '../kafka/consumer'
 import { KafkaProducerWrapper } from '../kafka/producer'
 import { HealthCheckResult, HealthCheckResultError, PluginServerService, RedisPool } from '../types'
@@ -35,6 +35,7 @@ import {
     AI_EVENTS_OUTPUT,
     DLQ_OUTPUT,
     EVENTS_OUTPUT,
+    GROUPS_OUTPUT,
     HEATMAPS_OUTPUT,
     INGESTION_WARNINGS_OUTPUT,
     REDIRECT_OUTPUT,
@@ -63,7 +64,6 @@ export interface IngestionConsumerDeps {
     teamManager: TeamManager
     groupTypeManager: GroupTypeManager
     groupRepository: GroupRepository
-    clickhouseGroupRepository: ClickhouseGroupRepository
     personRepository: PersonRepository
     cookielessManager: CookielessManager
     hogTransformer: HogTransformerService
@@ -94,7 +94,7 @@ export class IngestionConsumer {
     private tokenDistinctIdsToSkipPersons: string[] = []
     private tokenDistinctIdsToForceOverflow: string[] = []
     private personsStore: PersonsStore
-    public groupStore: BatchWritingGroupStore
+    public groupStore!: BatchWritingGroupStore
     private eventIngestionRestrictionManager: EventIngestionRestrictionManager
     private eventSchemaEnforcementManager: EventSchemaEnforcementManager
     public readonly promiseScheduler = new PromiseScheduler()
@@ -177,17 +177,6 @@ export class IngestionConsumer {
             updateAllProperties: this.config.PERSON_PROPERTIES_UPDATE_ALL,
         })
 
-        this.groupStore = new BatchWritingGroupStore(
-            this.deps.kafkaProducer,
-            this.deps.groupRepository,
-            this.deps.clickhouseGroupRepository,
-            {
-                maxConcurrentUpdates: this.config.GROUP_BATCH_WRITING_MAX_CONCURRENT_UPDATES,
-                maxOptimisticUpdateRetries: this.config.GROUP_BATCH_WRITING_MAX_OPTIMISTIC_UPDATE_RETRIES,
-                optimisticUpdateRetryInterval: this.config.GROUP_BATCH_WRITING_OPTIMISTIC_UPDATE_RETRY_INTERVAL_MS,
-            }
-        )
-
         this.kafkaConsumer = new KafkaConsumer({
             groupId: this.groupId,
             topic: this.topic,
@@ -244,7 +233,24 @@ export class IngestionConsumer {
             [REDIRECT_OUTPUT]: {
                 topic: '', // redirect topic comes from the pipeline result
             },
+            [GROUPS_OUTPUT]: {
+                topic: KAFKA_GROUPS,
+            },
         })
+
+        const groupsOutput = outputs.resolve(GROUPS_OUTPUT)
+        const ingestionWarningsOutput = outputs.resolve(INGESTION_WARNINGS_OUTPUT)
+        const clickhouseGroupRepository = new ClickhouseGroupRepository(groupsOutput.producer, groupsOutput.topic)
+        this.groupStore = new BatchWritingGroupStore(
+            this.deps.groupRepository,
+            clickhouseGroupRepository,
+            { producer: ingestionWarningsOutput.producer, topic: ingestionWarningsOutput.topic },
+            {
+                maxConcurrentUpdates: this.config.GROUP_BATCH_WRITING_MAX_CONCURRENT_UPDATES,
+                maxOptimisticUpdateRetries: this.config.GROUP_BATCH_WRITING_MAX_OPTIMISTIC_UPDATE_RETRIES,
+                optimisticUpdateRetryInterval: this.config.GROUP_BATCH_WRITING_OPTIMISTIC_UPDATE_RETRY_INTERVAL_MS,
+            }
+        )
 
         const joinedPipelineConfig: JoinedIngestionPipelineConfig = {
             eventSchemaEnforcementEnabled: this.config.EVENT_SCHEMA_ENFORCEMENT_ENABLED,

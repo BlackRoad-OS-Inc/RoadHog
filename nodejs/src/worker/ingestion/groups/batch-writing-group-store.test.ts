@@ -12,11 +12,11 @@ import { GroupRepository } from './repositories/group-repository.interface'
 
 // Mock the module before importing
 jest.mock('../utils', () => ({
-    captureIngestionWarning: jest.fn().mockResolvedValue(undefined),
+    produceIngestionWarning: jest.fn().mockResolvedValue(undefined),
 }))
 
 import { KafkaProducerWrapper } from '~/kafka/producer'
-import { captureIngestionWarning } from '../utils'
+import { produceIngestionWarning } from '../utils'
 
 // Mock the DB class
 
@@ -105,11 +105,10 @@ describe('BatchWritingGroupStore', () => {
         clickhouseGroupRepository = {
             upsertGroup: jest.fn().mockResolvedValue(undefined),
         } as unknown as ClickhouseGroupRepository
-        groupStore = new BatchWritingGroupStore(
-            {} as unknown as KafkaProducerWrapper,
-            groupRepository,
-            clickhouseGroupRepository
-        )
+        groupStore = new BatchWritingGroupStore(groupRepository, clickhouseGroupRepository, {
+            producer: {} as unknown as KafkaProducerWrapper,
+            topic: 'ingestion_warnings_test',
+        })
     })
 
     afterEach(() => {
@@ -298,7 +297,7 @@ describe('BatchWritingGroupStore', () => {
         expect(groupRepository.updateGroup).toHaveBeenCalledTimes(0)
         expect(groupRepository.inTransaction).toHaveBeenCalledTimes(0)
         // No transaction calls expected since optimistic update failed
-        expect(captureIngestionWarning).toHaveBeenCalledTimes(1)
+        expect(produceIngestionWarning).toHaveBeenCalledTimes(1)
     })
 
     it('should retry on race condition error and clear cache', async () => {

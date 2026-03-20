@@ -63,7 +63,6 @@ import { PubSub } from './utils/pubsub'
 import { TeamManager } from './utils/team-manager'
 import { delay } from './utils/utils'
 import { GroupTypeManager } from './worker/ingestion/group-type-manager'
-import { ClickhouseGroupRepository } from './worker/ingestion/groups/repositories/clickhouse-group-repository'
 import { PostgresGroupRepository } from './worker/ingestion/groups/repositories/postgres-group-repository'
 import { PostgresPersonRepository } from './worker/ingestion/persons/repositories/postgres-person-repository'
 
@@ -220,7 +219,6 @@ export class PluginServer {
                     teamManager,
                     groupTypeManager: ingestionServices!.groupTypeManager,
                     groupRepository: ingestionCdpServices!.groupRepository,
-                    clickhouseGroupRepository: ingestionServices!.clickhouseGroupRepository,
                     personRepository: ingestionCdpServices!.personRepository,
                     cookielessManager: this.cookielessManager!,
                     hogTransformer: createHogTransformerService(this.config, hogTransformerDeps!),
@@ -259,7 +257,6 @@ export class PluginServer {
                     teamManager,
                     groupTypeManager: ingestionServices!.groupTypeManager,
                     groupRepository: ingestionCdpServices!.groupRepository,
-                    clickhouseGroupRepository: ingestionServices!.clickhouseGroupRepository,
                     personRepository: ingestionCdpServices!.personRepository,
                     cookielessManager: this.cookielessManager!,
                     hogTransformer: createHogTransformerService(this.config, hogTransformerDeps!),
@@ -617,7 +614,6 @@ export class PluginServer {
         groupRepository: PostgresGroupRepository
     ): {
         groupTypeManager: GroupTypeManager
-        clickhouseGroupRepository: ClickhouseGroupRepository
     } {
         logger.info('🤔', 'Connecting to cookieless Redis...')
         this.cookielessRedisPool = createRedisPoolFromConfig({
@@ -629,9 +625,8 @@ export class PluginServer {
 
         this.cookielessManager = new CookielessManager(this.config, this.cookielessRedisPool)
         const groupTypeManager = new GroupTypeManager(groupRepository, teamManager)
-        const clickhouseGroupRepository = new ClickhouseGroupRepository(this.kafkaProducer!)
 
-        return { groupTypeManager, clickhouseGroupRepository }
+        return { groupTypeManager }
     }
 
     private createCdpLogsServices(teamManager: TeamManager): { quotaLimiting: QuotaLimiting } {

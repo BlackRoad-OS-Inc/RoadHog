@@ -18,6 +18,9 @@ export type DlqOutput = typeof DLQ_OUTPUT
 export const REDIRECT_OUTPUT = 'redirect' as const
 export type RedirectOutput = typeof REDIRECT_OUTPUT
 
+export const GROUPS_OUTPUT = 'groups' as const
+export type GroupsOutput = typeof GROUPS_OUTPUT
+
 export interface IngestionOutputConfig {
     topic: string
     producer: KafkaProducerWrapper

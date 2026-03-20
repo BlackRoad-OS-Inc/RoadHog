@@ -13,7 +13,7 @@ describe('ClickhouseGroupRepository', () => {
         kafkaProducer = {
             queueMessages: jest.fn().mockResolvedValue(undefined),
         }
-        repository = new ClickhouseGroupRepository(kafkaProducer)
+        repository = new ClickhouseGroupRepository(kafkaProducer, KAFKA_GROUPS)
     })
 
     it('should upsert group to ClickHouse via Kafka', async () => {
