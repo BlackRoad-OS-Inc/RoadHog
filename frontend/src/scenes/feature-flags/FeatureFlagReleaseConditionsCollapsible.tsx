@@ -22,11 +22,13 @@ import { EditableField } from 'lib/components/EditableField/EditableField'
 import { PropertyFilters } from 'lib/components/PropertyFilters/PropertyFilters'
 import { isPropertyFilterWithOperator } from 'lib/components/PropertyFilters/utils'
 import { TaxonomicFilterGroupType, TaxonomicFilterProps } from 'lib/components/TaxonomicFilter/types'
+import { FEATURE_FLAGS } from 'lib/constants'
 import { IconArrowDown, IconArrowUp } from 'lib/lemon-ui/icons'
 import { LemonRadio } from 'lib/lemon-ui/LemonRadio'
 import { LemonSlider } from 'lib/lemon-ui/LemonSlider'
 import { LemonTag } from 'lib/lemon-ui/LemonTag/LemonTag'
 import { Link } from 'lib/lemon-ui/Link'
+import { featureFlagLogic } from 'lib/logic/featureFlagLogic'
 import { humanFriendlyNumber } from 'lib/utils'
 import { clamp } from 'lib/utils'
 
@@ -275,6 +277,7 @@ const SortableCondition = ({
     flagId,
     id,
     isAnyItemDragging,
+    isDragDropEnabled = false,
 }: {
     group: FeatureFlagGroupType
     index: number
@@ -302,6 +305,7 @@ const SortableCondition = ({
     flagId?: FeatureFlagLogicProps['id']
     id: string
     isAnyItemDragging: boolean
+    isDragDropEnabled?: boolean
 }): JSX.Element => {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
         id: group.sort_key || index.toString(),
@@ -575,12 +579,14 @@ const SortableCondition = ({
                 </div>
                 {totalGroups > 1 && (
                     <div className="flex flex-col items-center gap-1 pr-2">
-                        <FeatureFlagConditionDragHandle
-                            listeners={listeners}
-                            attributes={attributes}
-                            setActivatorNodeRef={setActivatorNodeRef}
-                            hasMultipleConditions={true}
-                        />
+                        {isDragDropEnabled && (
+                            <FeatureFlagConditionDragHandle
+                                listeners={listeners}
+                                attributes={attributes}
+                                setActivatorNodeRef={setActivatorNodeRef}
+                                hasMultipleConditions={true}
+                            />
+                        )}
                         <div className="flex flex-col gap-0.5">
                             {index > 0 && (
                                 <LemonButton
@@ -649,6 +655,9 @@ export function FeatureFlagReleaseConditionsCollapsible({
         openConditions,
         properties,
     } = useValues(releaseConditionsLogic)
+
+    const { featureFlags } = useValues(featureFlagLogic)
+    const isDragDropEnabled = !!featureFlags[FEATURE_FLAGS.FEATURE_FLAG_DRAG_DROP_CONDITIONS]
 
     const {
         updateConditionSet,
@@ -893,83 +902,122 @@ export function FeatureFlagReleaseConditionsCollapsible({
             </div>
 
             <div ref={collapseRef}>
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={rectIntersection}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onDragCancel={() => {
-                        setIsAnyItemDragging(false)
-                        setDraggedGroup(null)
-                    }}
-                >
-                    <SortableContext
-                        items={filterGroups.map((group, index) => group.sort_key || index.toString())}
-                        strategy={verticalListSortingStrategy}
+                {isDragDropEnabled ? (
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={rectIntersection}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onDragCancel={() => {
+                            setIsAnyItemDragging(false)
+                            setDraggedGroup(null)
+                        }}
                     >
-                        {filterGroups.map((group, index) => (
-                            <React.Fragment key={`fragment-${group.sort_key ?? index}`}>
-                                {index > 0 && (
-                                    <div className="text-xs font-medium text-muted uppercase tracking-wide text-center w-full py-2">
-                                        or
-                                    </div>
-                                )}
-                                <SortableCondition
-                                    key={`condition-${group.sort_key ?? index}`}
-                                    group={group}
-                                    index={index}
-                                    totalGroups={filterGroups.length}
-                                    affectedUsers={affectedUsers}
-                                    totalUsers={totalUsers}
-                                    aggregationTargetName={aggregationTargetName}
-                                    onMoveUp={() => moveConditionSetUp(index)}
-                                    onMoveDown={() => moveConditionSetDown(index)}
-                                    onDuplicate={() => duplicateConditionSet(index)}
-                                    onRemove={() => removeConditionSet(index)}
-                                    updateConditionSet={updateConditionSet}
-                                    taxonomicGroupTypes={taxonomicGroupTypes}
-                                    filtersTaxonomicOptions={filtersTaxonomicOptions}
-                                    releaseFilters={releaseFilters}
-                                    variants={variants}
-                                    openConditions={openConditions}
-                                    handleOpenConditionsChange={handleOpenConditionsChange}
-                                    flagId={flagId}
-                                    id={id || 'feature-flag-conditions'}
-                                    isAnyItemDragging={isAnyItemDragging}
-                                />
-                            </React.Fragment>
-                        ))}
-                    </SortableContext>
-                    <DragOverlay>
-                        {draggedGroup ? (
-                            <div
-                                className="border rounded bg-bg-light"
-                                style={{ opacity: 0.9, boxShadow: '0 8px 25px rgba(0, 0, 0, 0.15)' }}
-                            >
-                                <div className="flex items-center justify-between w-full p-3">
-                                    <div className="flex items-start gap-2 min-w-0">
-                                        <span className="font-medium text-xs bg-bg-light rounded px-1.5 py-0.5 shrink-0">
-                                            {filterGroups.findIndex((g) => g.sort_key === draggedGroup.sort_key) + 1}
-                                        </span>
-                                        <span className="text-sm break-all">
-                                            {draggedGroup.description ||
-                                                summarizeProperties(
-                                                    draggedGroup.properties || [],
-                                                    aggregationTargetName
-                                                )}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        <span className="text-sm text-muted mr-2">
-                                            ({draggedGroup.rollout_percentage ?? 100}%
-                                            {draggedGroup.variant && ` · ${draggedGroup.variant}`})
-                                        </span>
+                        <SortableContext
+                            items={filterGroups.map((group, index) => group.sort_key || index.toString())}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            {filterGroups.map((group, index) => (
+                                <React.Fragment key={`fragment-${group.sort_key ?? index}`}>
+                                    {index > 0 && (
+                                        <div className="text-xs font-medium text-muted uppercase tracking-wide text-center w-full py-2">
+                                            or
+                                        </div>
+                                    )}
+                                    <SortableCondition
+                                        key={`condition-${group.sort_key ?? index}`}
+                                        group={group}
+                                        index={index}
+                                        totalGroups={filterGroups.length}
+                                        affectedUsers={affectedUsers}
+                                        totalUsers={totalUsers}
+                                        aggregationTargetName={aggregationTargetName}
+                                        onMoveUp={() => moveConditionSetUp(index)}
+                                        onMoveDown={() => moveConditionSetDown(index)}
+                                        onDuplicate={() => duplicateConditionSet(index)}
+                                        onRemove={() => removeConditionSet(index)}
+                                        updateConditionSet={updateConditionSet}
+                                        taxonomicGroupTypes={taxonomicGroupTypes}
+                                        filtersTaxonomicOptions={filtersTaxonomicOptions}
+                                        releaseFilters={releaseFilters}
+                                        variants={variants}
+                                        openConditions={openConditions}
+                                        handleOpenConditionsChange={handleOpenConditionsChange}
+                                        flagId={flagId}
+                                        id={id || 'feature-flag-conditions'}
+                                        isAnyItemDragging={isAnyItemDragging}
+                                        isDragDropEnabled={isDragDropEnabled}
+                                    />
+                                </React.Fragment>
+                            ))}
+                        </SortableContext>
+                        <DragOverlay>
+                            {draggedGroup ? (
+                                <div
+                                    className="border rounded bg-bg-light"
+                                    style={{ opacity: 0.9, boxShadow: '0 8px 25px rgba(0, 0, 0, 0.15)' }}
+                                >
+                                    <div className="flex items-center justify-between w-full p-3">
+                                        <div className="flex items-start gap-2 min-w-0">
+                                            <span className="font-medium text-xs bg-bg-light rounded px-1.5 py-0.5 shrink-0">
+                                                {filterGroups.findIndex((g) => g.sort_key === draggedGroup.sort_key) +
+                                                    1}
+                                            </span>
+                                            <span className="text-sm break-all">
+                                                {draggedGroup.description ||
+                                                    summarizeProperties(
+                                                        draggedGroup.properties || [],
+                                                        aggregationTargetName
+                                                    )}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <span className="text-sm text-muted mr-2">
+                                                ({draggedGroup.rollout_percentage ?? 100}%
+                                                {draggedGroup.variant && ` · ${draggedGroup.variant}`})
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ) : null}
-                    </DragOverlay>
-                </DndContext>
+                            ) : null}
+                        </DragOverlay>
+                    </DndContext>
+                ) : (
+                    // Fallback to non-draggable conditions when feature flag is disabled
+                    filterGroups.map((group, index) => (
+                        <React.Fragment key={`fragment-${group.sort_key ?? index}`}>
+                            {index > 0 && (
+                                <div className="text-xs font-medium text-muted uppercase tracking-wide text-center w-full py-2">
+                                    or
+                                </div>
+                            )}
+                            <SortableCondition
+                                key={`condition-${group.sort_key ?? index}`}
+                                group={group}
+                                index={index}
+                                totalGroups={filterGroups.length}
+                                affectedUsers={affectedUsers}
+                                totalUsers={totalUsers}
+                                aggregationTargetName={aggregationTargetName}
+                                onMoveUp={() => moveConditionSetUp(index)}
+                                onMoveDown={() => moveConditionSetDown(index)}
+                                onDuplicate={() => duplicateConditionSet(index)}
+                                onRemove={() => removeConditionSet(index)}
+                                updateConditionSet={updateConditionSet}
+                                taxonomicGroupTypes={taxonomicGroupTypes}
+                                filtersTaxonomicOptions={filtersTaxonomicOptions}
+                                releaseFilters={releaseFilters}
+                                variants={variants}
+                                openConditions={openConditions}
+                                handleOpenConditionsChange={handleOpenConditionsChange}
+                                flagId={flagId}
+                                id={id || 'feature-flag-conditions'}
+                                isAnyItemDragging={false}
+                                isDragDropEnabled={false}
+                            />
+                        </React.Fragment>
+                    ))
+                )}
             </div>
 
             <LemonButton type="secondary" icon={<IconPlus />} onClick={handleAddConditionSet} className="mt-1">
