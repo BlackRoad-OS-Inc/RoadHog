@@ -21,6 +21,11 @@ source .venv/bin/activate
 # Make hogli available — normally done by flox on-activate.sh
 ln -sf "$(pwd)/bin/hogli" .venv/bin/hogli 2>/dev/null || true
 
+# Pre-built cyclotron-node native addon — skip cargo build
+if [[ -f /usr/local/lib/cyclotron-node-index.node ]]; then
+    cp /usr/local/lib/cyclotron-node-index.node /workspace/rust/cyclotron-node/index.node
+fi
+
 echo "==> Installing Node dependencies..."
 pnpm install --frozen-lockfile --prefer-offline 2>&1 || pnpm install 2>&1
 

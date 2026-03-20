@@ -72,6 +72,11 @@ COPY --from=ghcr.io/posthog/posthog/feature-flags:master /usr/local/bin/feature-
 COPY --from=ghcr.io/posthog/posthog/property-defs-rs:master /usr/local/bin/property-defs-rs /usr/local/bin/posthog-rs-property-defs-rs
 COPY --from=ghcr.io/posthog/posthog/cyclotron-janitor:master /usr/local/bin/cyclotron-janitor /usr/local/bin/posthog-rs-cyclotron-janitor
 
+# Pre-built cyclotron-node native addon (needed by nodejs/posthog-node).
+# The entrypoint copies this to the worktree's rust/cyclotron-node/index.node
+# so pnpm's prestart:dev build step is skipped.
+COPY --from=ghcr.io/posthog/posthog-node:master /code/rust/cyclotron-node/index.node /usr/local/lib/cyclotron-node-index.node
+
 ENV NODE_ENV=development
 WORKDIR /workspace
 
