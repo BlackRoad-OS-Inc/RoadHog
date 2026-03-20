@@ -42,7 +42,7 @@ def check_timeouts() -> list[str]:
         for job_name, job_config in jobs.items():
             if not isinstance(job_config, dict):
                 continue
-            if "uses" in job_config and "/" in str(job_config["uses"]):
+            if "uses" in job_config:
                 continue
             if "timeout-minutes" not in job_config:
                 errors.append(f"{workflow_file.name}: job '{job_name}' is missing timeout-minutes")
