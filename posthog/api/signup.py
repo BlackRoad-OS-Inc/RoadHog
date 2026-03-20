@@ -808,10 +808,9 @@ def social_create_user(
 
     if invite_id:
         from_invite = True
-        result = process_social_invite_signup(strategy, invite_id, email, full_name)
-        if isinstance(result, HttpResponseRedirect):
-            return result
-        user = result
+        user = process_social_invite_signup(strategy, invite_id, email, full_name)
+        if isinstance(user, HttpResponseRedirect):
+            return user
 
     else:
         # JIT Provisioning?
