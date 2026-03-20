@@ -37,4 +37,7 @@ echo "==> Starting PostHog via mprocs in tmux..."
 # -L sandbox starts a new server that inherits our full environment.
 # exec replaces this process so the container stays alive as long as tmux does.
 # Use `sandbox shell` to attach and see the mprocs UI.
+# Clean up stale lock file from previous container crashes
+rm -f /workspace/bin/start.lock
+
 exec tmux -L sandbox new-session -s posthog "bash -c 'source .venv/bin/activate && bin/start'"

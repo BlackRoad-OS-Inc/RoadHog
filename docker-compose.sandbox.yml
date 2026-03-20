@@ -50,6 +50,8 @@ services:
             # they're running inside a sandbox container
             POSTHOG_SANDBOX: '1'
             HOST_BIND: '0.0.0.0'
+            # Tell Django where the browser can reach the Vite dev server
+            JS_URL: 'http://localhost:${SANDBOX_VITE_PORT:-49001}'
             # DuckLake connects to Postgres — point at the compose service, not localhost
             DUCKLAKE_RDS_HOST: 'db'
             DUCKLAKE_RDS_PORT: '5432'

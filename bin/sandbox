@@ -136,8 +136,9 @@ cmd_create() {
     registry_save "$branch" "$slug" "$port" "$worktree_path"
 
     # Start compose project
-    print_color blue "Starting sandbox '${project}' on port ${port}..."
-    SANDBOX_PORT="$port" SANDBOX_CODE="$worktree_path" \
+    local vite_port=$((port + 1000))
+    print_color blue "Starting sandbox '${project}' on port ${port} (Vite: ${vite_port})..."
+    SANDBOX_PORT="$port" SANDBOX_VITE_PORT="$vite_port" SANDBOX_CODE="$worktree_path" \
     SANDBOX_UID="$(id -u)" SANDBOX_GID="$(id -g)" \
         docker compose -p "$project" -f "$COMPOSE_FILE" up -d --build
 
@@ -190,10 +191,11 @@ cmd_start() {
     local worktree_path
     worktree_path=$(registry_get "$branch" "worktree")
 
-    print_color blue "Starting sandbox '${project}' on port ${port}..."
-    SANDBOX_PORT="$port" SANDBOX_CODE="$worktree_path" \
+    local vite_port=$((port + 1000))
+    print_color blue "Starting sandbox '${project}' on port ${port} (Vite: ${vite_port})..."
+    SANDBOX_PORT="$port" SANDBOX_VITE_PORT="$vite_port" SANDBOX_CODE="$worktree_path" \
     SANDBOX_UID="$(id -u)" SANDBOX_GID="$(id -g)" \
-        docker compose -p "$project" -f "$COMPOSE_FILE" start
+        docker compose -p "$project" -f "$COMPOSE_FILE" up -d
 
     success "PostHog running at http://localhost:${port}"
 }
