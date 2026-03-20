@@ -9,6 +9,7 @@ from django.contrib.auth import login, password_validation
 from django.contrib.sessions.backends.base import SessionBase, UpdateError
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls.base import reverse
 
@@ -641,7 +642,7 @@ def lookup_invite_for_saml(email: str, organization_domain_id: str) -> Optional[
 
 def process_social_invite_signup(
     strategy: DjangoStrategy, invite_id: str, email: str, full_name: str, user: Optional[User] = None
-) -> User:
+) -> Union[User, HttpResponseRedirect]:
     try:
         # nosemgrep: idor-lookup-without-org (invite UUID from server session serves as auth token)
         invite: Union[OrganizationInvite, TeamInviteSurrogate] = OrganizationInvite.objects.select_related(
