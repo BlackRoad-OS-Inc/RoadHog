@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 
 from posthog.models.team.team import Team
 
-from products.links.backend.models.link import Link
+from products.links.backend.models import Link
 
 logger = structlog.get_logger(__name__)
 

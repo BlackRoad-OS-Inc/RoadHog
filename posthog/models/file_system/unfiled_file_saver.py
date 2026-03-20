@@ -18,8 +18,8 @@ from posthog.models.user import User
 from posthog.session_recordings.models.session_recording_playlist import SessionRecordingPlaylist
 
 from products.early_access_features.backend.models import EarlyAccessFeature
-from products.links.backend.models.link import Link
 from products.experiments.backend.models.experiment import Experiment
+from products.links.backend.models import Link
 from products.notebooks.backend.models import Notebook
 
 MIXIN_MODELS = {
