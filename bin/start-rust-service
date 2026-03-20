@@ -138,11 +138,7 @@ case "$RS_SVC" in
     export RUST_BACKTRACE=1
     export WRITE_DATABASE_URL="${WRITE_DATABASE_URL:-$DEFAULT_PG}"
     export READ_DATABASE_URL="${READ_DATABASE_URL:-$DEFAULT_PG}"
-    if [[ "${POSTHOG_SANDBOX:-}" == "1" ]]; then
-      export MAXMIND_DB_PATH=/workspace/share/GeoLite2-City.mmdb
-    else
-      export MAXMIND_DB_PATH=../share/GeoLite2-City.mmdb
-    fi
+    export MAXMIND_DB_PATH=../share/GeoLite2-City.mmdb
     export REDIS_URL="$DEFAULT_REDIS"
     export ADDRESS=0.0.0.0:3001
     export DEBUG=1
@@ -195,43 +191,25 @@ if [[ -n "${DEV_RUST_SVC_OVERRIDE:-}" ]]; then
   export RS_SVC="$DEV_RUST_SVC_OVERRIDE"
 fi
 
-# In sandbox mode, use pre-built binaries from the Docker image instead of cargo
-PREBUILT_BIN="/usr/local/bin/posthog-rs-${RS_SVC}"
-if [[ "${POSTHOG_SANDBOX:-}" == "1" ]] && [[ -x "$PREBUILT_BIN" ]]; then
-  echo -e "\033[47m>>\033[0m Sandbox: using pre-built binary for '$RS_SVC'"
-  sleep 1
-  while true; do
-    if ! ps -p ${RS_PID:-} &>/dev/null; then
-      "$PREBUILT_BIN" &
-      export RS_PID=$!
-      echo -e "\n\033[47m>>\033[0m Started '$RS_SVC' with PID $RS_PID (pre-built)\n"
-    fi
-    set +e
-    wait $RS_PID
-    set -e
-    sleep 3
-  done
-else
-  # ensure Rust services are in scope for "cargo run --bin <SERVICE_NAME>"
-  cd rust
+# ensure Rust services are in scope for "cargo run --bin <SERVICE_NAME>"
+cd rust
 
-  # ensure the service restarts if it crashes in dev
-  sleep 1
-  while true; do
-    if ! ps -p ${RS_PID:-} &>/dev/null; then
-      cargo run --bin "$RS_SVC" &
-      export RS_PID=$!
-      echo -e "\n\033[47m>>\033[0m Restarted '$RS_SVC' with PID $RS_PID\n"
-    fi
+# ensure the service restarts if it crashes in dev
+sleep 1
+while true; do
+  if ! ps -p ${RS_PID:-} &>/dev/null; then
+    cargo run --bin "$RS_SVC" &
+    export RS_PID=$!
+    echo -e "\n\033[47m>>\033[0m Restarted '$RS_SVC' with PID $RS_PID\n"
+  fi
 
-    # restart subprocess if it fails without bin/start shutdown
-    set +e
-    wait $RS_PID
-    set -e
+  # restart subprocess if it fails without bin/start shutdown
+  set +e
+  wait $RS_PID
+  set -e
 
-    sleep 3
-  done
-fi
+  sleep 3
+done
 
 echo -e "\n\033[47m>>\033[0m Shut down '$RS_SVC'\n"
 exit 0
