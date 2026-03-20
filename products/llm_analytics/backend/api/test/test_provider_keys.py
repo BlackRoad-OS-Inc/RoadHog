@@ -814,6 +814,11 @@ class TestTrialEvaluationsEndpoint(APIBaseTest):
 
 
 class TestAssignKeyEndpoint(APIBaseTest):
+    def setUp(self):
+        super().setUp()
+        self.organization_membership.level = OrganizationMembership.Level.ADMIN
+        self.organization_membership.save()
+
     def test_assigns_key_to_trial_evaluations(self):
         key = LLMProviderKey.objects.create(
             team=self.team,
