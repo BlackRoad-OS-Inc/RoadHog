@@ -22,7 +22,6 @@ export type VolumeSparklineRenderArgs = {
     borderRadius: number
     minBarHeight: number
     eventLabelHeight: number
-    interactive: boolean
     /** Fraction of each bin width used for the bar (rest is gap). Default 0.9. */
     barWidthFraction?: number
     onHoverChange?: (index: number | null, datum: SparklineDatum | null) => void
@@ -127,7 +126,6 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
         borderRadius,
         minBarHeight,
         eventLabelHeight,
-        interactive,
         barWidthFraction = 0.9,
         onHoverChange,
         events = [],
@@ -172,7 +170,7 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
     const bandwidth = xScale(occurrences[1].date) - xScale(occurrences[0].date)
 
     const axisLineY = chartHeight
-    const showAxisHover = (xAxis === 'minimal' || xAxis === 'full') && interactive
+    const showAxisHover = xAxis === 'minimal' || xAxis === 'full'
 
     if (xAxis === 'minimal') {
         svg.append('line')
@@ -224,11 +222,7 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
             .attr('width', bandwidth)
             .attr('height', chartHeight - yScale(maxDomain))
             .style('fill', 'transparent')
-            .style('pointer-events', interactive ? 'all' : 'none')
-
-        if (!interactive) {
-            return
-        }
+            .style('pointer-events', 'all')
 
         g.on('mouseover', () => {
             onEventHoverChange?.(null)
@@ -288,24 +282,21 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
                 eventMinSpace,
                 borderRadius,
             },
-            interactive,
             onHoverChange,
             onEventHoverChange
         )
     }
 
-    if (interactive) {
-        svg.on('mouseleave', () => {
-            onEventHoverChange?.(null)
-            onHoverChange?.(null, null)
-            if (showAxisHover) {
-                svg.select('.volume-sparkline-x-axis-hover').attr('stroke-opacity', 0)
-            }
-            svg.selectAll<SVGGElement, SparklineDatum>('g.volume-bar').each(function (d) {
-                const g = d3.select(this)
-                g.select('.bar-hover-overlay').style('opacity', 0).style('fill', 'black')
-                g.select('.bar-main').style('fill', spikeBarFill(d, backgroundColor, patternIdFor))
-            })
+    svg.on('mouseleave', () => {
+        onEventHoverChange?.(null)
+        onHoverChange?.(null, null)
+        if (showAxisHover) {
+            svg.select('.volume-sparkline-x-axis-hover').attr('stroke-opacity', 0)
+        }
+        svg.selectAll<SVGGElement, SparklineDatum>('g.volume-bar').each(function (d) {
+            const g = d3.select(this)
+            g.select('.bar-hover-overlay').style('opacity', 0).style('fill', 'black')
+            g.select('.bar-main').style('fill', spikeBarFill(d, backgroundColor, patternIdFor))
         })
-    }
+    })
 }

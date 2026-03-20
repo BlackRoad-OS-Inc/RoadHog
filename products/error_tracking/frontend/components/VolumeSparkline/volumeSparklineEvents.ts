@@ -22,7 +22,6 @@ export function renderVolumeSparklineEventMarkers(
     chartHeight: number,
     width: number,
     options: VolumeSparklineEventLayoutOptions,
-    interactive: boolean,
     onHoverChange?: (index: number | null, datum: SparklineDatum | null) => void,
     onEventHoverChange?: (event: SparklineEvent<string> | null) => void
 ): void {
@@ -51,16 +50,14 @@ export function renderVolumeSparklineEventMarkers(
         selection.call(buildEventAnchor, xScale, chartHeight)
 
         selection.style('cursor', 'default')
-        if (interactive) {
-            selection
-                .on('mouseover', () => {
-                    onHoverChange?.(null, null)
-                    onEventHoverChange?.(d)
-                })
-                .on('mouseout', () => {
-                    onEventHoverChange?.(null)
-                })
-        }
+        selection
+            .on('mouseover', () => {
+                onHoverChange?.(null, null)
+                onEventHoverChange?.(d)
+            })
+            .on('mouseout', () => {
+                onEventHoverChange?.(null)
+            })
     })
 }
 

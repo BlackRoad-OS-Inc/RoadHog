@@ -118,7 +118,6 @@ function VolumeSparklineCore({
             borderRadius: chartStyle.borderRadius,
             minBarHeight: chartStyle.minBarHeight,
             eventLabelHeight: chartStyle.eventLabelHeight,
-            interactive: true,
             barWidthFraction,
             onHoverChange,
             events,
