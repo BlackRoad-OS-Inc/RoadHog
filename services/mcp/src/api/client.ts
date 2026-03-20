@@ -225,7 +225,7 @@ export class ApiClient {
 
                 const rawText = await response.text()
                 if (!rawText) {
-                    return { success: true, data: undefined as T }
+                    return { success: true, data: {} as T }
                 }
 
                 try {
