@@ -235,13 +235,11 @@ class HogFlowScheduledRunSerializer(serializers.ModelSerializer):
 
 def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
     """
-    Sync HogFlowSchedule and pending runs based on the trigger config.
-    Handles both recurring schedules (via `schedule` object) and one-time
-    scheduled runs (via `scheduled_at` without repeat).
+    Sync HogFlowSchedule and pending runs based on the trigger config's `schedule` object.
+    One-time schedules use COUNT=1 in the RRULE, same code path as recurring.
     """
     trigger = hog_flow.trigger or {}
     schedule_config = trigger.get("schedule")
-    scheduled_at_str = trigger.get("scheduled_at")
 
     existing_schedule = (
         HogFlowSchedule.objects.filter(hog_flow=hog_flow, team_id=team_id)
@@ -249,25 +247,19 @@ def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
         .first()
     )
 
-    if not schedule_config and not scheduled_at_str:
-        # No schedule: mark existing as completed and cancel pending runs
+    if not schedule_config:
+        # No schedule: mark existing as completed and delete pending runs
         if existing_schedule:
             existing_schedule.status = HogFlowSchedule.Status.COMPLETED
             existing_schedule.save(update_fields=["status", "updated_at"])
             HogFlowScheduledRun.objects.filter(
                 schedule=existing_schedule, status=HogFlowScheduledRun.Status.PENDING
-            ).update(status=HogFlowScheduledRun.Status.CANCELLED)
+            ).delete()
         return
 
-    if schedule_config:
-        rrule_str = schedule_config["rrule"]
-        starts_at = isoparse(schedule_config["starts_at"])
-        tz = schedule_config.get("timezone", "UTC")
-    else:
-        # One-time schedule from scheduled_at: COUNT=1 fires once
-        rrule_str = "FREQ=DAILY;COUNT=1"
-        starts_at = isoparse(scheduled_at_str)
-        tz = "UTC"
+    rrule_str = schedule_config["rrule"]
+    starts_at = isoparse(schedule_config["starts_at"])
+    tz = schedule_config.get("timezone", "UTC")
 
     schedule_status = (
         HogFlowSchedule.Status.ACTIVE if hog_flow.status == HogFlow.State.ACTIVE else HogFlowSchedule.Status.PAUSED

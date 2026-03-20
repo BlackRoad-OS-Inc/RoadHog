@@ -539,15 +539,9 @@ function StepTriggerConfigurationBatch({
                     <LemonLabel>Schedule</LemonLabel>
                     <RecurringSchedulePicker
                         schedule={config.schedule ?? null}
-                        scheduledAt={config.scheduled_at ?? null}
                         onChange={(schedule) =>
                             partialSetWorkflowActionConfig(action.id, {
                                 schedule: schedule,
-                            })
-                        }
-                        onScheduledAtChange={(scheduledAt) =>
-                            partialSetWorkflowActionConfig(action.id, {
-                                scheduled_at: scheduledAt ?? undefined,
                             })
                         }
                     />

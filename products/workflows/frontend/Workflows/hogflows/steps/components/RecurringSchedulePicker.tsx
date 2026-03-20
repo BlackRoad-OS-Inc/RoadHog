@@ -21,9 +21,7 @@ type ScheduleConfig = {
 
 interface RecurringSchedulePickerProps {
     schedule?: ScheduleConfig | null
-    scheduledAt?: string | null
     onChange: (schedule: ScheduleConfig | null) => void
-    onScheduledAtChange?: (scheduledAt: string | null) => void
 }
 
 type FrequencyOption = 'daily' | 'weekly' | 'monthly' | 'yearly'
@@ -321,21 +319,16 @@ function OccurrencesList({ occurrences, isFinite }: { occurrences: Date[]; isFin
     )
 }
 
-export function RecurringSchedulePicker({
-    schedule,
-    scheduledAt: externalScheduledAt,
-    onChange,
-    onScheduledAtChange,
-}: RecurringSchedulePickerProps): JSX.Element {
-    const isRepeating = !!schedule
+export function RecurringSchedulePicker({ schedule, onChange }: RecurringSchedulePickerProps): JSX.Element {
+    // A schedule with COUNT=1 is a one-time run, not a recurring schedule
+    const isOneTime = schedule?.rrule === 'FREQ=DAILY;COUNT=1'
+    const isRepeating = !!schedule && !isOneTime
     const [state, setState] = useState<ScheduleState>(() =>
-        schedule ? parseRRuleToState(schedule.rrule) : { ...DEFAULT_STATE }
+        schedule && !isOneTime ? parseRRuleToState(schedule.rrule) : { ...DEFAULT_STATE }
     )
 
     // Keep start date in local state so it persists when toggling repeat off
-    const [localStartsAt, setLocalStartsAt] = useState<string | null>(
-        schedule?.starts_at || externalScheduledAt || null
-    )
+    const [localStartsAt, setLocalStartsAt] = useState<string | null>(schedule?.starts_at || null)
     const [localTimezone] = useState<string>(schedule?.timezone || dayjs.tz.guess())
 
     const startsAt = schedule?.starts_at || localStartsAt
@@ -388,14 +381,20 @@ export function RecurringSchedulePicker({
                         onChange={(date) => {
                             const newStartsAt = date ? date.toISOString() : null
                             setLocalStartsAt(newStartsAt)
-                            if (isRepeating) {
-                                if (newStartsAt) {
+                            if (newStartsAt) {
+                                if (isRepeating) {
                                     emitChange(state, newStartsAt, timezone)
                                 } else {
-                                    onChange(null)
+                                    // One-time schedule: emit COUNT=1
+                                    onChange({
+                                        rrule: 'FREQ=DAILY;COUNT=1',
+                                        starts_at: newStartsAt,
+                                        timezone,
+                                    })
                                 }
+                            } else {
+                                onChange(null)
                             }
-                            onScheduledAtChange?.(newStartsAt)
                         }}
                         granularity="minute"
                         selectionPeriod="upcoming"
@@ -407,12 +406,17 @@ export function RecurringSchedulePicker({
                     <LemonSwitch
                         checked={isRepeating}
                         onChange={(checked) => {
+                            const startDate = localStartsAt || startsAt || new Date().toISOString()
+                            setLocalStartsAt(startDate)
                             if (checked) {
-                                const startDate = localStartsAt || new Date().toISOString()
-                                setLocalStartsAt(startDate)
                                 emitChange(state, startDate, timezone)
-                            } else {
-                                onChange(null)
+                            } else if (startDate) {
+                                // Downgrade to one-time schedule
+                                onChange({
+                                    rrule: 'FREQ=DAILY;COUNT=1',
+                                    starts_at: startDate,
+                                    timezone,
+                                })
                             }
                         }}
                     />
