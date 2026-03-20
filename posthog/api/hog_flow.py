@@ -271,10 +271,10 @@ def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
         existing_schedule.timezone = tz
         existing_schedule.status = schedule_status
         existing_schedule.save(update_fields=["rrule", "starts_at", "timezone", "status", "updated_at"])
-        # Cancel old pending runs, they'll be regenerated below
+        # Delete old pending runs, they'll be regenerated below
         HogFlowScheduledRun.objects.filter(
             schedule=existing_schedule, status=HogFlowScheduledRun.Status.PENDING
-        ).update(status=HogFlowScheduledRun.Status.CANCELLED)
+        ).delete()
         schedule = existing_schedule
     else:
         schedule = HogFlowSchedule.objects.create(
