@@ -2,8 +2,8 @@ import './CardStackProductSelection.scss'
 
 import clsx from 'clsx'
 import { useActions } from 'kea'
-import { motion, useMotionValue, useTransform, useAnimate, AnimatePresence } from 'motion/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react'
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react'
 
 import { IconArrowRight, IconCheck, IconX } from '@posthog/icons'
 import { LemonButton, Link } from '@posthog/lemon-ui'
@@ -58,11 +58,16 @@ const SWIPE_VELOCITY_THRESHOLD = 500
 const MAX_ROTATION = 18
 const CARD_WIDTH = 340
 const CARD_HEIGHT = 440
+const FLY_OUT_X = 600
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface SwipedCard {
     productKey: AvailableOnboardingProductKey
     pile: 'accepted' | 'rejected'
+}
+
+export interface SwipeableCardHandle {
+    swipeOut: (direction: 'left' | 'right') => void
 }
 
 // ─── Pile Component ─────────────────────────────────────────────────────────
@@ -138,17 +143,15 @@ function CardPile({ cards, type }: { cards: SwipedCard[]; type: 'accepted' | 're
 }
 
 // ─── Swipeable Card ─────────────────────────────────────────────────────────
-function SwipeableCard({
-    productKey,
-    isTop,
-    stackIndex,
-    onSwipe,
-}: {
-    productKey: AvailableOnboardingProductKey
-    isTop: boolean
-    stackIndex: number
-    onSwipe: (direction: 'left' | 'right') => void
-}): JSX.Element {
+const SwipeableCard = forwardRef<
+    SwipeableCardHandle,
+    {
+        productKey: AvailableOnboardingProductKey
+        isTop: boolean
+        stackIndex: number
+        onSwipe: (direction: 'left' | 'right') => void
+    }
+>(function SwipeableCard({ productKey, isTop, stackIndex, onSwipe }, ref) {
     const product = availableOnboardingProducts[productKey]
     const HedgehogComponent = PRODUCT_HEDGEHOG[productKey]
     const socialProof = getSocialProof(productKey)
@@ -159,22 +162,41 @@ function SwipeableCard({
     const acceptOpacity = useTransform(x, [0, SWIPE_THRESHOLD], [0, 1])
     const rejectOpacity = useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0])
 
-    const [scope, animate] = useAnimate()
+    // Track whether we're animating out to prevent double-swipes
+    const isAnimatingOut = useRef(false)
+
+    // Expose imperative swipeOut for button/keyboard triggers
+    useImperativeHandle(
+        ref,
+        () => ({
+            swipeOut: (direction: 'left' | 'right') => {
+                if (isAnimatingOut.current) {
+                    return
+                }
+                isAnimatingOut.current = true
+                onSwipe(direction)
+            },
+        }),
+        [onSwipe]
+    )
 
     const handleDragEnd = useCallback(
-        async (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
+        (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
+            if (isAnimatingOut.current) {
+                return
+            }
             const shouldSwipeRight = info.offset.x > SWIPE_THRESHOLD || info.velocity.x > SWIPE_VELOCITY_THRESHOLD
             const shouldSwipeLeft = info.offset.x < -SWIPE_THRESHOLD || info.velocity.x < -SWIPE_VELOCITY_THRESHOLD
 
             if (shouldSwipeRight) {
-                await animate(scope.current, { x: window.innerWidth, opacity: 0 }, { duration: 0.3 })
+                isAnimatingOut.current = true
                 onSwipe('right')
             } else if (shouldSwipeLeft) {
-                await animate(scope.current, { x: -window.innerWidth, opacity: 0 }, { duration: 0.3 })
+                isAnimatingOut.current = true
                 onSwipe('left')
             }
         },
-        [animate, onSwipe, scope]
+        [onSwipe]
     )
 
     // Stack depth: cards behind the top card are slightly scaled down and offset
@@ -188,14 +210,14 @@ function SwipeableCard({
 
     return (
         <motion.div
-            ref={scope}
             className="absolute"
+            initial={isTop ? { scale: 1, y: 0, opacity: 1 } : { scale: stackScale, y: stackY, opacity: stackOpacity }}
+            animate={{ scale: stackScale, y: stackY, opacity: stackOpacity }}
+            exit={{ x: isTop ? FLY_OUT_X : 0, opacity: 0, rotate: isTop ? MAX_ROTATION : 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             style={{
                 x: isTop ? x : 0,
                 rotate: isTop ? rotate : 0,
-                scale: stackScale,
-                y: stackY,
-                opacity: stackOpacity,
                 zIndex: 10 - stackIndex,
                 width: CARD_WIDTH,
                 willChange: isTop ? 'transform' : 'auto',
@@ -291,7 +313,7 @@ function SwipeableCard({
             </div>
         </motion.div>
     )
-}
+})
 
 // ─── End of Deck ────────────────────────────────────────────────────────────
 function EndOfDeck({
@@ -378,6 +400,9 @@ export function CardStackProductSelection(): JSX.Element {
     const [swipedCards, setSwipedCards] = useState<SwipedCard[]>([])
     const [isComplete, setIsComplete] = useState(false)
     const [mounted, setMounted] = useState(false)
+    // Track last exit direction so AnimatePresence exit knows which way to fly
+    const exitDirectionRef = useRef<'left' | 'right'>('right')
+    const topCardRef = useRef<SwipeableCardHandle>(null)
 
     useEffect(() => {
         const timer = setTimeout(() => setMounted(true), 50)
@@ -390,6 +415,7 @@ export function CardStackProductSelection(): JSX.Element {
     const handleSwipe = useCallback(
         (direction: 'left' | 'right') => {
             const productKey = allProducts[currentIndex]
+            exitDirectionRef.current = direction
 
             const newCard: SwipedCard = {
                 productKey,
@@ -413,6 +439,18 @@ export function CardStackProductSelection(): JSX.Element {
             }
         },
         [allProducts, currentIndex]
+    )
+
+    const handleButtonSwipe = useCallback(
+        (direction: 'left' | 'right') => {
+            exitDirectionRef.current = direction
+            if (topCardRef.current) {
+                topCardRef.current.swipeOut(direction)
+            } else {
+                handleSwipe(direction)
+            }
+        },
+        [handleSwipe]
     )
 
     const handleContinue = useCallback(() => {
@@ -440,23 +478,23 @@ export function CardStackProductSelection(): JSX.Element {
         const onKeyDown = (e: KeyboardEvent): void => {
             if (e.key === 'ArrowRight' || e.key === 'Enter') {
                 e.preventDefault()
-                handleSwipe('right')
+                handleButtonSwipe('right')
             } else if (e.key === 'ArrowLeft') {
                 e.preventDefault()
-                handleSwipe('left')
+                handleButtonSwipe('left')
             }
         }
 
         window.addEventListener('keydown', onKeyDown)
         return () => window.removeEventListener('keydown', onKeyDown)
-    }, [handleSwipe, isComplete])
+    }, [handleButtonSwipe, isComplete])
 
     // Current spotlight product for background color wash
     const spotlightKey = remainingCards[0]
     const spotlightProduct = spotlightKey ? availableOnboardingProducts[spotlightKey] : null
 
     return (
-        <div className="CardStackProductSelection flex flex-col flex-1 w-full min-h-full p-4 items-center justify-center bg-primary overflow-hidden">
+        <div className="CardStackProductSelection flex flex-col flex-1 w-full min-h-full p-4 items-center justify-center bg-primary overflow-x-hidden">
             {/* Subtle product color wash */}
             {spotlightProduct && (
                 <div
@@ -479,15 +517,16 @@ export function CardStackProductSelection(): JSX.Element {
                 {/* Card stack area */}
                 <div
                     className="relative flex items-center justify-center mb-6"
-                    style={{ width: CARD_WIDTH, height: CARD_HEIGHT + 20 }}
+                    style={{ width: CARD_WIDTH, height: CARD_HEIGHT + 20, isolation: 'isolate' }}
                 >
-                    <AnimatePresence>
+                    <AnimatePresence mode="popLayout" custom={exitDirectionRef.current}>
                         {!isComplete &&
                             remainingCards
                                 .slice(0, 3)
                                 .map((productKey, i) => (
                                     <SwipeableCard
                                         key={productKey}
+                                        ref={i === 0 ? topCardRef : undefined}
                                         productKey={productKey}
                                         isTop={i === 0}
                                         stackIndex={i}
@@ -510,7 +549,7 @@ export function CardStackProductSelection(): JSX.Element {
                         {/* Buttons */}
                         <div className="flex items-center gap-6">
                             <button
-                                onClick={() => handleSwipe('left')}
+                                onClick={() => handleButtonSwipe('left')}
                                 className="w-14 h-14 rounded-full border-2 border-danger/30 hover:border-danger hover:bg-danger/10 flex items-center justify-center transition-all cursor-pointer"
                                 aria-label="Skip this product"
                             >
@@ -522,7 +561,7 @@ export function CardStackProductSelection(): JSX.Element {
                             </span>
 
                             <button
-                                onClick={() => handleSwipe('right')}
+                                onClick={() => handleButtonSwipe('right')}
                                 className="w-14 h-14 rounded-full border-2 border-success/30 hover:border-success hover:bg-success/10 flex items-center justify-center transition-all cursor-pointer"
                                 aria-label="Add this product"
                             >
