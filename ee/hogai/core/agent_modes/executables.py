@@ -247,8 +247,10 @@ class AgentExecutable(BaseAgentLoopRootExecutable):
 
         request_kwargs = {}
         if has_llm_gateway_bedrock_feature_flag(self._team, self._user):
-            model_name = to_bedrock_model_id(model_name)
-            request_kwargs = self._get_llm_gateway_kwargs()
+            gateway_kwargs = self._get_llm_gateway_kwargs()
+            if gateway_kwargs:
+                model_name = to_bedrock_model_id(model_name)
+                request_kwargs = gateway_kwargs
 
         base_model = MaxChatAnthropic(
             model=model_name,
