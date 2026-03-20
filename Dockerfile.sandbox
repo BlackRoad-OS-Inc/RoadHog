@@ -65,6 +65,13 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get update && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
+# Pre-built Rust service binaries from CI (same images as docker-compose.base.yml).
+# These run inside the container instead of cargo build.
+COPY --from=ghcr.io/posthog/posthog/capture:master /usr/local/bin/capture /usr/local/bin/posthog-rs-capture
+COPY --from=ghcr.io/posthog/posthog/feature-flags:master /usr/local/bin/feature-flags /usr/local/bin/posthog-rs-feature-flags
+COPY --from=ghcr.io/posthog/posthog/property-defs-rs:master /usr/local/bin/property-defs-rs /usr/local/bin/posthog-rs-property-defs-rs
+COPY --from=ghcr.io/posthog/posthog/cyclotron-janitor:master /usr/local/bin/cyclotron-janitor /usr/local/bin/posthog-rs-cyclotron-janitor
+
 ENV NODE_ENV=development
 WORKDIR /workspace
 

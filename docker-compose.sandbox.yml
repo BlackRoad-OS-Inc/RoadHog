@@ -117,6 +117,7 @@ services:
             timeout: 10s
             retries: 10
         volumes:
+            - clickhouse-data:/var/lib/clickhouse
             # Config from the worktree (read-only — sandbox ClickHouse never writes these)
             - ${SANDBOX_CODE:-.}/posthog/idl:/idl:ro
             - ${SANDBOX_CODE:-.}/docker/clickhouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:ro
@@ -222,3 +223,4 @@ services:
 volumes:
     postgres-data:
     redpanda-data:
+    clickhouse-data:
