@@ -1,13 +1,13 @@
 import { actions, kea, key, path, props, reducers, selectors } from 'kea'
 
+import type { errorTrackingVolumeSparklineLogicType } from './errorTrackingVolumeSparklineLogicType'
 import type { SparklineDatum } from './types'
 
 export interface ErrorTrackingVolumeSparklineLogicProps {
     sparklineKey: string
 }
 
-/** After `pnpm --filter=@posthog/frontend run typegen:write`, add `kea<errorTrackingVolumeSparklineLogicType>` and generated `*LogicType.ts`. */
-export const errorTrackingVolumeSparklineLogic = kea([
+export const errorTrackingVolumeSparklineLogic = kea<errorTrackingVolumeSparklineLogicType>([
     path((key) => [
         'products',
         'error_tracking',

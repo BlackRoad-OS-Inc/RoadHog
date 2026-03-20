@@ -1,4 +1,4 @@
-import { useActions, useMountedLogic, useValues } from 'kea'
+import { useActions, useMountedLogic } from 'kea'
 import { useCallback, useEffect, useRef } from 'react'
 import { match } from 'ts-pattern'
 import useResizeObserver from 'use-resize-observer'
@@ -47,7 +47,6 @@ export type ErrorTrackingVolumeSparklineProps =
           onEventHoverChange?: (event: SparklineEvent<string> | null) => void
       })
 
-/** D3 volume bars. With `sparklineKey`, mounts Kea hover for the issues table; with `onHoverChange`, parent-controlled (issue detail). */
 export function ErrorTrackingVolumeSparkline(props: ErrorTrackingVolumeSparklineProps): JSX.Element {
     if (props.interactive) {
         if ('sparklineKey' in props && props.sparklineKey) {
@@ -141,9 +140,7 @@ function VolumeSparklineCore({
         [layout, events.length]
     )
 
-    // Slightly wider bars / tighter gaps vs 0.72 (roughly ~1px less gap at typical bin widths)
     const barWidthFraction = layout === 'compact' ? 0.78 : 0.9
-    const roundedTopOnly = layout === 'compact'
 
     useEffect(() => {
         const svg = svgRef.current
@@ -164,7 +161,6 @@ function VolumeSparklineCore({
             eventLabelHeight: chartStyle.eventLabelHeight,
             interactive,
             barWidthFraction,
-            roundedTopOnly,
             onHoverChange,
             events,
             onEventHoverChange,
@@ -188,7 +184,6 @@ function VolumeSparklineCore({
         chartStyle.eventMinSpace,
         interactive,
         barWidthFraction,
-        roundedTopOnly,
         onHoverChange,
         events,
         onEventHoverChange,
@@ -207,15 +202,4 @@ function VolumeSparklineCore({
             <svg ref={svgRef} className="block overflow-visible" height="100%" width="100%" />
         </div>
     )
-}
-
-/** Subscribe to hover state for `sparklineKey` (mounts the keyed logic; pair with interactive `ErrorTrackingVolumeSparkline`). */
-export function useErrorTrackingVolumeSparklineHover(sparklineKey: string): {
-    hoveredIndex: number | null
-    hoveredDatum: SparklineDatum | null
-    isBarHighlighted: boolean
-} {
-    useMountedLogic(errorTrackingVolumeSparklineLogic({ sparklineKey }))
-    const logic = errorTrackingVolumeSparklineLogic({ sparklineKey })
-    return useValues(logic)
 }

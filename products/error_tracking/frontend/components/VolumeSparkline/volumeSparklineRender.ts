@@ -2,7 +2,6 @@ import * as d3 from 'd3'
 
 import type { SparklineData, SparklineDatum, SparklineEvent, VolumeSparklineXAxisMode } from './types'
 
-/** Bottom reserve for tick labels (px) by x-axis mode. */
 const VOLUME_SPARKLINE_X_AXIS_RESERVE_PX: Record<VolumeSparklineXAxisMode, number> = {
     full: 26,
     minimal: 2,
@@ -26,8 +25,6 @@ export type VolumeSparklineRenderArgs = {
     interactive: boolean
     /** Fraction of each bin width used for the bar (rest is gap). Default 0.9. */
     barWidthFraction?: number
-    /** Top corners rounded with `borderRadius`; bottom flush to chart / x-axis. */
-    roundedTopOnly?: boolean
     onHoverChange?: (index: number | null, datum: SparklineDatum | null) => void
     /** First seen / last seen / current — issue detail only */
     events?: SparklineEvent<string>[]
@@ -37,16 +34,29 @@ export type VolumeSparklineRenderArgs = {
     eventMinSpace?: number
 }
 
-/** Flat bottom, rounded top only (quadratic corners). */
+/** Flat bottom, rounded top corners only (quadratic beziers at top-left / top-right). */
 function roundedTopBarPath(x: number, y: number, w: number, h: number, r: number): string {
     if (w <= 0 || h <= 0) {
         return ''
     }
     const rr = Math.min(Math.max(r, 0), w / 2, h / 2)
+    const x0 = x
+    const x1 = x + w
+    const y0 = y
+    const y1 = y + h
     if (rr <= 0) {
-        return `M ${x} ${y} L ${x + w} ${y} L ${x + w} ${y + h} L ${x} ${y + h} Z`
+        return `M ${x0} ${y0} L ${x1} ${y0} L ${x1} ${y1} L ${x0} ${y1} Z`
     }
-    return `M ${x + rr} ${y} L ${x + w - rr} ${y} Q ${x + w} ${y} ${x + w} ${y + rr} L ${x + w} ${y + h} L ${x} ${y + h} L ${x} ${y + rr} Q ${x} ${y} ${x + rr} ${y} Z`
+    return [
+        `M ${x0 + rr} ${y0}`,
+        `L ${x1 - rr} ${y0}`,
+        `Q ${x1} ${y0} ${x1} ${y0 + rr}`,
+        `L ${x1} ${y1}`,
+        `L ${x0} ${y1}`,
+        `L ${x0} ${y0 + rr}`,
+        `Q ${x0} ${y0} ${x0 + rr} ${y0}`,
+        'Z',
+    ].join(' ')
 }
 
 function hashColorId(color: string): string {
@@ -105,9 +115,6 @@ function ensureStripePatterns(
     return (color: string) => idByColor.get(color) ?? hashColorId(color)
 }
 
-/**
- * Full redraw of the volume sparkline (bars + optional time axis). Intended to be called from a React effect.
- */
 export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklineRenderArgs): void {
     const {
         data,
@@ -122,7 +129,6 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
         eventLabelHeight,
         interactive,
         barWidthFraction = 0.9,
-        roundedTopOnly = false,
         onHoverChange,
         events = [],
         onEventHoverChange,
@@ -164,9 +170,7 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
     const xAxisFull = d3.axisBottom(xScale).tickValues(xTicks).tickSize(0).tickPadding(5)
 
     const bandwidth = xScale(occurrences[1].date) - xScale(occurrences[0].date)
-    const flushBottom = !roundedTopOnly && borderRadius === 0
 
-    // Align with bottom of bars (flush to chartHeight).
     const axisLineY = chartHeight
     const showAxisHover = (xAxis === 'minimal' || xAxis === 'full') && interactive
 
@@ -195,25 +199,12 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
         const barW = bandwidth * barWidthFraction
         const barX = binLeft + (bandwidth - barW) / 2
 
-        let barTop: number
-        let barHeight: number
-        let clipBottomPx = 0
-
-        if (roundedTopOnly) {
-            barTop = yScale(d.value)
-            barHeight = d.value > 0 ? chartHeight - yScale(d.value) : 0
-        } else if (flushBottom) {
-            barTop = yScale(d.value)
-            barHeight = d.value > 0 ? chartHeight - yScale(d.value) : 0
-        } else {
-            barTop = yScale(d.value) + borderRadius
-            barHeight = d.value > 0 ? chartHeight - yScale(d.value) : 0
-            clipBottomPx = borderRadius + 1
-        }
+        const barTop = yScale(d.value)
+        const barHeight = d.value > 0 ? chartHeight - yScale(d.value) : 0
 
         const fill = spikeBarFill(d, backgroundColor, patternIdFor)
 
-        if (roundedTopOnly && barHeight > 0) {
+        if (barHeight > 0) {
             const dPath = roundedTopBarPath(barX, barTop, barW, barHeight, borderRadius)
             g.append('path').attr('class', 'bar-main').attr('d', dPath).style('fill', fill)
 
@@ -223,43 +214,15 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
                 .style('fill', 'black')
                 .style('opacity', 0)
                 .style('pointer-events', 'none')
-        } else {
-            const main = g
-                .append('rect')
-                .attr('class', 'bar-main')
-                .attr('x', barX)
-                .attr('y', barTop)
-                .attr('width', barW)
-                .attr('height', barHeight)
-                .style('fill', fill)
-
-            if (clipBottomPx > 0) {
-                main.style('clip-path', `inset(0 0 ${clipBottomPx}px 0)`)
-            }
-            main.attr('rx', borderRadius).attr('ry', borderRadius)
-
-            g.append('rect')
-                .attr('class', 'bar-hover-overlay')
-                .attr('x', barX)
-                .attr('y', barTop)
-                .attr('width', barW)
-                .attr('height', barHeight)
-                .style('fill', 'black')
-                .style('opacity', 0)
-                .style('pointer-events', 'none')
-                .style('clip-path', clipBottomPx > 0 ? `inset(0 0 ${clipBottomPx}px 0)` : null)
-                .attr('rx', borderRadius)
-                .attr('ry', borderRadius)
         }
 
         const maxDomain = Math.max(...yScale.domain())
-        const hitBottomPad = flushBottom || roundedTopOnly ? 0 : borderRadius
         g.append('rect')
             .attr('class', 'bar-hit')
             .attr('x', binLeft)
             .attr('y', yScale(maxDomain))
             .attr('width', bandwidth)
-            .attr('height', chartHeight - yScale(maxDomain) + hitBottomPad)
+            .attr('height', chartHeight - yScale(maxDomain))
             .style('fill', 'transparent')
             .style('pointer-events', interactive ? 'all' : 'none')
 
@@ -282,7 +245,6 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
                 }
             }
             if (d.animated && d.color) {
-                // Dark overlay darkens stripes; white overlay lightens to match solid-bar hover
                 g.select('.bar-hover-overlay').style('fill', 'white').style('opacity', 0.22)
             } else {
                 g.select('.bar-main').style('fill', hoverBackgroundColor)
@@ -299,7 +261,6 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
         svg.append('g').attr('transform', `translate(0,${chartHeight})`).style('color', axisColor).call(xAxisFull)
     }
 
-    // After the full axis so the segment paints above the domain line; minimal mode has no axis group
     if (showAxisHover) {
         svg.append('line')
             .attr('class', 'volume-sparkline-x-axis-hover')

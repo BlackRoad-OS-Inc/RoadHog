@@ -69,7 +69,6 @@ export function useSparklineDataIssueScene(): SparklineData {
     return useMemo(() => applyVolumeSpikeHighlights(data, spikeEvents), [data, spikeEvents])
 }
 
-/** Marks bins that contain a spike `detected_at` with striped yellow bars (same rules as legacy Chart.js sparkline). */
 export function applyVolumeSpikeHighlights(
     data: SparklineData,
     spikeEvents: ErrorTrackingSpikeEvent[],

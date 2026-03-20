@@ -15,13 +15,6 @@ export type VolumeSparklineEventLayoutOptions = {
 
 const COLLISION_TICKS = 500
 
-/**
- * First seen / last seen / current markers (labels + anchor + connector line).
- * Drawn after the x-axis group.
- *
- * Label collision: all labels are simulated together (see `spreadSparklineEventPillLabels`). Per-label
- * simulation never had more than one node, so labels could overlap — fixed by one global pass.
- */
 export function renderVolumeSparklineEventMarkers(
     svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
     events: SparklineEvent<string>[],
@@ -71,7 +64,6 @@ export function renderVolumeSparklineEventMarkers(
     })
 }
 
-/** Text + pill rect only — collision runs once in `spreadSparklineEventPillLabels`. */
 export function buildVolumeSparklineEventLabelContent(
     selection: LabelGroupSel,
     xScale: d3.ScaleTime<number, number>,

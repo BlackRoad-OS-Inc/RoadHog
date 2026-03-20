@@ -13,7 +13,7 @@ import {
 } from 'lib/components/Errors/types'
 import { SetupTaskId, globalSetupLogic } from 'lib/components/ProductSetup'
 import { Dayjs, dayjs } from 'lib/dayjs'
-import { dateStringToDayJs, uuid } from 'lib/utils'
+import { uuid } from 'lib/utils'
 import { MaxContextInput, createMaxContextHelpers } from 'scenes/max/maxTypes'
 import { Scene } from 'scenes/sceneTypes'
 import { Params } from 'scenes/sceneTypes'
@@ -37,7 +37,7 @@ import {
 } from '../../components/IssueFilters/issueFiltersLogic'
 import { errorTrackingIssueEventsQuery, errorTrackingIssueQuery, errorTrackingSimilarIssuesQuery } from '../../queries'
 import { syncSearchParams } from '../../utils'
-import { ERROR_TRACKING_DETAILS_RESOLUTION } from '../../utils'
+import { ERROR_TRACKING_DETAILS_RESOLUTION, dateRangeToIsoBounds } from '../../utils'
 import {
     DEFAULT_CATEGORY,
     ErrorTrackingIssueSceneCategory,
@@ -287,30 +287,11 @@ export const errorTrackingIssueSceneLogic = kea<errorTrackingIssueSceneLogicType
             [] as ErrorTrackingSpikeEvent[],
             {
                 loadSpikeEvents: async () => {
-                    const dr = values.dateRange
-                    let dateFromIso: string | undefined
-                    let dateToIso: string | undefined
-                    if (dr?.date_from) {
-                        const from = dateStringToDayJs(dr.date_from)
-                        if (from) {
-                            dateFromIso = from.toISOString()
-                        }
-                    }
-                    if (dr?.date_to) {
-                        const to = dateStringToDayJs(dr.date_to)
-                        if (to) {
-                            dateToIso = to.toISOString()
-                        }
-                    } else if (dr?.date_from) {
-                        const to = dateStringToDayJs(new Date().toISOString())
-                        if (to) {
-                            dateToIso = to.toISOString()
-                        }
-                    }
+                    const { dateFrom, dateTo } = dateRangeToIsoBounds(values.dateRange)
                     const response = await api.errorTracking.getSpikeEvents({
                         issueIds: [props.id],
-                        dateFrom: dateFromIso,
-                        dateTo: dateToIso,
+                        dateFrom,
+                        dateTo,
                     })
                     return response.results
                 },

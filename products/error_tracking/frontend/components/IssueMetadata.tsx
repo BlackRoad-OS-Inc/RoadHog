@@ -82,36 +82,30 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
                 </div>
             </div>
             <div onClick={cancelEvent} className="shrink-0 min-h-[200px] flex flex-col">
-                {sparklineData.length >= 2 ? (
-                    <div className="pb-3">
-                        <div className="relative w-full flex-1 min-h-0 pt-4">
-                            <ErrorTrackingVolumeSparkline
-                                data={sparklineData}
-                                layout="detailed"
-                                xAxis="full"
-                                events={sparklineEvents}
-                                interactive
-                                onHoverChange={(_index, datum) => {
-                                    if (datum == null) {
-                                        setHoveredDatum(null)
-                                    } else {
-                                        setHoveredDatum({ type: 'datum', data: datum })
-                                    }
-                                }}
-                                onEventHoverChange={(e) => {
-                                    if (e == null) {
-                                        setHoveredDatum(null)
-                                    } else {
-                                        setHoveredDatum({ type: 'event', data: e })
-                                    }
-                                }}
-                                className="!p-0 h-full min-h-[160px]"
-                            />
-                        </div>
-                    </div>
-                ) : (
-                    <LemonSkeleton className="h-40 w-full shrink-0" />
-                )}
+                <div className="relative w-full flex-1 min-h-0 pt-4 pb-3">
+                    <ErrorTrackingVolumeSparkline
+                        data={sparklineData}
+                        layout="detailed"
+                        xAxis="full"
+                        events={sparklineEvents}
+                        interactive
+                        onHoverChange={(_index, datum) => {
+                            if (datum == null) {
+                                setHoveredDatum(null)
+                            } else {
+                                setHoveredDatum({ type: 'datum', data: datum })
+                            }
+                        }}
+                        onEventHoverChange={(e) => {
+                            if (e == null) {
+                                setHoveredDatum(null)
+                            } else {
+                                setHoveredDatum({ type: 'event', data: e })
+                            }
+                        }}
+                        className="!p-0 h-full min-h-[160px]"
+                    />
+                </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
         </div>

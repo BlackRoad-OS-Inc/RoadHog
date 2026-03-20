@@ -134,6 +134,7 @@ export const earlyAccessFeatureLogic = kea<earlyAccessFeatureLogicType>([
             errors: ({ name, payload }) =>
                 ({
                     name: !name ? 'Feature name must be set' : undefined,
+
                     // payload is edited as a JSON string in the form, but typed as Record<string, any>
                     payload:
                         payload && typeof payload === 'string'
