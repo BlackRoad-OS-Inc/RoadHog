@@ -469,19 +469,22 @@ fn apply_person_cohort_to_state(
         state.set_cohort_matches(cohort_matches);
     }
 
-    let mut all_person_properties: HashMap<String, Value> =
-        if let Some(ref person) = result.person {
-            match person.properties.as_object() {
-                Some(obj) => obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                None => HashMap::new(),
-            }
-        } else {
-            HashMap::new()
-        };
+    let mut all_person_properties: HashMap<String, Value> = if let Some(ref person) = result.person
+    {
+        match person.properties.as_object() {
+            Some(obj) => obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            None => HashMap::new(),
+        }
+    } else {
+        HashMap::new()
+    };
 
     // Always add distinct_id to person properties to match Python implementation.
     // This allows flags to filter on distinct_id even when no other person properties exist.
-    all_person_properties.insert("distinct_id".to_string(), Value::String(distinct_id.to_owned()));
+    all_person_properties.insert(
+        "distinct_id".to_string(),
+        Value::String(distinct_id.to_owned()),
+    );
 
     state.set_person_properties(all_person_properties);
     person_processing_timer.fin();
@@ -541,12 +544,7 @@ pub async fn fetch_and_locally_cache_all_relevant_properties(
         // .await while borrowed), so double-borrow cannot occur. Do NOT refactor to
         // tokio::spawn — that would create separate tasks and break task-local access.
         let (person_cohort, group) = tokio::try_join!(
-            fetch_person_and_cohorts(
-                &persons_reader,
-                team_id,
-                &distinct_id,
-                &static_cohort_ids
-            ),
+            fetch_person_and_cohorts(&persons_reader, team_id, &distinct_id, &static_cohort_ids),
             fetch_group_properties(&non_persons_reader, team_id, group_type_to_key),
         )?;
 
@@ -555,13 +553,9 @@ pub async fn fetch_and_locally_cache_all_relevant_properties(
             flag_evaluation_state.set_group_properties(idx, props);
         }
     } else {
-        let person_cohort = fetch_person_and_cohorts(
-            &persons_reader,
-            team_id,
-            &distinct_id,
-            &static_cohort_ids,
-        )
-        .await?;
+        let person_cohort =
+            fetch_person_and_cohorts(&persons_reader, team_id, &distinct_id, &static_cohort_ids)
+                .await?;
         apply_person_cohort_to_state(flag_evaluation_state, person_cohort, &distinct_id);
     }
 
