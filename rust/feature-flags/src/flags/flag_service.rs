@@ -114,11 +114,7 @@ impl FlagService {
         let key = KeyType::string(token);
         let skip_pg = self.skip_pg_team_fallback;
         let pg_client = self.pg_client.clone();
-        let token_owned = if skip_pg {
-            String::new()
-        } else {
-            token.to_string()
-        };
+        let token_owned = token.to_string();
 
         let (data, source) = self
             .team_hypercache_reader
