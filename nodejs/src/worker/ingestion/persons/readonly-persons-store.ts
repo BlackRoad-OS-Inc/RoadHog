@@ -22,6 +22,11 @@ export class ReadonlyPersonsStore implements PersonsStore {
     // ── reads ────────────────────────────────────────────────────────
 
     async fetchForChecking(teamId: number, distinctId: string): Promise<InternalPerson | null> {
+        const key = `${teamId}:${distinctId}`
+        const cached = this.prefetchCache.get(key)
+        if (cached) {
+            return cached
+        }
         const person = await this.personRepository.fetchPerson(teamId, distinctId, { useReadReplica: true })
         return person ?? null
     }
