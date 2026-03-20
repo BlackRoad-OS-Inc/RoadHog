@@ -14,6 +14,7 @@ import { ProductKey } from '~/queries/schema/schema-general'
 
 import { UseCaseDefinition } from '../productRecommendations'
 import { availableOnboardingProducts, getProductIcon } from '../utils'
+import { CardStackProductSelection } from './CardStackProductSelection'
 import { productSelectionLogic } from './productSelectionLogic'
 import { SimplifiedProductSelection } from './SimplifiedProductSelection'
 
@@ -347,8 +348,19 @@ export function ProductSelection(): JSX.Element {
     const { featureFlags } = useValues(featureFlagLogic)
     const { currentStep } = useValues(productSelectionLogic)
 
-    const isSimplifiedOnboarding = featureFlags[FEATURE_FLAGS.ONBOARDING_SIMPLIFIED_PRODUCT_SELECTION]
+    // New multi-variant flag takes precedence
+    const productSelectionVariant = featureFlags[FEATURE_FLAGS.ONBOARDING_PRODUCT_SELECTION_VARIANT]
 
+    if (productSelectionVariant === 'card-stack') {
+        return <CardStackProductSelection />
+    }
+
+    if (productSelectionVariant === 'simplified') {
+        return <SimplifiedProductSelection />
+    }
+
+    // Fall through to old flag during migration period
+    const isSimplifiedOnboarding = featureFlags[FEATURE_FLAGS.ONBOARDING_SIMPLIFIED_PRODUCT_SELECTION]
     if (isSimplifiedOnboarding === 'test') {
         return <SimplifiedProductSelection />
     }

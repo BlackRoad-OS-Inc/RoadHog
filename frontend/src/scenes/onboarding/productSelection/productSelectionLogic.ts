@@ -23,7 +23,7 @@ import {
 import type { productSelectionLogicType } from './productSelectionLogicType'
 
 export type OnboardingStep = 'choose_path' | 'product_selection'
-export type RecommendationSource = 'use_case' | 'ai' | 'browsing_history' | 'manual' | 'simplified'
+export type RecommendationSource = 'use_case' | 'ai' | 'browsing_history' | 'manual' | 'simplified' | 'card-stack'
 
 export const productSelectionLogic = kea<productSelectionLogicType>([
     path(['scenes', 'onboarding', 'productSelection', 'productSelectionLogic']),

@@ -1,0 +1,35 @@
+.CardStackProductSelection {
+    &__card-enter {
+        animation: CardStackProductSelection__dealIn 0.4s ease-out both;
+    }
+
+    &__pile-pulse {
+        animation: CardStackProductSelection__pilePulse 0.3s ease-out;
+    }
+
+    @keyframes CardStackProductSelection__dealIn {
+        0% {
+            opacity: 0;
+            transform: translateY(-40px) scale(0.9);
+        }
+
+        100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @keyframes CardStackProductSelection__pilePulse {
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.04);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+}
