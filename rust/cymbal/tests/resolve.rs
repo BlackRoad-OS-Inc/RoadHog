@@ -154,8 +154,9 @@ async fn sourcemap_nulls_dont_go_on_frames() {
     let frame: RawFrame = serde_json::from_str(content).unwrap();
 
     let jsdata_bytes = include_bytes!("static/sourcemap_with_nulls.jsdata").to_vec();
-    let data: SourceAndMap = read_symbol_data(jsdata_bytes).unwrap();
-    let smc = OwnedSourceMapCache::from_source_and_map(data).unwrap();
+    let data: SourceAndMap = read_symbol_data(jsdata_bytes.clone()).unwrap();
+    let decompressed_bytes = jsdata_bytes.len();
+    let smc = OwnedSourceMapCache::from_source_and_map(data, decompressed_bytes).unwrap();
     let c = smc.get_smc();
 
     let RawFrame::JavaScriptWeb(frame) = frame else {
