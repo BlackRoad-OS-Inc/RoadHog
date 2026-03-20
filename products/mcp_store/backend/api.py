@@ -24,7 +24,6 @@ from posthog.api.routing import TeamAndOrgViewSetMixin
 from posthog.cloud_utils import is_dev_mode
 from posthog.event_usage import report_user_action
 from posthog.models import User
-from posthog.models.integration import OauthIntegration
 from posthog.rate_limit import (
     MCPOAuthBurstThrottle,
     MCPOAuthRedirectBurstThrottle,
@@ -41,7 +40,6 @@ from .oauth import (
     OAuthTokenExchangeError,
     discover_oauth_metadata,
     exchange_dcr_token,
-    exchange_known_provider_token,
     generate_pkce,
     register_dcr_client,
 )
@@ -124,7 +122,6 @@ class RecommendedServerSerializer(serializers.Serializer):
     url = serializers.URLField()
     description = serializers.CharField()
     auth_type = serializers.ChoiceField(choices=["none", "api_key", "oauth"])
-    oauth_provider_kind = serializers.CharField(required=False, default="")
 
 
 @extend_schema(tags=["mcp_store"])
@@ -201,7 +198,6 @@ class InstallCustomSerializer(serializers.Serializer):
     auth_type = serializers.ChoiceField(choices=["api_key", "oauth"])
     api_key = serializers.CharField(required=False, allow_blank=True, default="")
     description = serializers.CharField(required=False, allow_blank=True, default="")
-    oauth_provider_kind = serializers.CharField(required=False, allow_blank=True, default="")
     install_source = serializers.ChoiceField(choices=["posthog", "posthog-code"], required=False, default="posthog")
     posthog_code_callback_url = serializers.CharField(required=False, allow_blank=True, default="")
 
@@ -395,7 +391,6 @@ class MCPServerInstallationViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet
         auth_type = data["auth_type"]
         api_key = data.get("api_key", "")
         description = data.get("description", "")
-        oauth_provider_kind = data.get("oauth_provider_kind", "")
 
         install_source = data.get("install_source", "posthog")
         posthog_code_callback_url = data.get("posthog_code_callback_url", "")
@@ -407,7 +402,6 @@ class MCPServerInstallationViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet
                 name=name,
                 mcp_url=url,
                 description=description,
-                oauth_provider_kind=oauth_provider_kind,
                 install_source=install_source,
                 posthog_code_callback_url=posthog_code_callback_url,
             )
@@ -465,7 +459,6 @@ class MCPServerInstallationViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet
         name: str,
         mcp_url: str,
         description: str,
-        oauth_provider_kind: str = "",
         install_source: str = "posthog",
         posthog_code_callback_url: str = "",
     ) -> HttpResponse:
@@ -508,7 +501,6 @@ class MCPServerInstallationViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet
                 redirect_uri=redirect_uri,
                 name=name,
                 request=request,
-                oauth_provider_kind=oauth_provider_kind,
             )
         except DCRNotSupportedError:
             if created:
@@ -558,7 +550,6 @@ class MCPServerInstallationViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet
         redirect_uri: str,
         name: str,
         request: Request,
-        oauth_provider_kind: str = "",
     ) -> MCPServer:
         existing_server = MCPServer.objects.filter(url=issuer_url).first()
 
@@ -589,7 +580,6 @@ class MCPServerInstallationViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet
                 url=issuer_url,
                 defaults={
                     "name": name,
-                    "oauth_provider_kind": oauth_provider_kind,
                     "oauth_metadata": metadata_with_redirect,
                     "oauth_client_id": client_id,
                     "created_by": request.user,
@@ -652,18 +642,6 @@ class MCPServerInstallationViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet
             team_id=self.team_id, user=cast(User, request.user), server=server
         ).first()
 
-        if server.oauth_provider_kind:
-            try:
-                return self._authorize_known_provider(
-                    server.oauth_provider_kind,
-                    server,
-                    install_source=install_source,
-                    posthog_code_callback_url=posthog_code_callback_url,
-                    installation=installation,
-                )
-            except NotImplementedError:
-                pass
-
         mcp_url = installation.url if installation else server.url
 
         return self._authorize_dcr(
@@ -673,38 +651,6 @@ class MCPServerInstallationViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet
             install_source=install_source,
             posthog_code_callback_url=posthog_code_callback_url,
         )
-
-    def _authorize_known_provider(
-        self,
-        kind: str,
-        server: MCPServer,
-        *,
-        install_source: str = "posthog",
-        posthog_code_callback_url: str = "",
-        installation: MCPServerInstallation | None = None,
-    ) -> HttpResponse:
-        oauth_config = OauthIntegration.oauth_config_for_kind(kind)
-        redirect_uri = _get_oauth_redirect_uri()
-
-        token = secrets.token_urlsafe(32)
-
-        if installation:
-            _create_oauth_state(installation, server, token, install_source, posthog_code_callback_url)
-
-        query_params = {
-            "client_id": oauth_config.client_id,
-            "scope": oauth_config.scope,
-            "redirect_uri": redirect_uri,
-            "response_type": "code",
-            "state": token,
-            **(oauth_config.additional_authorize_params or {}),
-        }
-
-        authorize_url = f"{oauth_config.authorize_url}?{urlencode(query_params)}"
-
-        response = HttpResponse(status=302)
-        response["Location"] = authorize_url
-        return response
 
     def _authorize_dcr(
         self,
@@ -903,39 +849,14 @@ class MCPOAuthRedirectViewSet(viewsets.ViewSet):
     def _exchange_and_store_tokens(
         installation: MCPServerInstallation, server: MCPServer, code: str, pkce_verifier: str
     ) -> None:
-        has_pkce = bool(pkce_verifier)
         redirect_uri = _get_oauth_redirect_uri()
-        if has_pkce:
-            token_data = exchange_dcr_token(
-                server=server,
-                code=code,
-                pkce_verifier=pkce_verifier,
-                redirect_uri=redirect_uri,
-                is_https=_is_https,
-            )
-        elif server.oauth_provider_kind:
-            try:
-                token_data = exchange_known_provider_token(
-                    kind=server.oauth_provider_kind,
-                    code=code,
-                    redirect_uri=redirect_uri,
-                )
-            except NotImplementedError:
-                token_data = exchange_dcr_token(
-                    server=server,
-                    code=code,
-                    pkce_verifier=pkce_verifier,
-                    redirect_uri=redirect_uri,
-                    is_https=_is_https,
-                )
-        else:
-            token_data = exchange_dcr_token(
-                server=server,
-                code=code,
-                pkce_verifier=pkce_verifier,
-                redirect_uri=redirect_uri,
-                is_https=_is_https,
-            )
+        token_data = exchange_dcr_token(
+            server=server,
+            code=code,
+            pkce_verifier=pkce_verifier,
+            redirect_uri=redirect_uri,
+            is_https=_is_https,
+        )
 
         access_token = token_data.get("access_token")
         if not access_token:
