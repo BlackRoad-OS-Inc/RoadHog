@@ -651,11 +651,7 @@ def process_social_invite_signup(
         try:
             invite = TeamInviteSurrogate(invite_id)
         except Team.DoesNotExist:
-            raise ValidationError(
-                "Team does not exist",
-                code="invalid_invite",
-                params={"source": "social_create_user"},
-            )
+            return redirect("/login?error_code=invalid_invite")
 
     if user:
         invite.validate(user=user, email=email)
