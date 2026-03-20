@@ -1,11 +1,50 @@
+use std::fmt;
+use std::str::FromStr;
+
 use envconfig::Envconfig;
 use std::net::SocketAddr;
 use std::time::Duration;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RouterMode {
+    /// Replica-only mode: all requests go to personhog-replica.
+    Replica,
+    /// Leader mode: person writes and strong reads go to leader pods
+    /// via etcd-coordinated partition routing. Everything else goes to replica.
+    Leader,
+}
+
+impl fmt::Display for RouterMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RouterMode::Replica => write!(f, "replica"),
+            RouterMode::Leader => write!(f, "leader"),
+        }
+    }
+}
+
+impl FromStr for RouterMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "replica" => Ok(RouterMode::Replica),
+            "leader" => Ok(RouterMode::Leader),
+            other => Err(format!(
+                "unknown router mode '{other}', expected 'replica' or 'leader'"
+            )),
+        }
+    }
+}
 
 #[derive(Envconfig, Clone, Debug)]
 pub struct Config {
     #[envconfig(default = "127.0.0.1:50052")]
     pub grpc_address: SocketAddr,
+
+    /// Router mode: "replica" (default) or "leader"
+    #[envconfig(default = "replica")]
+    pub router_mode: RouterMode,
 
     /// URL of the personhog-replica backend
     #[envconfig(default = "http://127.0.0.1:50051")]
@@ -46,7 +85,7 @@ pub struct Config {
     #[envconfig(default = "10")]
     pub backend_keepalive_timeout_secs: u64,
 
-    // ── etcd coordination ────────────────────────────────────────
+    // ── etcd coordination (leader mode only) ─────────────────────
     #[envconfig(default = "http://localhost:2379")]
     pub etcd_endpoints: String,
 
