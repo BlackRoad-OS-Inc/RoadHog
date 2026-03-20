@@ -148,7 +148,7 @@ def delete_codespace(name: str, force: bool = False) -> None:
     subprocess.run(cmd, env=_gh_env(), check=False)
 
 
-def wait_for_codespace(name: str, timeout: int = 900) -> bool:
+def wait_for_codespace(name: str, timeout: int = 1800) -> bool:
     """Wait for a codespace to become Available. Returns True on success.
 
     Polls state every 5 seconds and prints status updates, matching
