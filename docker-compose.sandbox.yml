@@ -37,6 +37,8 @@ services:
             PGHOST: db
             PGUSER: posthog
             PGPASSWORD: posthog
+            PERSONS_DB_WRITER_URL: 'postgres://posthog:posthog@db:5432/posthog'
+            PERSONS_DB_READER_URL: 'postgres://posthog:posthog@db:5432/posthog'
             SKIP_SERVICE_VERSION_REQUIREMENTS: '1'
             IS_BEHIND_PROXY: 'true'
             DISABLE_SECURE_SSL_REDIRECT: 'true'
