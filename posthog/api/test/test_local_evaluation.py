@@ -4,7 +4,7 @@ from rest_framework import status
 
 from posthog.models import FeatureFlag
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class TestFeatureFlagDependencyTransformation(APIBaseTest):

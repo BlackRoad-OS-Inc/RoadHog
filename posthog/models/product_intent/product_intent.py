@@ -21,7 +21,7 @@ from posthog.utils import get_instance_realm
 from products.error_tracking.backend.models import ErrorTrackingIssue
 from products.experiments.backend.models.experiment import Experiment
 from products.product_tours.backend.models import ProductTour
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 """
 How to use this model:

@@ -88,7 +88,7 @@ def register_all_admin():
     from products.experiments.backend.models.experiment import Experiment, ExperimentSavedMetric
     from products.signals.backend.admin import SignalReportAdmin
     from products.signals.backend.models import SignalReport
-    from products.surveys.backend.survey import Survey
+    from products.surveys.backend.models import Survey
     from products.tasks.backend.admin import (
         CodeInviteAdmin,
         CodeInviteRedemptionAdmin,

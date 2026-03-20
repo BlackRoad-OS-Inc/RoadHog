@@ -15,7 +15,7 @@ from posthog.sync import database_sync_to_async
 from products.data_warehouse.backend.models.external_data_source import ExternalDataSource
 from products.event_definitions.backend.models.event_definition import EventDefinition
 from products.experiments.backend.models.experiment import Experiment
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 def query_teams_for_digest() -> QuerySet:

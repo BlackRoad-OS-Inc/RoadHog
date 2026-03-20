@@ -18,7 +18,7 @@ from posthog.models.plugin import Plugin, PluginConfig, PluginSourceFile
 from posthog.models.project import Project
 from posthog.models.remote_config import RemoteConfig
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 CONFIG_REFRESH_QUERY_COUNT = 6
 

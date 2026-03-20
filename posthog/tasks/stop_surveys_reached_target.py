@@ -8,7 +8,7 @@ from posthog.clickhouse.client import sync_execute
 from posthog.clickhouse.client.connection import Workload
 from posthog.models.utils import UUIDT
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 def _get_surveys_response_counts(

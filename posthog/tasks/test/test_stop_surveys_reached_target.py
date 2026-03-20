@@ -12,7 +12,7 @@ from dateutil.relativedelta import relativedelta
 from posthog.models import FeatureFlag, Organization, Team, User
 from posthog.tasks.stop_surveys_reached_target import stop_surveys_reached_target
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class TestStopSurveysReachedTarget(TestCase, ClickhouseTestMixin):

@@ -16,7 +16,7 @@ from posthog.session_recordings.models.session_recording import SessionRecording
 from posthog.utils import get_instance_realm
 
 from products.experiments.backend.models.experiment import Experiment
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class TestProductIntent(BaseTest):

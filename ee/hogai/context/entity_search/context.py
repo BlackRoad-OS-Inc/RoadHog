@@ -21,7 +21,7 @@ from posthog.sync import database_sync_to_async
 
 from products.experiments.backend.models.experiment import Experiment
 from products.notebooks.backend.models import Notebook
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 from ee.hogai.artifacts.handlers.base import get_handler_for_content_type
 from ee.hogai.context.context import AssistantContextManager

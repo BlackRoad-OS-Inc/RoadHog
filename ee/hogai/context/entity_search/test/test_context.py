@@ -11,7 +11,7 @@ from posthog.models import Action, Cohort, Dashboard, FeatureFlag, Insight
 from posthog.models.insight import InsightViewed
 
 from products.experiments.backend.models.experiment import Experiment
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 from ee.hogai.context import AssistantContextManager
 from ee.hogai.context.entity_search import EntitySearchContext

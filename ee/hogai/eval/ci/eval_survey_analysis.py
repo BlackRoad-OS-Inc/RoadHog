@@ -9,7 +9,7 @@ from braintrust import EvalCase, Score
 from langchain_core.runnables import RunnableConfig
 
 from products.surveys.backend.max_tools import SurveyAnalysisTool
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 from ee.hogai.utils.types.base import AssistantState
 

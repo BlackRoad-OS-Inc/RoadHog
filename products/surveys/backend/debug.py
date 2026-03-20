@@ -127,7 +127,7 @@ def find_teams_with_cache_inconsistencies(
     Returns:
         List of dictionaries with information about teams with inconsistencies
     """
-    from products.surveys.backend.survey import Survey
+    from products.surveys.backend.models import Survey
 
     inconsistent_teams: list[dict[str, Any]] = []
     teams_checked = 0

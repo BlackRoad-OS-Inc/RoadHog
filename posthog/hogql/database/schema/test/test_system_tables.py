@@ -38,7 +38,7 @@ from products.data_warehouse.backend.models.table import DataWarehouseTable as D
 from products.error_tracking.backend.models import ErrorTrackingIssue
 from products.experiments.backend.models.experiment import Experiment
 from products.notebooks.backend.models import Notebook
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 ALL_SYSTEM_TABLE_NAMES = sorted(SystemTables().children.keys())
 

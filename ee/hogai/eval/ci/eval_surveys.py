@@ -11,7 +11,7 @@ from braintrust import EvalCase, Score
 from posthog.models import FeatureFlag
 
 from products.surveys.backend.max_tools import CreateSurveyTool, SimpleSurveyQuestion
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 from ee.hogai.eval.base import MaxPublicEval
 from ee.models.assistant import Conversation

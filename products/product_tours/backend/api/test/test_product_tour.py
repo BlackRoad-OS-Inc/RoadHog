@@ -12,7 +12,7 @@ from posthog.models.team.team import Team
 from products.product_tours.backend.api.product_tour import get_product_tours_response
 from products.product_tours.backend.constants import ProductTourEventName, ProductTourPersonProperties
 from products.product_tours.backend.models import ProductTour
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class TestProductTour(APIBaseTest):

@@ -17,7 +17,7 @@ from posthog.models.team.team import Team
 
 from products.early_access_features.backend.models import EarlyAccessFeature
 from products.experiments.backend.models.experiment import Experiment
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class TestOrganizationFeatureFlagGet(APIBaseTest, QueryMatchingTest):

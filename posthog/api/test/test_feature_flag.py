@@ -43,7 +43,7 @@ from posthog.test.test_utils import create_group_type_mapping_without_created_at
 from products.early_access_features.backend.models import EarlyAccessFeature
 from products.experiments.backend.models.experiment import Experiment
 from products.product_tours.backend.models import ProductTour
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class TestExtractEtagFromHeader:

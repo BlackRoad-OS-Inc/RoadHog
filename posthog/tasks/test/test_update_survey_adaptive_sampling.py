@@ -10,7 +10,7 @@ from django.utils import timezone
 from posthog.models import FeatureFlag
 from posthog.tasks.update_survey_adaptive_sampling import update_survey_adaptive_sampling
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class TestUpdateSurveyAdaptiveSampling(BaseTest):

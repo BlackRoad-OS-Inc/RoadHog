@@ -4,7 +4,7 @@ from posthog.hogql_queries.query_runner import get_query_runner
 from posthog.models import Team
 from posthog.sync import database_sync_to_async
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 from .prompts import SURVEY_CONTEXT_TEMPLATE
 

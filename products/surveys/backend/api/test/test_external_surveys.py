@@ -8,7 +8,7 @@ from unittest.mock import patch
 from django.core.cache import cache
 from django.test import TestCase
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class TestExternalSurveys(APIBaseTest):
@@ -233,7 +233,7 @@ class TestExternalSurveys(APIBaseTest):
     @patch("products.surveys.backend.api.survey.logger")
     def test_database_error_handling(self, mock_logger):
         """Test proper error handling for database errors"""
-        with patch("products.surveys.backend.survey.Survey.objects.select_related") as mock_select:
+        with patch("products.surveys.backend.models.Survey.objects.select_related") as mock_select:
             mock_select.side_effect = Exception("Database connection error")
 
             fake_uuid = str(uuid.uuid4())
@@ -246,7 +246,7 @@ class TestExternalSurveys(APIBaseTest):
     @patch("products.surveys.backend.api.survey.capture_exception")
     def test_exception_reporting(self, mock_capture):
         """Test that exceptions are properly reported to error tracking"""
-        with patch("products.surveys.backend.survey.Survey.objects.select_related") as mock_select:
+        with patch("products.surveys.backend.models.Survey.objects.select_related") as mock_select:
             test_exception = Exception("Test error")
             mock_select.side_effect = test_exception
 

@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class SurveyAdmin(admin.ModelAdmin):

@@ -8,7 +8,7 @@ from django.utils.timezone import now
 from posthog.models import FeatureFlag, Organization, Team, User
 from posthog.tasks.update_survey_iteration import update_survey_iteration
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class TestUpdateSurveyIteration(TestCase, ClickhouseTestMixin):

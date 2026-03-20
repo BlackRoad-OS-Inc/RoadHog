@@ -25,7 +25,7 @@ from posthog.storage.hypercache import HyperCache, HyperCacheStoreMissing
 
 from products.error_tracking.backend.models import ErrorTrackingSuppressionRule
 from products.product_tours.backend.models import ProductTour
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 tracer = trace.get_tracer(__name__)
 

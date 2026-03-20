@@ -54,7 +54,7 @@ from products.data_warehouse.backend.models import (
     ExternalDataSchema,
 )
 from products.error_tracking.backend.models import ErrorTrackingIssue, ErrorTrackingSymbolSet
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 from products.surveys.backend.util import get_unique_survey_event_uuids_sql_subquery
 
 logger = structlog.get_logger(__name__)

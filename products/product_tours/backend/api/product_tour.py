@@ -34,7 +34,7 @@ from posthog.utils_cors import cors_response
 from products.product_tours.backend.constants import ProductTourEventName, ProductTourPersonProperties
 from products.product_tours.backend.generate_tour_content import ContentGenerationResult, generate_with_gemini
 from products.product_tours.backend.models import ProductTour
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 logger = logging.getLogger(__name__)
 

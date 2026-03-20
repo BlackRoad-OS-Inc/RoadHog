@@ -4,7 +4,7 @@ from unittest.mock import patch
 from django.core.management import call_command
 from django.db.models.signals import pre_save
 
-from products.surveys.backend.survey import Survey, pre_save_survey
+from products.surveys.backend.models import Survey, pre_save_survey
 
 
 class TestAddQuestionIdsToSurveys(BaseTest):

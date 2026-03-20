@@ -33,8 +33,7 @@ from posthog.models.organization import Organization
 
 from products.product_tours.backend.models import ProductTour
 from products.surveys.backend.api.survey import nh3_clean_with_allow_list
-from products.surveys.backend.survey import MAX_ITERATION_COUNT, Survey, surveys_hypercache
-from products.surveys.backend.survey_response_archive import SurveyResponseArchive
+from products.surveys.backend.models import MAX_ITERATION_COUNT, Survey, SurveyResponseArchive, surveys_hypercache
 
 
 class TestSurvey(APIBaseTest):

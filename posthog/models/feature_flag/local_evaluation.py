@@ -48,7 +48,7 @@ from posthog.person_db_router import PERSONS_DB_FOR_READ
 from posthog.storage.hypercache import HyperCache, emit_cache_sync_metrics
 from posthog.storage.hypercache_manager import HyperCacheManagementConfig
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 logger = structlog.get_logger(__name__)
 

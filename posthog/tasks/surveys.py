@@ -4,7 +4,7 @@ from celery import shared_task
 from posthog.models.team import Team
 from posthog.tasks.utils import CeleryQueue
 
-from products.surveys.backend.survey import surveys_hypercache
+from products.surveys.backend.models import surveys_hypercache
 
 logger = structlog.get_logger(__name__)
 

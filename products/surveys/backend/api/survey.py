@@ -56,9 +56,14 @@ from posthog.rbac.access_control_api_mixin import AccessControlViewSetMixin
 from posthog.rbac.user_access_control import UserAccessControlSerializerMixin
 from posthog.utils_cors import cors_response
 
+from products.surveys.backend.models import (
+    MAX_ITERATION_COUNT,
+    Survey,
+    SurveyResponseArchive,
+    ensure_question_ids,
+    surveys_hypercache,
+)
 from products.surveys.backend.summarization import fetch_responses, format_as_markdown, summarize_responses
-from products.surveys.backend.survey import MAX_ITERATION_COUNT, Survey, ensure_question_ids, surveys_hypercache
-from products.surveys.backend.survey_response_archive import SurveyResponseArchive
 from products.surveys.backend.util import (
     SurveyEventName,
     SurveyEventProperties,

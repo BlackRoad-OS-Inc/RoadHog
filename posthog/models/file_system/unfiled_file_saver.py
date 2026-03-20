@@ -20,7 +20,7 @@ from posthog.session_recordings.models.session_recording_playlist import Session
 from products.early_access_features.backend.models import EarlyAccessFeature
 from products.experiments.backend.models.experiment import Experiment
 from products.notebooks.backend.models import Notebook
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 MIXIN_MODELS = {
     "action": Action,

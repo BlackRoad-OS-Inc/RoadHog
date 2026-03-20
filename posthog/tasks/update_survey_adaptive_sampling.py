@@ -5,7 +5,7 @@ from django.utils.timezone import now
 
 from posthog.clickhouse.client import sync_execute
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 def _update_survey_adaptive_sampling(survey: Survey) -> None:

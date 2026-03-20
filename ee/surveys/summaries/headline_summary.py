@@ -13,7 +13,7 @@ from posthog.api.utils import ServerTimingsGathered
 from posthog.hogql_queries.insights.paginators import HogQLHasMorePaginator
 from posthog.models import Team, User
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 from products.surveys.backend.util import get_archived_response_uuids, get_survey_response_clickhouse_query
 
 from ee.hogai.llm import MaxChatOpenAI

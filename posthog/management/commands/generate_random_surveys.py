@@ -14,7 +14,7 @@ from posthog.models.event.sql import BULK_INSERT_EVENT_SQL
 from posthog.models.person.person import Person, PersonDistinctId
 from posthog.settings.data_stores import CLICKHOUSE_CLUSTER
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 
 class MultipleChoiceTemplate(TypedDict):

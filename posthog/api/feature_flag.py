@@ -89,7 +89,7 @@ from posthog.views import format_bytes
 
 from products.experiments.backend.models.experiment import Experiment
 from products.product_tours.backend.models import ProductTour
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 BEHAVIOURAL_COHORT_FOUND_ERROR_CODE = "behavioral_cohort_found"
 

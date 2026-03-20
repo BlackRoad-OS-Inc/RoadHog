@@ -8,7 +8,7 @@ from posthog.api.feature_flag import FeatureFlagSerializer
 from posthog.models import FeatureFlag, Tag, TaggedItem
 
 from products.experiments.backend.models.experiment import Experiment
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 # ============================================================
 # max-tools-direct-model-create (WARNING - should use serializer)

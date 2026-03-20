@@ -17,8 +17,8 @@ from posthog.constants import DEFAULT_SURVEY_APPEARANCE
 from posthog.exceptions_capture import capture_exception
 from posthog.models import Team
 
+from products.surveys.backend.models import Survey
 from products.surveys.backend.summarization.fetch import fetch_responses
-from products.surveys.backend.survey import Survey
 
 from ee.hogai.tool import MaxTool
 

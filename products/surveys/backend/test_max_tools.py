@@ -12,7 +12,7 @@ from langchain_core.runnables import RunnableConfig
 
 from posthog.models import FeatureFlag, Insight
 
-from products.surveys.backend.survey import Survey
+from products.surveys.backend.models import Survey
 
 from .max_tools import CreateSurveyTool, EditSurveyTool, SimpleSurveyQuestion, SurveyAnalysisTool
 
