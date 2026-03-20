@@ -1,0 +1,114 @@
+use std::time::Duration;
+
+use axum::routing::{get, post};
+use axum::Router;
+use envconfig::Envconfig;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{EnvFilter, Layer};
+
+use clickhouse_gateway::config::Config;
+use clickhouse_gateway::query::handle_query;
+use clickhouse_gateway::state::AppState;
+
+common_alloc::used!();
+
+#[tokio::main]
+async fn main() {
+    let config = Config::init_from_env().expect("Invalid configuration:");
+
+    // Initialize tracing
+    let log_layer = tracing_subscriber::fmt::layer()
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_level(true)
+        .json()
+        .flatten_event(true)
+        .with_span_list(true)
+        .with_current_span(true)
+        .with_filter(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .boxed();
+
+    tracing_subscriber::registry().with(log_layer).init();
+
+    // Root span with pod hostname for Loki/Grafana filtering
+    let pod = std::env::var("HOSTNAME").unwrap_or_else(|_| "unknown".to_string());
+    let _root_span = tracing::info_span!("service", pod = %pod).entered();
+
+    let bind_addr = format!("{}:{}", config.host, config.port);
+    let metrics_addr = format!("{}:{}", config.host, config.metrics_port);
+
+    tracing::info!(
+        bind = %bind_addr,
+        metrics = %metrics_addr,
+        "starting clickhouse-gateway"
+    );
+
+    let state = AppState::new(config);
+
+    // Main API router
+    let app = Router::new()
+        .route("/query", post(handle_query))
+        .route("/_health", get(health_handler))
+        .route("/_ready", get(readiness_handler))
+        .with_state(state.clone());
+
+    // Metrics router (separate port)
+    let metrics_router = common_metrics::setup_metrics_routes(Router::new());
+
+    // Lifecycle manager for graceful shutdown
+    let mut manager = lifecycle::Manager::builder("clickhouse-gateway")
+        .with_trap_signals(true)
+        .with_prestop_check(true)
+        .with_health_poll_interval(Duration::from_secs(2))
+        .build();
+
+    let guard = manager.monitor_background();
+
+    // Bind listeners
+    let listener = tokio::net::TcpListener::bind(&bind_addr)
+        .await
+        .expect("could not bind main port");
+    tracing::info!("listening on {}", listener.local_addr().unwrap());
+
+    let metrics_listener = tokio::net::TcpListener::bind(&metrics_addr)
+        .await
+        .expect("could not bind metrics port");
+    tracing::info!(
+        "metrics listening on {}",
+        metrics_listener.local_addr().unwrap()
+    );
+
+    // Serve metrics on a separate task
+    tokio::spawn(async move {
+        axum::serve(metrics_listener, metrics_router)
+            .await
+            .expect("metrics server failed");
+    });
+
+    // Serve main API
+    axum::serve(listener, app).await.expect("server failed");
+
+    match guard.wait().await {
+        Ok(()) => tracing::info!("All lifecycle components completed cleanly"),
+        Err(e) => tracing::warn!("Lifecycle monitor reported: {e}"),
+    }
+    tracing::info!("Shutdown complete");
+}
+
+async fn health_handler() -> axum::http::StatusCode {
+    axum::http::StatusCode::OK
+}
+
+async fn readiness_handler() -> axum::http::StatusCode {
+    // Check for prestop shutdown file (k8s rolling deployment pattern)
+    if std::path::Path::new("/tmp/shutdown").exists() {
+        return axum::http::StatusCode::SERVICE_UNAVAILABLE;
+    }
+    axum::http::StatusCode::OK
+}

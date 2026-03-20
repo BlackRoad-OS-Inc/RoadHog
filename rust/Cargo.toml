@@ -44,6 +44,7 @@ members = [
     "personhog-proto",
     "personhog-replica",
     "personhog-router",
+    "clickhouse-gateway",
 ]
 
 [workspace.lints.rust]
