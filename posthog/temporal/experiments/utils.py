@@ -6,7 +6,8 @@ import structlog
 from posthog.schema import ExperimentFunnelMetric, ExperimentMeanMetric, ExperimentRatioMetric
 
 from posthog.cdp.internal_events import InternalEventEvent, produce_internal_event
-from posthog.models.experiment import (
+
+from products.experiments.backend.models.experiment import (
     Experiment,
     ExperimentMetricResult as ExperimentMetricResultModel,
 )
