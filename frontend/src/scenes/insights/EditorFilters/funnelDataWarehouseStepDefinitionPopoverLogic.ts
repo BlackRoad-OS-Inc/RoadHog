@@ -3,6 +3,7 @@ import posthog from 'posthog-js'
 
 import { definitionPopoverLogic } from 'lib/components/DefinitionPopover/definitionPopoverLogic'
 import type { TablePreviewExpressionColumn } from 'lib/components/TablePreview/types'
+import { getDataWarehouseItemWithFieldDefaults } from 'lib/components/TaxonomicFilter/dataWarehouseItemUtils'
 import type {
     DataWarehousePopoverField,
     TaxonomicFilterGroup,
@@ -31,6 +32,7 @@ export interface FunnelDataWarehouseStepDefinitionPopoverLogicProps {
     table: DataWarehouseTableForInsight
     group: TaxonomicFilterGroup
     dataWarehousePopoverFields: DataWarehousePopoverField[]
+    selectedItemMeta?: Record<string, any> | null
     onSelectItem: (group: TaxonomicFilterGroup, value: TaxonomicFilterValue | null, item: any) => void
     insightProps: InsightLogicProps
 }
@@ -40,7 +42,12 @@ export const funnelDataWarehouseStepDefinitionPopoverLogic = kea<funnelDataWareh
     key((props) => props.table.name),
     path((key) => ['scenes', 'insights', 'EditorFilters', 'funnelDataWarehouseStepDefinitionPopoverLogic', key]),
     connect((props: FunnelDataWarehouseStepDefinitionPopoverLogicProps) => ({
-        values: [definitionPopoverLogic, ['localDefinition'], funnelDataLogic(props.insightProps), ['querySource']],
+        values: [
+            definitionPopoverLogic,
+            ['definition', 'localDefinition'],
+            funnelDataLogic(props.insightProps),
+            ['querySource'],
+        ],
         actions: [definitionPopoverLogic, ['setLocalDefinition']],
     })),
     actions(() => ({
@@ -88,10 +95,17 @@ export const funnelDataWarehouseStepDefinitionPopoverLogic = kea<funnelDataWareh
             (dataWarehousePopoverFields, activeFieldKey) =>
                 dataWarehousePopoverFields.find((f) => f.key === activeFieldKey),
         ],
+        scopedLocalDefinition: [
+            (s, p) => [s.definition, s.localDefinition, p.table, p.selectedItemMeta],
+            (definition, localDefinition, table, selectedItemMeta) =>
+                definition.name === table.name
+                    ? localDefinition
+                    : getDataWarehouseItemWithFieldDefaults(table, selectedItemMeta),
+        ],
         activeFieldValue: [
-            (s) => [s.localDefinition, s.activeFieldKey],
-            (localDefinition, activeFieldKey) =>
-                (localDefinition as Partial<Record<FunnelFieldKey, string | undefined>>)[activeFieldKey],
+            (s) => [s.scopedLocalDefinition, s.activeFieldKey],
+            (scopedLocalDefinition, activeFieldKey) =>
+                (scopedLocalDefinition as Partial<Record<FunnelFieldKey, string | undefined>>)[activeFieldKey],
         ],
         previewTable: [
             (_, p) => [p.table],
@@ -103,14 +117,14 @@ export const funnelDataWarehouseStepDefinitionPopoverLogic = kea<funnelDataWareh
             }),
         ],
         previewExpressionColumns: [
-            (s, p) => [p.table, s.dataWarehousePopoverFields, s.localDefinition],
-            (table, dataWarehousePopoverFields, localDefinition): TablePreviewExpressionColumn[] => {
+            (s, p) => [p.table, s.dataWarehousePopoverFields, s.scopedLocalDefinition],
+            (table, dataWarehousePopoverFields, scopedLocalDefinition): TablePreviewExpressionColumn[] => {
                 const tableFieldNames = new Set(Object.values(table.fields).map((field) => field.name))
                 const usedKeys = new Set(tableFieldNames)
                 return EDITABLE_FIELD_ORDER.flatMap((fieldKey) => {
-                    const configuredValue = (localDefinition as Partial<Record<FunnelFieldKey, string | undefined>>)[
-                        fieldKey
-                    ]
+                    const configuredValue = (
+                        scopedLocalDefinition as Partial<Record<FunnelFieldKey, string | undefined>>
+                    )[fieldKey]
                     if (typeof configuredValue !== 'string') {
                         return []
                     }
@@ -180,7 +194,7 @@ export const funnelDataWarehouseStepDefinitionPopoverLogic = kea<funnelDataWareh
     }),
     listeners(({ values, props }) => ({
         selectTable: () => {
-            props.onSelectItem(props.group, props.table.name, values.localDefinition)
+            props.onSelectItem(props.group, props.table.name, values.scopedLocalDefinition)
             posthog.capture('funnel data warehouse step selected')
         },
     })),
