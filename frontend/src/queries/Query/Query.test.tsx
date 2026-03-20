@@ -36,7 +36,7 @@ describe('Query', () => {
         insightVizQueryCalls.length = 0
     })
 
-    it('passes updated propsQuery on every render when controlled via setQuery', () => {
+    it('immediately uses propsQuery on re-render when controlled via setQuery (no stale localQuery)', () => {
         const originalQuery = makeInsightVizQuery()
         const setQuery = jest.fn()
 
