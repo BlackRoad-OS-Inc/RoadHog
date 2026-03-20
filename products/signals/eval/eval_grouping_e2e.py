@@ -310,7 +310,7 @@ class TestGroupingPipeline:
     async def _capture_pre_emit_actionability(self, case: EvalSignalCase, thoughts: str | None, outcome: bool):
         passed = outcome == case.actionable
         self._capture(
-            eval_name=f"{case.signal.source.value.lower()}-actionability-check",
+            eval_name=f"{case.signal.config.source_product.lower()}-actionability-check",
             item_name=f"case-{case.group_index}-{case.signal_index}",
             input=case.signal.content.description,
             output="ACTIONABLE" if outcome else "NOT_ACTIONABLE",
