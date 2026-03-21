@@ -20,12 +20,8 @@ export const errorTrackingVolumeSparklineLogic = kea<errorTrackingVolumeSparklin
     key(({ sparklineKey }) => sparklineKey),
 
     actions({
-        setHoveredBin: (payload: unknown) => ({
-            payload: payload as { index: number; datum: SparklineDatum } | null,
-        }),
-        setHoveredEvent: (payload: unknown) => ({
-            payload: payload as SparklineEvent<string> | null,
-        }),
+        setHoveredBin: (payload: { index: number; datum: SparklineDatum } | null) => ({ payload }),
+        setHoveredEvent: (payload: SparklineEvent<string> | null) => ({ payload }),
     }),
 
     reducers({
