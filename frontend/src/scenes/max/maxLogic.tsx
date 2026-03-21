@@ -135,6 +135,7 @@ export const maxLogic = kea<maxLogicType>([
                 'conversationHistory',
                 'conversationHistoryLoading',
                 'activeConversation',
+                'activeConversationLoading',
             ],
             maxSettingsLogic,
             ['coreMemory'],
@@ -263,15 +264,12 @@ export const maxLogic = kea<maxLogicType>([
             (cb: ((filters: RecordingUniversalFilters) => void) | null) => cb,
         ],
         conversation: [
-            (s) => [s.activeConversation, s.conversationHistory, s.conversationId],
-            (activeConversation, conversationHistory, conversationId): ConversationDetail | Conversation | null => {
-                if (!conversationId) {
-                    return null
-                }
+            (s) => [s.activeConversation, s.conversationId],
+            (activeConversation, conversationId): ConversationDetail | null => {
                 if (activeConversation?.id === conversationId) {
                     return activeConversation
                 }
-                return conversationHistory.find((c) => c.id === conversationId) ?? null
+                return null
             },
         ],
 
@@ -301,9 +299,9 @@ export const maxLogic = kea<maxLogicType>([
         ],
 
         conversationLoading: [
-            (s) => [s.conversationHistory, s.conversationHistoryLoading, s.conversationId, s.conversation],
-            (conversationHistory, conversationHistoryLoading, conversationId, conversation) => {
-                return !conversationHistory.length && conversationHistoryLoading && !!conversationId && !conversation
+            (s) => [s.conversationId, s.conversation, s.activeConversationLoading, s.conversationHistoryLoading],
+            (conversationId, conversation, activeConversationLoading, conversationHistoryLoading) => {
+                return !!conversationId && !conversation && (activeConversationLoading || conversationHistoryLoading)
             },
         ],
 
@@ -882,22 +880,12 @@ export const RESEARCH_SUGGESTIONS_DATA: readonly SuggestionGroup[] = [
     },
 ]
 
-/**
- * Merges a new conversation into the conversation history.
- */
-function toBasicConversation(conversation: Conversation | ConversationDetail): Conversation {
-    if ('messages' in conversation) {
-        const { messages, ...basic } = conversation
-        return basic
-    }
-    return conversation
-}
-
 export function mergeConversationHistory(
     state: Conversation[],
     newConversation: ConversationDetail | Conversation
 ): Conversation[] {
-    const basic = toBasicConversation(newConversation)
+    const { messages: _, ...basic } =
+        'messages' in newConversation ? newConversation : { messages: undefined, ...newConversation }
     const index = state.findIndex((c) => c.id === basic.id)
     if (index !== -1) {
         return [...state.slice(0, index), { ...state[index], ...basic }, ...state.slice(index + 1)]

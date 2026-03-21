@@ -122,11 +122,6 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
             return
         }
 
-        // Guard: conversation may briefly lack messages while loadConversation hydrates it
-        if (!('messages' in props.conversation)) {
-            return
-        }
-
         // New messages have been added since we last updated the thread
         if (!values.streamingActive && props.conversation.messages.length > values.threadMessageCount) {
             actions.setThread(updateMessagesWithCompletedStatus(props.conversation.messages))
@@ -1138,7 +1133,7 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
 
         loadConversationHistorySuccess: ({ conversationHistory, payload }) => {
             const doNotUpdate = typeof payload === 'object' && payload?.doNotUpdateCurrentThread
-            if (doNotUpdate || values.autoRun || values.streamingActive) {
+            if (doNotUpdate || values.autoRun || values.streamingActive || values.multiQuestionFormPending) {
                 return
             }
             const conversation = conversationHistory.find((c) => c.id === values.conversationId)

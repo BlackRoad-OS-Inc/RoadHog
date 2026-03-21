@@ -72,32 +72,24 @@ class ConversationSerializer(ConversationMinimalSerializer):
     is_sandbox = serializers.SerializerMethodField()
     pending_approvals = serializers.SerializerMethodField()
 
+    @tracer.start_as_current_span("conversations.serializer.get_messages")
     def get_messages(self, conversation: Conversation) -> list[dict[str, Any]]:
-        with tracer.start_as_current_span("conversations.serializer.get_messages") as span:
-            span.set_attribute("conversations.conversation_id", str(conversation.id))
+        if conversation.messages_json is not None:
+            return conversation.messages_json
 
-            if conversation.messages_json is not None:
-                span.set_attribute("conversations.source", "messages_json")
-                return conversation.messages_json
+        state, _, _ = self._get_cached_state(conversation)
+        if state is None:
+            return []
 
-            state, _, _ = self._get_cached_state(conversation)
-            if state is None:
-                return []
-
-            try:
-                team = self.context["team"]
-                user = self.context["user"]
-                with tracer.start_as_current_span("conversations.serializer.enrich_messages"):
-                    artifact_manager = ArtifactManager(team, user)
-                    enriched_messages = async_to_sync(artifact_manager.aenrich_messages)(list(state.messages))
-                messages = [
-                    message.model_dump() for message in enriched_messages if should_output_assistant_message(message)
-                ]
-                span.set_attribute("conversations.message_count", len(messages))
-                return messages
-            except Exception as e:
-                capture_exception(e)
-                return []
+        try:
+            team = self.context["team"]
+            user = self.context["user"]
+            artifact_manager = ArtifactManager(team, user)
+            enriched_messages = async_to_sync(artifact_manager.aenrich_messages)(list(state.messages))
+            return [message.model_dump() for message in enriched_messages if should_output_assistant_message(message)]
+        except Exception as e:
+            capture_exception(e)
+            return []
 
     def get_has_unsupported_content(self, conversation: Conversation) -> bool:
         _, has_unsupported_content, _ = self._get_cached_state(conversation)
@@ -157,9 +149,7 @@ class ConversationSerializer(ConversationMinimalSerializer):
 
         cache_key = str(conversation.id)
         if cache_key not in self._state_cache:
-            with tracer.start_as_current_span("conversations.serializer.get_state") as span:
-                span.set_attribute("conversations.conversation_id", cache_key)
-                self._state_cache[cache_key] = async_to_sync(self._aget_state)(conversation)
+            self._state_cache[cache_key] = async_to_sync(self._aget_state)(conversation)
 
         return self._state_cache[cache_key]
 
@@ -176,14 +166,11 @@ class ConversationSerializer(ConversationMinimalSerializer):
             team = self.context["team"]
             user = self.context["user"]
             graph_class, state_class = CONVERSATION_TYPE_MAP[conversation.type]  # type: ignore[index]
-            with tracer.start_as_current_span("conversations.serializer.compile_graph"):
-                graph: CompiledStateGraph = graph_class(team, user).compile_full_graph()
-            with tracer.start_as_current_span("conversations.serializer.aget_state"):
-                snapshot = await graph.aget_state(
-                    {"configurable": {"thread_id": str(conversation.id), "checkpoint_ns": ""}}
-                )
-            with tracer.start_as_current_span("conversations.serializer.validate_state"):
-                state = state_class.model_validate(snapshot.values)
+            graph: CompiledStateGraph = graph_class(team, user).compile_full_graph()
+            snapshot = await graph.aget_state(
+                {"configurable": {"thread_id": str(conversation.id), "checkpoint_ns": ""}}
+            )
+            state = state_class.model_validate(snapshot.values)
 
             # Extract interrupt payloads from pending tasks
             # This is the single source of truth for payload data
