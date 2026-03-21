@@ -163,7 +163,7 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
                 'loadConversationHistorySuccess',
             ],
             maxGlobalLogic,
-            ['loadConversation', 'loadActiveConversationSuccess'],
+            ['loadConversation'],
         ],
     })),
 
@@ -1154,26 +1154,6 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
             }
         },
 
-        loadActiveConversationSuccess: ({ activeConversation }) => {
-            if (values.autoRun || values.streamingActive) {
-                return
-            }
-            // Don't auto-reconnect if there's a pending form
-            if (values.multiQuestionFormPending) {
-                return
-            }
-            if (!activeConversation || activeConversation.id !== values.conversationId) {
-                return
-            }
-
-            actions.setConversation(activeConversation)
-
-            if (activeConversation.status === ConversationStatus.InProgress) {
-                setTimeout(() => {
-                    actions.reconnectToStream()
-                }, 0)
-            }
-        },
         selectCommand: ({ command }) => {
             if (command.arg) {
                 actions.setQuestion(command.name + ' ')

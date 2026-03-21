@@ -12,7 +12,7 @@ import { Link } from 'lib/lemon-ui/Link'
 import { ButtonPrimitive } from 'lib/ui/Button/ButtonPrimitives'
 import { cn } from 'lib/utils/css-classes'
 
-import { ConversationDetail } from '~/types'
+import { Conversation } from '~/types'
 
 import { maxLogic } from '../maxLogic'
 import { CHAT_HISTORY_COLLAPSE_THRESHOLD, maxPanelSizingLogic } from '../maxPanelSizingLogic'
@@ -66,7 +66,7 @@ export const ChatHistoryPanel = memo(function ChatHistoryPanel({ tabId }: ChatHi
             <Autocomplete.Root
                 items={conversationHistory}
                 filter={(item, query) => (item?.title || '').toLowerCase().includes(query.toLowerCase())}
-                itemToStringValue={(item: ConversationDetail) => item?.title ?? ''}
+                itemToStringValue={(item: Conversation) => item?.title ?? ''}
                 inline
                 defaultOpen
                 autoHighlight={true}
@@ -129,7 +129,7 @@ export const ChatHistoryPanel = memo(function ChatHistoryPanel({ tabId }: ChatHi
                                     <Autocomplete.List className="flex flex-col gap-1 -mx-1">
                                         <Autocomplete.Group items={conversationHistory}>
                                             <Autocomplete.Collection>
-                                                {(conversation: ConversationDetail) => (
+                                                {(conversation: Conversation) => (
                                                     <AiChatListItem.Root>
                                                         <AiChatListItem.Group>
                                                             <Autocomplete.Item
