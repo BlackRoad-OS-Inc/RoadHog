@@ -5564,7 +5564,7 @@ const api = {
         },
 
         list(): Promise<PaginatedResponse<ConversationDetail>> {
-            return new ApiRequest().conversations().get()
+            return new ApiRequest().conversations().withQueryString({ view: 'basic' }).get()
         },
 
         get(conversationId: string): Promise<ConversationDetail> {
