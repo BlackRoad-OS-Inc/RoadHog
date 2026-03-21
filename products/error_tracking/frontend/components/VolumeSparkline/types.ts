@@ -21,18 +21,19 @@ export type VolumeSparklineLayout = 'compact' | 'detailed'
 
 export type VolumeSparklineXAxisMode = 'none' | 'minimal' | 'full'
 
-/** Internal Kea reducer shape: at most one of bin or event is hovered. */
+/** Bar bin vs timeline event — single discriminated union for hover state and UI */
 export type VolumeSparklineHoverSelection =
     | { kind: 'bin'; index: number; datum: SparklineDatum }
     | { kind: 'event'; event: SparklineEvent<string> }
 
-/** Bar vs event marker hover — matches issue detail header / list footer consumers. */
-export type VolumeSparklineHoverPanel =
-    | { type: 'datum'; data: SparklineDatum }
-    | { type: 'event'; data: SparklineEvent<string> }
-    | null
+/** Subset of `errorTrackingVolumeSparklineLogic` values used for hover UI */
+export type ErrorTrackingVolumeSparklineHoverValues = {
+    hoveredIndex: number | null
+    hoveredDatum: SparklineDatum | null
+    isBarHighlighted: boolean
+    hoverSelection: VolumeSparklineHoverSelection | null
+}
 
-/** Visual + layout numbers from `useSparklineOptions` → D3 `renderVolumeSparkline`. */
 export type SparklineOptions = {
     backgroundColor: string
     hoverBackgroundColor: string

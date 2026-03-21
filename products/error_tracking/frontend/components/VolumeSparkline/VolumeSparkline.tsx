@@ -17,7 +17,6 @@ type VolumeSparklineLayout = 'compact' | 'detailed'
 export type VolumeSparklineProps = {
     data: SparklineData
     layout: VolumeSparklineLayout
-    /** Keyed Kea store for bar / event hover */
     sparklineKey: string
     xAxis?: VolumeSparklineXAxisMode
     className?: string

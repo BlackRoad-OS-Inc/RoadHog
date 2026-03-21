@@ -104,9 +104,7 @@ const customOptions: Record<string, string> = {
     all: 'All',
 }
 
-/**
- * ISO bounds for REST query params — same resolution as sparkline data when `date_to` is omitted (end = now).
- */
+// TODO: doubl check before prod if we dont alraedy have this
 export function dateRangeToIsoBounds(dateRange: DateRange | undefined): {
     dateFrom: string | undefined
     dateTo: string | undefined

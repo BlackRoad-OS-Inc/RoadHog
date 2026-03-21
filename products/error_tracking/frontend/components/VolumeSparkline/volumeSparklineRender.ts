@@ -22,10 +22,8 @@ export type VolumeSparklineRenderArgs = {
     borderRadius: number
     minBarHeight: number
     eventLabelHeight: number
-    /** Fraction of each bin width used for the bar (rest is gap). Default 0.9. */
     barWidthFraction?: number
     onHoverChange?: (index: number | null, datum: SparklineDatum | null) => void
-    /** First seen / last seen / current — issue detail only */
     events?: SparklineEvent<string>[]
     onEventHoverChange?: (event: SparklineEvent<string> | null) => void
     eventLabelPaddingX?: number
@@ -33,7 +31,7 @@ export type VolumeSparklineRenderArgs = {
     eventMinSpace?: number
 }
 
-/** Flat bottom, rounded top corners only (quadratic beziers at top-left / top-right). */
+// TODO: DO SOMETHING ABOUT IT BEFORE PROD
 function roundedTopBarPath(x: number, y: number, w: number, h: number, r: number): string {
     if (w <= 0 || h <= 0) {
         return ''

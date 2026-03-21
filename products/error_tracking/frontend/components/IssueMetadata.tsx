@@ -15,15 +15,15 @@ import { useSparklineEvents } from '../hooks/use-sparkline-events'
 import { errorTrackingIssueSceneLogic } from '../scenes/ErrorTrackingIssueScene/errorTrackingIssueSceneLogic'
 import { cancelEvent } from '../utils'
 import { TimeBoundary } from './TimeBoundary'
-import type { SparklineDatum, SparklineEvent, VolumeSparklineHoverPanel } from './VolumeSparkline/types'
-import { useVolumeSparklineHoverValues } from './VolumeSparkline/useVolumeSparklineHoverValues'
+import { errorTrackingVolumeSparklineLogic } from './VolumeSparkline/errorTrackingVolumeSparklineLogic'
+import type { SparklineDatum, SparklineEvent, VolumeSparklineHoverSelection } from './VolumeSparkline/types'
 import { VolumeSparkline } from './VolumeSparkline/VolumeSparkline'
 
 export const Metadata = ({ children, className }: PropsWithChildren<{ className?: string }>): JSX.Element => {
     const { aggregations, summaryLoading, issueLoading, firstSeen, lastSeen, issueId } =
         useValues(errorTrackingIssueSceneLogic)
     const sparklineKey = issueId || 'issue-unknown'
-    const { hoverPanel } = useVolumeSparklineHoverValues(sparklineKey)
+    const { hoverSelection } = useValues(errorTrackingVolumeSparklineLogic({ sparklineKey }))
     const sparklineData = useSparklineDataIssueScene()
     const sparklineEvents = useSparklineEvents()
 
@@ -31,17 +31,17 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
         <div className={className}>
             <div className="flex justify-between items-center h-[40px] px-2 shrink-0">
                 <div className="flex justify-end items-center h-full">
-                    {match(hoverPanel)
+                    {match(hoverSelection)
                         .when(
                             (data) => shouldRenderIssueMetrics(data),
                             () => <IssueMetrics aggregations={aggregations} summaryLoading={summaryLoading} />
                         )
-                        .with({ type: 'datum' }, (data) => renderDataPoint(data.data))
-                        .with({ type: 'event' }, (data) => renderEventPoint(data.data))
+                        .with({ kind: 'bin' }, (data) => renderDataPoint(data.datum))
+                        .with({ kind: 'event' }, (data) => renderEventPoint(data.event))
                         .otherwise(() => null)}
                 </div>
                 <div className="flex justify-end items-center h-full">
-                    {match(hoverPanel)
+                    {match(hoverSelection)
                         .when(
                             (data) => shouldRenderIssueMetrics(data),
                             () => (
@@ -68,8 +68,8 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
                                 </>
                             )
                         )
-                        .with({ type: 'datum' }, (data) => renderDate(data.data.date))
-                        .with({ type: 'event' }, (data) => renderDate(data.data.date))
+                        .with({ kind: 'bin' }, (data) => renderDate(data.datum.date))
+                        .with({ kind: 'event' }, (data) => renderDate(data.event.date))
                         .otherwise(() => null)}
                 </div>
             </div>
@@ -90,11 +90,11 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
     )
 }
 
-function shouldRenderIssueMetrics(data: VolumeSparklineHoverPanel): boolean {
+function shouldRenderIssueMetrics(data: VolumeSparklineHoverSelection | null): boolean {
     if (data == null) {
         return true
     }
-    if (data.type == 'datum' && data.data.value == 0) {
+    if (data.kind === 'bin' && data.datum.value == 0) {
         return true
     }
     return false

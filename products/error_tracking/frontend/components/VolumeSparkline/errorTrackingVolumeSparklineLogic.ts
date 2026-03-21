@@ -1,6 +1,6 @@
 import { actions, kea, key, path, props, reducers, selectors } from 'kea'
 
-import type { SparklineDatum, SparklineEvent, VolumeSparklineHoverPanel, VolumeSparklineHoverSelection } from './types'
+import type { SparklineDatum, SparklineEvent, VolumeSparklineHoverSelection } from './types'
 
 export interface ErrorTrackingVolumeSparklineLogicProps {
     sparklineKey: string
@@ -28,8 +28,7 @@ export const errorTrackingVolumeSparklineLogic = kea([
     }),
 
     reducers({
-        /** Bin or event hover; name kept for Kea selector typing (`[s.hoveredBin]`). */
-        hoveredBin: [
+        hoverSelection: [
             null as VolumeSparklineHoverSelection | null,
             {
                 setHoveredBin: (_, { payload }): VolumeSparklineHoverSelection | null =>
@@ -42,31 +41,17 @@ export const errorTrackingVolumeSparklineLogic = kea([
 
     selectors({
         hoveredIndex: [
-            (s) => [s.hoveredBin],
+            (s) => [s.hoverSelection],
             (sel: VolumeSparklineHoverSelection | null): number | null => (sel?.kind === 'bin' ? sel.index : null),
         ],
         hoveredDatum: [
-            (s) => [s.hoveredBin],
+            (s) => [s.hoverSelection],
             (sel: VolumeSparklineHoverSelection | null): SparklineDatum | null =>
                 sel?.kind === 'bin' ? sel.datum : null,
         ],
         isBarHighlighted: [
-            (s) => [s.hoveredBin],
+            (s) => [s.hoverSelection],
             (sel: VolumeSparklineHoverSelection | null): boolean => sel?.kind === 'bin',
-        ],
-        hoverPanel: [
-            (s) => [s.hoveredBin],
-            (sel: VolumeSparklineHoverSelection | null): VolumeSparklineHoverPanel => hoverSelectionToPanel(sel),
         ],
     }),
 ])
-
-function hoverSelectionToPanel(sel: VolumeSparklineHoverSelection | null): VolumeSparklineHoverPanel {
-    if (sel == null) {
-        return null
-    }
-    if (sel.kind === 'bin') {
-        return { type: 'datum', data: sel.datum }
-    }
-    return { type: 'event', data: sel.event }
-}
