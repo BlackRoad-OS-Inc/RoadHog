@@ -98,9 +98,9 @@ export const maxGlobalLogic = kea<maxGlobalLogicType>([
         dismissDataProcessing: true,
     }),
 
-    loaders(({ values }) => ({
+    loaders(() => ({
         conversationHistory: [
-            [] as ConversationDetail[],
+            [] as Conversation[],
             {
                 loadConversationHistory: async (
                     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Used for conversation restoration
@@ -112,19 +112,13 @@ export const maxGlobalLogic = kea<maxGlobalLogicType>([
                     const response = await api.conversations.basicList()
                     return response.results
                 },
-
+            },
+        ],
+        activeConversation: [
+            null as ConversationDetail | null,
+            {
                 loadConversation: async (conversationId: string) => {
-                    const response = await api.conversations.get(conversationId)
-                    const itemIndex = values.conversationHistory.findIndex((c) => c.id === conversationId)
-
-                    if (itemIndex !== -1) {
-                        return [
-                            ...values.conversationHistory.slice(0, itemIndex),
-                            response,
-                            ...values.conversationHistory.slice(itemIndex + 1),
-                        ]
-                    }
-                    return [response, ...values.conversationHistory]
+                    return await api.conversations.get(conversationId)
                 },
             },
         ],

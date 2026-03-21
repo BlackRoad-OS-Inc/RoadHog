@@ -168,7 +168,7 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
                 'loadConversationHistorySuccess',
             ],
             maxGlobalLogic,
-            ['loadConversation'],
+            ['loadConversation', 'loadActiveConversationSuccess'],
         ],
     })),
 
@@ -1137,14 +1137,8 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
         },
 
         loadConversationHistorySuccess: ({ conversationHistory, payload }) => {
-            // payload is an object with doNotUpdateCurrentThread for loadConversationHistory,
-            // but it's a string (conversationId) for loadConversation
             const doNotUpdate = typeof payload === 'object' && payload?.doNotUpdateCurrentThread
             if (doNotUpdate || values.autoRun || values.streamingActive) {
-                return
-            }
-            // Don't auto-reconnect if there's a pending form
-            if (values.multiQuestionFormPending) {
                 return
             }
             const conversation = conversationHistory.find((c) => c.id === values.conversationId)
@@ -1152,10 +1146,26 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
                 return
             }
 
-            // Sync conversation data
             actions.setConversation(conversation)
 
             if (conversation.status === ConversationStatus.InProgress) {
+                setTimeout(() => {
+                    actions.reconnectToStream()
+                }, 0)
+            }
+        },
+
+        loadActiveConversationSuccess: ({ activeConversation }) => {
+            if (values.autoRun || values.streamingActive || values.multiQuestionFormPending) {
+                return
+            }
+            if (!activeConversation || activeConversation.id !== values.conversationId) {
+                return
+            }
+
+            actions.setConversation(activeConversation)
+
+            if (activeConversation.status === ConversationStatus.InProgress) {
                 setTimeout(() => {
                     actions.reconnectToStream()
                 }, 0)

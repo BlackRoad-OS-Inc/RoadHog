@@ -134,6 +134,7 @@ export const maxLogic = kea<maxLogicType>([
                 'toolSuggestions',
                 'conversationHistory',
                 'conversationHistoryLoading',
+                'activeConversation',
             ],
             maxSettingsLogic,
             ['coreMemory'],
@@ -145,7 +146,12 @@ export const maxLogic = kea<maxLogicType>([
             maxContextLogic,
             ['resetContext'],
             maxGlobalLogic,
-            ['loadConversationHistory', 'prependOrReplaceConversation', 'loadConversationHistorySuccess'],
+            [
+                'loadConversationHistory',
+                'loadConversation',
+                'prependOrReplaceConversation',
+                'loadConversationHistorySuccess',
+            ],
         ],
     })),
 
@@ -257,12 +263,15 @@ export const maxLogic = kea<maxLogicType>([
             (cb: ((filters: RecordingUniversalFilters) => void) | null) => cb,
         ],
         conversation: [
-            (s) => [s.conversationHistory, s.conversationId],
-            (conversationHistory, conversationId) => {
-                if (conversationId) {
-                    return conversationHistory.find((c) => c.id === conversationId) ?? null
+            (s) => [s.activeConversation, s.conversationHistory, s.conversationId],
+            (activeConversation, conversationHistory, conversationId): ConversationDetail | Conversation | null => {
+                if (!conversationId) {
+                    return null
                 }
-                return null
+                if (activeConversation?.id === conversationId) {
+                    return activeConversation
+                }
+                return conversationHistory.find((c) => c.id === conversationId) ?? null
             },
         ],
 
@@ -876,38 +885,27 @@ export const RESEARCH_SUGGESTIONS_DATA: readonly SuggestionGroup[] = [
 /**
  * Merges a new conversation into the conversation history.
  */
+function toBasicConversation(conversation: Conversation | ConversationDetail): Conversation {
+    if ('messages' in conversation) {
+        const { messages, ...basic } = conversation
+        return basic
+    }
+    return conversation
+}
+
 export function mergeConversationHistory(
-    state: ConversationDetail[],
+    state: Conversation[],
     newConversation: ConversationDetail | Conversation
-): ConversationDetail[] {
-    const index = state.findIndex((c) => c.id === newConversation.id)
+): Conversation[] {
+    const basic = toBasicConversation(newConversation)
+    const index = state.findIndex((c) => c.id === basic.id)
     if (index !== -1) {
-        return [...state.slice(0, index), mergeConversations(newConversation, state[index]), ...state.slice(index + 1)]
+        return [...state.slice(0, index), { ...state[index], ...basic }, ...state.slice(index + 1)]
     }
 
-    // Insert and make sure it's sorted by date
-    return [mergeConversations(newConversation), ...state].sort((a, b) => {
+    return [basic, ...state].sort((a, b) => {
         const dateA = a.updated_at ? dayjs(a.updated_at).valueOf() : 0
         const dateB = b.updated_at ? dayjs(b.updated_at).valueOf() : 0
         return dateB - dateA
     })
-}
-
-/**
- * Stream returns a `Conversation` object, which doesn't have a `messages` property.
- * However, when we load the conversation history, we get `ConversationDetail` objects.
- * This function merges the two types so that we can use the same logic for both.
- */
-export function mergeConversations(
-    newObj: Conversation | ConversationDetail,
-    oldObj?: ConversationDetail
-): ConversationDetail {
-    if ('messages' in newObj) {
-        return newObj
-    }
-
-    return {
-        ...newObj,
-        messages: oldObj?.messages ?? [],
-    }
 }
