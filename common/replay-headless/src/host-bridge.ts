@@ -1,6 +1,6 @@
 import type { RecordingSegment } from '@posthog/replay-shared'
 
-import { PLAYER_EMIT_FN, PLAYER_INIT_EVENT, PLAYER_START_EVENT } from './protocol'
+import { PLAYER_CONFIG_KEY, PLAYER_EMIT_FN, PLAYER_START_EVENT } from './protocol'
 import type { PlayerConfig, PlayerError, PlayerMessage } from './protocol'
 
 /**
@@ -50,32 +50,22 @@ export class HostBridge {
         this.emit({ type: 'inactivity_periods', periods })
     }
 
-    // --- Events ---
+    // --- Config ---
 
     /**
-     * Signal to the rasterizer that the player is ready to receive config.
-     * The rasterizer responds by dispatching a CustomEvent with the config
-     * as its detail payload.
+     * Read config injected by the rasterizer via evaluateOnNewDocument.
+     * The config is set as a window global before page load, so it's
+     * always available by the time this runs.
      */
-    async waitForConfig(timeoutMs = 30000): Promise<PlayerConfig> {
-        const configPromise = new Promise<PlayerConfig>((resolve, reject) => {
-            const timer = setTimeout(
-                () => reject(new Error(`${PLAYER_INIT_EVENT} not received within ${timeoutMs / 1000}s`)),
-                timeoutMs
-            )
-            window.addEventListener(
-                PLAYER_INIT_EVENT,
-                ((event: CustomEvent<PlayerConfig>) => {
-                    clearTimeout(timer)
-                    resolve(event.detail)
-                }) as EventListener,
-                { once: true }
-            )
-        })
-
-        this.emit({ type: 'ready' })
-        return configPromise
+    getConfig(): PlayerConfig {
+        const config = window[PLAYER_CONFIG_KEY]
+        if (!config) {
+            throw new Error('Player config not found — was it injected via evaluateOnNewDocument?')
+        }
+        return config
     }
+
+    // --- Events ---
 
     async waitForStart(timeoutMs = 30000): Promise<void> {
         await new Promise<void>((resolve, reject) => {

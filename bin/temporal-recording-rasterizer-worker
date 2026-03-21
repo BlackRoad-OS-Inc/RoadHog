@@ -86,7 +86,7 @@ docker run --rm \
     -e AWS_ACCESS_KEY_ID=object_storage_root_user \
     -e AWS_SECRET_ACCESS_KEY=object_storage_root_password \
     -e DISABLE_BROWSER_SECURITY="${DISABLE_BROWSER_SECURITY:-1}" \
-    -e MAX_CONCURRENT_ACTIVITIES="${MAX_CONCURRENT_ACTIVITIES:-2}" \
+    -e MAX_CONCURRENT_ACTIVITIES="${MAX_CONCURRENT_ACTIVITIES:-8}" \
     -e CAPTURE_BROWSER_LOGS="${CAPTURE_BROWSER_LOGS:-0}" \
     -e LOG_LEVEL="${LOG_LEVEL:-info}" \
     -e CHROME_HOST_RESOLVER_RULES="MAP localhost host.docker.internal" \

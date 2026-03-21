@@ -58,7 +58,8 @@ export async function capturePlayback(
     player: PlayerController,
     captureConfig: CaptureConfig,
     outputPath: string,
-    log: Logger = createLogger()
+    log: Logger = createLogger(),
+    onProgress?: () => void
 ): Promise<Pick<RecordingResult, 'capture_duration_s' | 'inactivity_periods' | 'timings'>> {
     const captureStart = process.hrtime()
     let frameCount = 0
@@ -80,18 +81,19 @@ export async function capturePlayback(
         ffmpeg: process.env.FFMPEG_PATH || undefined,
     })
 
-    const logInterval = Math.max(10, captureConfig.captureFps)
+    const progressInterval = Math.max(10, captureConfig.captureFps)
     recorder.on('frameCaptured', () => {
         frameCount++
-        if (frameCount % logInterval === 0) {
+        if (frameCount % progressInterval === 0) {
             log.info(
                 {
                     frame: frameCount,
                     virtual_s: +(frameCount / captureConfig.captureFps).toFixed(1),
                     wall_s: +elapsed(captureStart).toFixed(1),
                 },
-                'frame captured'
+                'capture progress'
             )
+            onProgress?.()
         }
     })
 

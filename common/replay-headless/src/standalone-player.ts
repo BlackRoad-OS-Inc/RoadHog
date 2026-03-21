@@ -48,12 +48,9 @@ async function init(config: PlayerConfig, bridge: HostBridge): Promise<void> {
 }
 
 const bridge = new HostBridge()
-bridge
-    .waitForConfig()
-    .then((config) => {
-        return init(config, bridge)
-    })
-    .catch((err) => {
+try {
+    const config = bridge.getConfig()
+    init(config, bridge).catch((err) => {
         const message = err instanceof Error ? err.message : String(err)
         const retryable = err instanceof DataLoadError ? err.retryable : true
         const code = err instanceof DataLoadError ? 'DATA_LOAD_FAILED' : 'INIT_FAILED'
@@ -61,3 +58,9 @@ bridge
         bridge.setError({ code, message, retryable })
         bridge.signalEnded()
     })
+} catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[headless-player] Fatal error:', message)
+    bridge.setError({ code: 'INIT_FAILED', message, retryable: true })
+    bridge.signalEnded()
+}

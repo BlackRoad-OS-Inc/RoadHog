@@ -1,6 +1,6 @@
 import { Page } from 'puppeteer'
 
-import { PLAYER_EMIT_FN, PLAYER_INIT_EVENT, PLAYER_START_EVENT } from '@posthog/replay-headless/protocol'
+import { PLAYER_CONFIG_KEY, PLAYER_EMIT_FN, PLAYER_START_EVENT } from '@posthog/replay-headless/protocol'
 import type { InactivityPeriod, PlayerConfig, PlayerMessage } from '@posthog/replay-headless/protocol'
 
 import { config as defaultConfig } from './config'
@@ -45,11 +45,6 @@ export class PlayerController {
         inactivityPeriods: [] as InactivityPeriod[],
     }
 
-    // Resolved by handleMessage when the corresponding state transition occurs.
-    // readyPromise is created eagerly so 'ready' messages arriving between
-    // load() and waitForStart() are not lost.
-    private readyResolve: (() => void) | null = null
-    private readyPromise: Promise<void>
     private startedResolve: (() => void) | null = null
     private errorReject: ((err: RasterizationError) => void) | null = null
     private playbackError: RasterizationError | null = null
@@ -58,11 +53,7 @@ export class PlayerController {
     constructor(
         private page: Page,
         private log: Logger = createLogger()
-    ) {
-        this.readyPromise = new Promise<void>((resolve) => {
-            this.readyResolve = resolve
-        })
-    }
+    ) {}
 
     private toError(err: { code: string; message: string; retryable: boolean }): RasterizationError {
         return new RasterizationError(`[${err.code}] ${err.message}`, err.retryable)
@@ -81,10 +72,6 @@ export class PlayerController {
 
     private handleMessage(msg: PlayerMessage): void {
         switch (msg.type) {
-            case 'ready':
-                this.readyResolve?.()
-                this.readyResolve = null
-                break
             case 'loading_progress':
                 this.resetStaleTimer?.()
                 this.log.info({ loaded: msg.loaded, total: msg.total }, 'loading blocks')
@@ -154,12 +141,22 @@ export class PlayerController {
         })
     }
 
-    async load(html: string, siteUrl: string): Promise<void> {
+    async load(html: string, siteUrl: string, playerConfig: PlayerConfig): Promise<void> {
         const playerUrl = `${siteUrl}/player`
 
         await this.page.exposeFunction(PLAYER_EMIT_FN, (msg: PlayerMessage) => {
             this.handleMessage(msg)
         })
+
+        // Inject config as a window global before the page loads — the
+        // browser-side HostBridge reads it synchronously on startup.
+        await this.page.evaluateOnNewDocument(
+            (key, config) => {
+                ;(window as any)[key] = config
+            },
+            PLAYER_CONFIG_KEY,
+            playerConfig
+        )
 
         await this.page.setRequestInterception(true)
         this.page.on('request', (request) => {
@@ -180,28 +177,13 @@ export class PlayerController {
     }
 
     /**
-     * Wait for the player to load and signal readiness, send it the config,
-     * then wait for it to finish loading recording data and signal started.
+     * Wait for the player to finish loading recording data and signal started.
      *
-     * Flow: player sends 'ready' → rasterizer dispatches config via
-     * CustomEvent → player loads data (sending progress messages) →
-     * player sends 'started'.
+     * The player reads its config synchronously from a window global
+     * (injected by {@link load} via evaluateOnNewDocument), so there's
+     * no config handshake — we just wait for the 'started' message.
      */
     async waitForStart(playerConfig: PlayerConfig, staleMs = 30000): Promise<void> {
-        await this.awaitWithTimeout(
-            this.readyPromise,
-            staleMs,
-            `Player did not become ready for session ${playerConfig.sessionId} (waited ${staleMs / 1000}s)`
-        )
-
-        await this.page.evaluate(
-            (evt, config) => {
-                window.dispatchEvent(new CustomEvent(evt, { detail: config }))
-            },
-            PLAYER_INIT_EVENT,
-            playerConfig
-        )
-
         const startedPromise = new Promise<void>((resolve) => {
             this.startedResolve = resolve
         })

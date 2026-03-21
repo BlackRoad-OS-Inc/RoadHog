@@ -90,7 +90,8 @@ export async function rasterizeRecording(
     input: RasterizeRecordingInput,
     outputPath: string,
     cfg: typeof defaultConfig = defaultConfig,
-    log: Logger = createLogger({ session_id: input.session_id, team_id: input.team_id })
+    log: Logger = createLogger({ session_id: input.session_id, team_id: input.team_id }),
+    onProgress?: () => void
 ): Promise<RecordingResult> {
     validateInput(input)
 
@@ -110,15 +111,16 @@ export async function rasterizeRecording(
         const playerConfig = buildPlayerConfig(input, captureConfig.playbackSpeed, cfg)
 
         log.info('loading player')
-        await player.load(baseHtml, cfg.siteUrl)
+        await player.load(baseHtml, cfg.siteUrl, playerConfig)
         log.info('player loaded, waiting for recording data')
 
         await player.waitForStart(playerConfig)
         log.info('recording started')
+        onProgress?.()
 
         const setupS = elapsed(setupStart)
 
-        const captureResult = await capturePlayback(page, player, captureConfig, outputPath, log)
+        const captureResult = await capturePlayback(page, player, captureConfig, outputPath, log, onProgress)
 
         return {
             video_path: outputPath,

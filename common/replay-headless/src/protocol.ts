@@ -4,7 +4,8 @@
  *
  * The player runs inside a Puppeteer-controlled browser and communicates
  * with the rasterizer via:
- *   - DOM events with config payload (rasterizer → player)
+ *   - A window global for config (rasterizer → player, injected before page load)
+ *   - A DOM event to start playback (rasterizer → player)
  *   - An exposed function callback (player → rasterizer)
  *
  * This module defines the types, event names, and Window augmentation
@@ -48,7 +49,6 @@ export interface InactivityPeriod {
 // --- Player → rasterizer messages ---
 
 export type PlayerMessage =
-    | { type: 'ready' }
     | { type: 'loading_progress'; loaded: number; total: number }
     | { type: 'started' }
     | { type: 'ended' }
@@ -56,16 +56,18 @@ export type PlayerMessage =
     | { type: 'inactivity_periods'; periods: InactivityPeriod[] }
 
 export const PLAYER_EMIT_FN = '__posthog_player_emit__'
+export const PLAYER_CONFIG_KEY = '__posthog_player_config__'
 
 // --- Event names (rasterizer → player) ---
 
-export const PLAYER_INIT_EVENT = 'posthog-player-init'
 export const PLAYER_START_EVENT = 'posthog-player-start'
 
 // --- Window augmentation ---
 
 declare global {
     interface Window {
+        // Config injected by rasterizer via evaluateOnNewDocument before page load
+        [PLAYER_CONFIG_KEY]?: PlayerConfig
         // Player → rasterizer callback (installed by page.exposeFunction)
         [PLAYER_EMIT_FN]?: (msg: PlayerMessage) => Promise<void>
     }

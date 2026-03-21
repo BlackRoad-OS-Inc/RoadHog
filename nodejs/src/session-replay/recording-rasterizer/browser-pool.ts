@@ -15,113 +15,96 @@ const LAUNCH_ARGS = [
         : []),
 ]
 
+interface BrowserSlot {
+    browser: Browser
+    usageCount: number
+}
+
 export class BrowserPool {
-    private browser: Browser | null = null
-    private usageCount = 0
-    private pages = new Set<Page>()
-    private recycling: Promise<void> | null = null
+    private slots = new Map<Page, BrowserSlot>()
+    private idle: BrowserSlot[] = []
 
     constructor(private recycleAfter: number = config.browserRecycleAfter) {}
 
-    private launching: Promise<void> | null = null
+    private async launchBrowser(): Promise<BrowserSlot> {
+        const args = config.disableBrowserSecurity ? [...LAUNCH_ARGS, '--disable-web-security'] : LAUNCH_ARGS
+        const browser = await launchForCapture({
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+            args,
+        })
+        return { browser, usageCount: 0 }
+    }
+
+    private async closeBrowser(slot: BrowserSlot): Promise<void> {
+        try {
+            await slot.browser.close()
+        } catch {
+            // Ignore cleanup errors
+        }
+    }
 
     async launch(): Promise<void> {
-        if (this.browser) {
-            return
-        }
-        if (this.launching) {
-            return this.launching
-        }
-        this.launching = (async () => {
-            const args = config.disableBrowserSecurity ? [...LAUNCH_ARGS, '--disable-web-security'] : LAUNCH_ARGS
-            this.browser = await launchForCapture({
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-                args,
-            })
-            this.usageCount = 0
-        })()
-        try {
-            await this.launching
-        } finally {
-            this.launching = null
+        // Pre-warm one browser so the first getPage() is fast
+        if (this.idle.length === 0) {
+            this.idle.push(await this.launchBrowser())
         }
     }
 
     async getPage(): Promise<Page> {
-        if (this.recycling) {
-            await this.recycling
+        let slot: BrowserSlot
+        if (this.idle.length > 0) {
+            slot = this.idle.pop()!
+        } else {
+            slot = await this.launchBrowser()
         }
 
-        if (!this.browser) {
-            await this.launch()
-        }
-
-        const page = await this.browser!.newPage()
-        this.pages.add(page)
-        this.usageCount++
+        const page = await slot.browser.newPage()
+        slot.usageCount++
+        this.slots.set(page, slot)
         return page
     }
 
     async releasePage(page: Page): Promise<void> {
-        this.pages.delete(page)
+        const slot = this.slots.get(page)
+        this.slots.delete(page)
+
         try {
             await page.close()
         } catch {
             // Page may already be closed
         }
 
-        if (this.usageCount >= this.recycleAfter && this.pages.size === 0) {
-            try {
-                await this.recycle()
-            } catch (err) {
-                log.error({ error: err instanceof Error ? err.message : String(err) }, 'browser recycle failed')
-            }
+        if (!slot) {
+            return
+        }
+
+        if (slot.usageCount >= this.recycleAfter) {
+            log.info({ usage_count: slot.usageCount }, 'recycling browser')
+            await this.closeBrowser(slot)
+        } else {
+            this.idle.push(slot)
         }
     }
 
-    /** Close all tracked pages without shutting down the browser. */
     async releaseAllPages(): Promise<void> {
-        const pages = [...this.pages]
-        this.pages.clear()
-        await Promise.all(
-            pages.map((p) =>
-                p.close().catch(() => {
-                    /* already closed */
-                })
-            )
-        )
-    }
-
-    async recycle(): Promise<void> {
-        if (this.recycling) {
-            return this.recycling
-        }
-        this.recycling = this._doRecycle()
-        try {
-            await this.recycling
-        } finally {
-            this.recycling = null
-        }
-    }
-
-    private async _doRecycle(): Promise<void> {
-        await this.shutdown()
-        await this.launch()
+        const pages = [...this.slots.keys()]
+        await Promise.all(pages.map((p) => this.releasePage(p)))
     }
 
     async shutdown(): Promise<void> {
-        this.pages.clear()
-        if (this.browser) {
-            try {
-                await this.browser.close()
-            } catch {
-                // Ignore cleanup errors
-            }
-            this.browser = null
-        }
+        await this.releaseAllPages()
+        await Promise.all(this.idle.map((slot) => this.closeBrowser(slot)))
+        this.idle = []
     }
 
     get stats(): { usageCount: number; activePages: number } {
-        return { usageCount: this.usageCount, activePages: this.pages.size }
+        let totalUsage = 0
+        for (const slot of this.slots.values()) {
+            totalUsage += slot.usageCount
+        }
+        for (const slot of this.idle) {
+            totalUsage += slot.usageCount
+        }
+        return { usageCount: totalUsage, activePages: this.slots.size }
     }
 }

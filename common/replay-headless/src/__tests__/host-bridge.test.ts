@@ -1,7 +1,7 @@
 import type { RecordingSegment } from '@posthog/replay-shared'
 
 import { HostBridge } from '../host-bridge'
-import { PLAYER_EMIT_FN, PLAYER_INIT_EVENT } from '../protocol'
+import { PLAYER_CONFIG_KEY, PLAYER_EMIT_FN } from '../protocol'
 import type { PlayerConfig, PlayerMessage } from '../protocol'
 
 const makeSegment = (
@@ -78,24 +78,20 @@ describe('HostBridge', () => {
         })
     })
 
-    describe('waitForConfig', () => {
-        it('emits ready and resolves with config when init event fires', async () => {
-            const promise = bridge.waitForConfig()
-
-            expect(emitted).toEqual([{ type: 'ready' }])
-
+    describe('getConfig', () => {
+        it('returns config from window global', () => {
             const config = { sessionId: 'test', teamId: 1 } as PlayerConfig
-            window.dispatchEvent(new CustomEvent(PLAYER_INIT_EVENT, { detail: config }))
+            ;(window as any)[PLAYER_CONFIG_KEY] = config
 
-            await expect(promise).resolves.toEqual(config)
+            expect(bridge.getConfig()).toEqual(config)
+
+            delete (window as any)[PLAYER_CONFIG_KEY]
         })
 
-        it('rejects on timeout', async () => {
-            jest.useFakeTimers()
-            const promise = bridge.waitForConfig(100)
-            jest.advanceTimersByTime(100)
-            await expect(promise).rejects.toThrow('posthog-player-init not received within 0.1s')
-            jest.useRealTimers()
+        it('throws when config is not injected', () => {
+            expect(() => bridge.getConfig()).toThrow(
+                'Player config not found — was it injected via evaluateOnNewDocument?'
+            )
         })
     })
 
