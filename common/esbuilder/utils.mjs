@@ -4,6 +4,7 @@ import cors from 'cors'
 import cssnano from 'cssnano'
 import { analyzeMetafile, context } from 'esbuild'
 import { lessLoader } from 'esbuild-plugin-less'
+import { polyfillNode } from 'esbuild-plugin-polyfill-node'
 import { sassPlugin } from 'esbuild-sass-plugin'
 import express from 'express'
 import fse from 'fs-extra'
@@ -202,6 +203,63 @@ export const commonConfig = {
             },
         }),
         lessLoader({ javascriptEnabled: true }),
+        polyfillNode({
+            globals: {
+                buffer: false,
+                crypto: false,
+                process: true,
+            },
+            polyfills: {
+                _stream_duplex: false,
+                _stream_passthrough: false,
+                _stream_readable: false,
+                _stream_transform: false,
+                _stream_writable: false,
+                assert: false,
+                'assert/strict': false,
+                async_hooks: false,
+                buffer: false,
+                child_process: false,
+                cluster: false,
+                console: false,
+                constants: false,
+                crypto: false,
+                dgram: false,
+                diagnostics_channel: false,
+                dns: false,
+                domain: false,
+                events: false,
+                fs: false,
+                'fs/promises': false,
+                http: false,
+                http2: false,
+                https: false,
+                module: false,
+                net: false,
+                os: false,
+                path: false,
+                perf_hooks: false,
+                process: true,
+                punycode: false,
+                querystring: false,
+                readline: false,
+                repl: false,
+                stream: false,
+                string_decoder: false,
+                sys: false,
+                timers: false,
+                'timers/promises': false,
+                tls: false,
+                tty: false,
+                url: false,
+                util: false,
+                v8: false,
+                vm: false,
+                wasi: false,
+                worker_threads: false,
+                zlib: false,
+            },
+        }),
     ],
     alias: {
         buffer: 'buffer',
@@ -212,10 +270,6 @@ export const commonConfig = {
     define: {
         global: 'globalThis',
         'process.env.NODE_ENV': isDev ? '"development"' : '"production"',
-        'process.env': '{}',
-        'process.browser': 'true',
-        'process.version': '""',
-        'process.nextTick': '(cb => Promise.resolve().then(cb))',
     },
     loader: {
         '.ttf': 'file',
