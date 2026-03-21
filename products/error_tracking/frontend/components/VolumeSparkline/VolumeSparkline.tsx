@@ -114,7 +114,7 @@ export function VolumeSparkline({
 
     const paddingClass = match(layout)
         .with('compact', () => 'p-1')
-        .with('detailed', () => 'p-4')
+        .with('detailed', () => 'p-0')
         .exhaustive()
 
     return (

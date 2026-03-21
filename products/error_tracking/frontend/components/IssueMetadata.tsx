@@ -29,7 +29,7 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
 
     return (
         <div className={className}>
-            <div className="flex justify-between items-center h-[40px] px-2 shrink-0">
+            <div className="flex justify-between items-center h-[40px] px-4 shrink-0">
                 <div className="flex justify-end items-center h-full">
                     {match(hoverSelection)
                         .when(
@@ -73,17 +73,15 @@ export const Metadata = ({ children, className }: PropsWithChildren<{ className?
                         .otherwise(() => null)}
                 </div>
             </div>
-            <div onClick={cancelEvent} className="shrink-0 min-h-[200px] flex flex-col">
-                <div className="relative w-full flex-1 min-h-0 pt-4 pb-3">
-                    <VolumeSparkline
-                        data={sparklineData}
-                        layout="detailed"
-                        xAxis="full"
-                        events={sparklineEvents}
-                        sparklineKey={sparklineKey}
-                        className="!p-0 h-full min-h-[160px]"
-                    />
-                </div>
+            <div onClick={cancelEvent} className="relative w-full min-h-[160px] shrink-0 flex flex-col px-4">
+                <VolumeSparkline
+                    data={sparklineData}
+                    layout="detailed"
+                    xAxis="full"
+                    events={sparklineEvents}
+                    sparklineKey={sparklineKey}
+                    className="h-full min-h-[160px]"
+                />
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
         </div>

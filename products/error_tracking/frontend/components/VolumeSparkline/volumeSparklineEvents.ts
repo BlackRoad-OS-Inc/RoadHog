@@ -100,6 +100,12 @@ type MovingLabelNode = {
     vx: number
     vy: number
     radius: number
+    halfWidth: number
+}
+
+/** Minimum gap between chart left/right edge and pill bounds (px). */
+function chartLabelHorizontalMargin(options: VolumeSparklineEventLayoutOptions): number {
+    return Math.max(4, options.eventMinSpace)
 }
 
 /** Run collision + boundary forces on all labels so pills separate horizontally; keep baseline Y fixed. */
@@ -110,24 +116,43 @@ export function spreadSparklineEventPillLabels(
     contentWidth: number
 ): void {
     const labelNodes = svg.selectAll<SVGGElement, SparklineEvent<string>>(labelSelector).nodes()
-    if (labelNodes.length <= 1) {
+    if (labelNodes.length === 0) {
         return
     }
+
+    const margin = chartLabelHorizontalMargin(options)
 
     const movingNodes: MovingLabelNode[] = labelNodes.map((node) => {
         const bbox = node.getBBox()
         const center = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 }
+        const halfWidth = bbox.width / 2
         return {
             x: center.x,
             y: center.y,
             vx: 0,
             vy: 0,
-            radius: bbox.width / 2 + options.eventMinSpace,
+            halfWidth,
+            radius: halfWidth + options.eventMinSpace,
         }
     })
 
     const initialY = movingNodes.map((n) => n.y)
     const clonedNodes = movingNodes.map((n) => ({ ...n }))
+
+    if (labelNodes.length === 1) {
+        const node = movingNodes[0]
+        const minCenterX = margin + node.halfWidth
+        const maxCenterX = contentWidth - margin - node.halfWidth
+        let newX = node.x
+        if (minCenterX > maxCenterX) {
+            newX = contentWidth / 2
+        } else {
+            newX = Math.min(maxCenterX, Math.max(minCenterX, newX))
+        }
+        const deltaX = newX - node.x
+        d3.select(labelNodes[0]).attr('transform', `translate(${deltaX}, 0)`).attr('dx', deltaX).attr('dy', 0)
+        return
+    }
 
     const simulation = d3
         .forceSimulation(movingNodes)
@@ -136,7 +161,7 @@ export function spreadSparklineEventPillLabels(
             'collision',
             d3.forceCollide<MovingLabelNode>().radius((d) => d.radius)
         )
-        .force('boundaries', forceBoundaries(movingNodes, -10, contentWidth + 10))
+        .force('boundaries', forceHorizontalBoundaries(movingNodes, contentWidth, margin))
 
     simulation.stop()
     for (let i = 0; i < COLLISION_TICKS; i++) {
@@ -198,18 +223,19 @@ function buildEventLine(
         })
 }
 
-function forceBoundaries(
-    nodes: { x: number; y: number; vx: number; vy: number; radius: number }[],
-    minX: number,
-    maxX: number
-) {
+/** Keep pill centers so each pill's horizontal bounds stay inside [margin, contentWidth - margin]. */
+function forceHorizontalBoundaries(nodes: MovingLabelNode[], contentWidth: number, margin: number) {
     return () => {
         nodes.forEach((node) => {
             node.vy = 0
-            if (node.x + node.radius > maxX) {
-                node.vx += maxX - (node.x + node.radius)
-            } else if (node.x - node.radius < minX) {
-                node.vx += minX - (node.x - node.radius)
+            const minCenterX = margin + node.halfWidth
+            const maxCenterX = contentWidth - margin - node.halfWidth
+            if (minCenterX > maxCenterX) {
+                node.vx += contentWidth / 2 - node.x
+            } else if (node.x > maxCenterX) {
+                node.vx += maxCenterX - node.x
+            } else if (node.x < minCenterX) {
+                node.vx += minCenterX - node.x
             }
         })
     }
