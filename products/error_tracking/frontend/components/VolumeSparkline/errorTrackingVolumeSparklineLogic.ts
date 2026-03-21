@@ -1,12 +1,13 @@
 import { actions, kea, key, path, props, reducers, selectors } from 'kea'
 
+import type { errorTrackingVolumeSparklineLogicType } from './errorTrackingVolumeSparklineLogicType'
 import type { SparklineDatum, SparklineEvent, VolumeSparklineHoverSelection } from './types'
 
 export interface ErrorTrackingVolumeSparklineLogicProps {
     sparklineKey: string
 }
 
-export const errorTrackingVolumeSparklineLogic = kea([
+export const errorTrackingVolumeSparklineLogic = kea<errorTrackingVolumeSparklineLogicType>([
     path((key) => [
         'products',
         'error_tracking',
