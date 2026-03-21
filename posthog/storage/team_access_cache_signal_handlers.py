@@ -300,9 +300,6 @@ def user_saved(sender, instance: "User", created, **kwargs):
 
     Invalidation runs synchronously for immediate effect. If the sync attempt fails,
     an async Celery retry is scheduled as a safety net.
-
-    Note: Rust's in-memory negative cache (auth_negative_cache_ttl_seconds, default 5 min)
-    is per-pod and cannot be cleared from Python — only Redis keys are invalidated.
     """
     # Brand-new users have no cached tokens; nothing to invalidate.
     if created:

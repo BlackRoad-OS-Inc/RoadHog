@@ -356,12 +356,9 @@ pub async fn serve<F>(
     );
 
     // Auth token cache: read-through cache for secret + personal API key validation.
-    // Uses the flags Redis client for cache reads/writes and an in-memory negative cache
-    // to avoid repeated PG lookups for invalid tokens.
-    let auth_negative_cache = NegativeCache::new(
-        config.auth_negative_cache_capacity,
-        config.auth_negative_cache_ttl_seconds,
-    );
+    // Uses the flags Redis client for cache reads/writes. No in-memory negative cache —
+    // Python signal handlers invalidate Redis on scope/key changes, but cannot reach
+    // Rust's in-memory cache, which would cause stale denials.
     let auth_redis = dedicated_redis_client
         .clone()
         .unwrap_or_else(|| redis_client.clone());
@@ -372,7 +369,7 @@ pub async fn serve<F>(
             crate::api::auth::TOKEN_CACHE_PREFIX,
             config.auth_token_cache_ttl_seconds,
         ),
-        Some(Arc::new(auth_negative_cache)),
+        None,
     ));
     let auth_token_cache = Arc::new(common_cache::ReadThroughCacheWithMetrics::new(
         auth_token_inner,
@@ -380,11 +377,7 @@ pub async fn serve<F>(
         "token",
         &[],
     ));
-    tracing::info!(
-        negative_cache_capacity = config.auth_negative_cache_capacity,
-        negative_cache_ttl_seconds = config.auth_negative_cache_ttl_seconds,
-        "Created auth token read-through cache"
-    );
+    tracing::info!("Created auth token read-through cache (no negative cache)");
 
     if *config.skip_writes {
         tracing::warn!(
