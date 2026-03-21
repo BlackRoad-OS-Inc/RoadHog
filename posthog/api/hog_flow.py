@@ -105,7 +105,6 @@ class HogFlowActionSerializer(serializers.Serializer):
                     properties = filters.get("properties", None)
                     if properties is not None and not isinstance(properties, list):
                         raise serializers.ValidationError({"filters": {"properties": "Properties must be an array."}})
-
             else:
                 if not is_draft:
                     raise serializers.ValidationError({"config": "Invalid trigger type"})
@@ -210,42 +209,6 @@ class HogFlowScheduledRunSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
-
-
-def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
-    """
-    Manage the next pending HogFlowScheduledRun based on schedule_config.
-    Deletes any existing pending run and creates a new one if the workflow is active.
-    """
-    schedule_config = hog_flow.schedule_config
-
-    # Always clean up existing pending run
-    HogFlowScheduledRun.objects.filter(hog_flow=hog_flow, status=HogFlowScheduledRun.Status.PENDING).delete()
-
-    if not schedule_config or hog_flow.status != HogFlow.State.ACTIVE:
-        return
-
-    rrule_str = schedule_config.get("rrule")
-    starts_at_str = schedule_config.get("starts_at")
-    tz = schedule_config.get("timezone", "UTC")
-
-    if not rrule_str or not starts_at_str:
-        return
-
-    starts_at = isoparse(starts_at_str)
-    occurrences = compute_next_occurrences(
-        rrule_string=rrule_str,
-        starts_at=starts_at,
-        timezone_str=tz,
-        count=1,
-    )
-    if occurrences:
-        HogFlowScheduledRun.objects.create(
-            team_id=team_id,
-            hog_flow=hog_flow,
-            run_at=occurrences[0],
-            status=HogFlowScheduledRun.Status.PENDING,
-        )
 
 
 class HogFlowMinimalSerializer(serializers.ModelSerializer):
@@ -364,39 +327,33 @@ class HogFlowSerializer(HogFlowMinimalSerializer):
             if "bytecode" not in data["conversion"]:
                 data["conversion"]["bytecode"] = []
 
-        # Validate schedule_config if present
+        # Validate schedule_config if present and not a draft
         schedule_config = data.get("schedule_config")
-        if schedule_config:
-            is_draft = self.context.get("is_draft")
-            if not is_draft:
-                rrule_str = schedule_config.get("rrule")
-                if not rrule_str:
-                    raise serializers.ValidationError({"schedule_config": {"rrule": "RRULE string is required."}})
-                try:
-                    validate_rrule(rrule_str)
-                except (ValueError, TypeError) as e:
-                    logger.warning("Invalid RRULE encountered during validation", rrule=rrule_str, error=str(e))
-                    raise serializers.ValidationError({"schedule_config": {"rrule": "Invalid RRULE."}})
+        if schedule_config and not self.context.get("is_draft"):
+            rrule_str = schedule_config.get("rrule")
+            if not rrule_str:
+                raise serializers.ValidationError({"schedule_config": {"rrule": "RRULE string is required."}})
 
-                from dateutil.rrule import (
-                    HOURLY,
-                    MINUTELY,
-                    SECONDLY,
-                    rrulestr as rrulestr_parse,
+            try:
+                validate_rrule(rrule_str)
+            except (ValueError, TypeError) as e:
+                logger.warning("Invalid RRULE encountered during validation", rrule=rrule_str, error=str(e))
+                raise serializers.ValidationError({"schedule_config": {"rrule": "Invalid RRULE."}})
+
+            if not schedule_config.get("starts_at"):
+                raise serializers.ValidationError({"schedule_config": {"starts_at": "Start date is required."}})
+
+            # Enforce minimum interval of 1 hour by checking actual occurrences
+            from datetime import timedelta
+
+            starts_at = isoparse(schedule_config["starts_at"])
+            sample = compute_next_occurrences(
+                rrule_str, starts_at, timezone_str=schedule_config.get("timezone", "UTC"), count=2
+            )
+            if len(sample) == 2 and (sample[1] - sample[0]) < timedelta(hours=1):
+                raise serializers.ValidationError(
+                    {"schedule_config": {"rrule": "Schedules must run at most once per hour."}}
                 )
-
-                parsed_rule = rrulestr_parse(rrule_str)
-                if parsed_rule._freq in (MINUTELY, SECONDLY):
-                    raise serializers.ValidationError(
-                        {"schedule_config": {"rrule": "Batch schedules must run at most once per hour."}}
-                    )
-                if parsed_rule._freq == HOURLY and (parsed_rule._interval or 1) < 1:
-                    raise serializers.ValidationError(
-                        {"schedule_config": {"rrule": "Batch schedules must run at most once per hour."}}
-                    )
-
-                if not schedule_config.get("starts_at"):
-                    raise serializers.ValidationError({"schedule_config": {"starts_at": "Start date is required."}})
 
         return data
 
