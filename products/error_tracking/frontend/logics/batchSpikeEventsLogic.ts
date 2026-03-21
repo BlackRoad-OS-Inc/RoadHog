@@ -37,6 +37,7 @@ export const batchSpikeEventsLogic = kea<batchSpikeEventsLogicType>([
         spikeEventsByIssueId: [
             {} as Record<string, ErrorTrackingSpikeEvent[]>,
             {
+                loadSpikeEventsForIssues: () => ({}),
                 loadSpikeEventsForIssuesSuccess: (_, { rawSpikeEvents }) => {
                     const grouped: Record<string, ErrorTrackingSpikeEvent[]> = {}
                     for (const event of rawSpikeEvents) {
