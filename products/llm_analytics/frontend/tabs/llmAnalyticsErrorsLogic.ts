@@ -139,6 +139,10 @@ export const llmAnalyticsErrorsLogic = kea<llmAnalyticsErrorsLogicType>([
                         },
                         {
                             kind: NodeKind.EventsNode,
+                            event: '$ai_trace',
+                        },
+                        {
+                            kind: NodeKind.EventsNode,
                             event: '$ai_embedding',
                         },
                     ],
@@ -177,6 +181,10 @@ export const llmAnalyticsErrorsLogic = kea<llmAnalyticsErrorsLogicType>([
                         {
                             kind: NodeKind.EventsNode,
                             event: '$ai_span',
+                        },
+                        {
+                            kind: NodeKind.EventsNode,
+                            event: '$ai_trace',
                         },
                         {
                             kind: NodeKind.EventsNode,
