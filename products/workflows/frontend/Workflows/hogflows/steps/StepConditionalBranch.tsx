@@ -23,17 +23,16 @@ export function StepConditionalBranchConfiguration({
     const action = node.data
     const { conditions } = action.config
 
-    const { edgesByActionId, selectedNodeCanBeDeleted } = useValues(hogFlowEditorLogic)
+    const { edgesByActionId } = useValues(hogFlowEditorLogic)
     const { setWorkflowAction, setWorkflowActionEdges } = useActions(hogFlowEditorLogic)
 
     const nodeEdges = edgesByActionId[action.id] ?? []
 
+    const continueEdge = nodeEdges.find((edge) => edge.type === 'continue' && edge.from === action.id)
+
     const setConditions = (
         conditions: Extract<HogFlowAction, { type: 'conditional_branch' }>['config']['conditions']
     ): void => {
-        // TODO: Find all related edges. We can only delete those that are the same as the continue edge.
-        // All others should be disabled for deletion until the subbranch is removed
-
         // For condition modifiers we need to setup the branches as well
         setWorkflowAction(action.id, {
             ...action,
@@ -97,7 +96,11 @@ export function StepConditionalBranchConfiguration({
                             size="xsmall"
                             icon={<IconX />}
                             onClick={() => removeCondition(index)}
-                            disabledReason={selectedNodeCanBeDeleted ? undefined : 'Clean up branching steps first'}
+                            disabledReason={
+                                branchEdges[index]?.to === continueEdge?.to
+                                    ? undefined
+                                    : 'Remove steps on this branch first'
+                            }
                         />
                     </div>
 
