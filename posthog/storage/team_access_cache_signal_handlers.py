@@ -383,4 +383,11 @@ def clear_project_secret_api_key_cache_on_delete(sender: type["Team"], instance:
 
     from posthog.storage.team_access_cache import token_auth_cache
 
-    transaction.on_commit(lambda: token_auth_cache.invalidate_tokens(secure_values))
+    def _invalidate_tokens_on_commit() -> None:
+        try:
+            token_auth_cache.invalidate_tokens(secure_values)
+        except Exception as e:
+            capture_exception(e)
+            logger.exception("Error invalidating PSAK cache on team delete", team_id=instance.pk)
+
+    transaction.on_commit(_invalidate_tokens_on_commit)
