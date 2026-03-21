@@ -397,6 +397,9 @@ export function ReplayDataRetentionSettings(): JSX.Element {
     }
 
     const handleRetentionChange = (retention_period: SessionRecordingRetentionPeriod): void => {
+        if (retention_period === currentRetention) {
+            return
+        }
         const label = renderOptions(false).find((o) => o.value === retention_period)?.label ?? retention_period
         LemonDialog.open({
             title: 'Change recording retention period?',
