@@ -102,7 +102,7 @@ const FAILURE_MESSAGE: FailureMessage & ThreadMessage = {
 export interface MaxThreadLogicProps {
     tabId: string // used to refer back to MaxLogic
     conversationId: string
-    conversation?: ConversationDetail | null
+    conversation?: Conversation | ConversationDetail | null
 }
 
 export const maxThreadLogic = kea<maxThreadLogicType>([
@@ -123,9 +123,11 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
             return
         }
 
+        const messages = 'messages' in props.conversation ? props.conversation.messages : undefined
+
         // New messages have been added since we last updated the thread
-        if (!values.streamingActive && props.conversation.messages.length > values.threadMessageCount) {
-            actions.setThread(updateMessagesWithCompletedStatus(props.conversation.messages))
+        if (!values.streamingActive && messages && messages.length > values.threadMessageCount) {
+            actions.setThread(updateMessagesWithCompletedStatus(messages))
         }
 
         // Check if the meta fields like the `status` field have changed
@@ -2061,7 +2063,11 @@ function parseResponse<T>(response: string): T | null | undefined {
     }
 }
 
-function removeConversationMessages({ messages, ...conversation }: ConversationDetail): Conversation {
+function removeConversationMessages(conversation: Conversation | ConversationDetail): Conversation {
+    if ('messages' in conversation) {
+        const { messages, ...rest } = conversation
+        return rest
+    }
     return conversation
 }
 

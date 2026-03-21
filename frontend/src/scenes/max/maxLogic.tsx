@@ -476,6 +476,10 @@ export const maxLogic = kea<maxLogicType>([
             const conversation = values.conversationHistory.find((c) => c.id === conversationId)
 
             if (conversation) {
+                // Hydrate with full details (messages) if we only have the basic version
+                if (!('messages' in conversation)) {
+                    actions.loadConversation(conversationId)
+                }
                 actions.scrollThreadToBottom('instant')
             } else if (!values.conversationHistoryLoading) {
                 actions.pollConversation(conversationId, 0, 200)
@@ -874,9 +878,9 @@ export const RESEARCH_SUGGESTIONS_DATA: readonly SuggestionGroup[] = [
  * Merges a new conversation into the conversation history.
  */
 export function mergeConversationHistory(
-    state: ConversationDetail[],
+    state: (Conversation | ConversationDetail)[],
     newConversation: ConversationDetail | Conversation
-): ConversationDetail[] {
+): (Conversation | ConversationDetail)[] {
     const index = state.findIndex((c) => c.id === newConversation.id)
     if (index !== -1) {
         return [...state.slice(0, index), mergeConversations(newConversation, state[index]), ...state.slice(index + 1)]
@@ -897,14 +901,18 @@ export function mergeConversationHistory(
  */
 export function mergeConversations(
     newObj: Conversation | ConversationDetail,
-    oldObj?: ConversationDetail
-): ConversationDetail {
+    oldObj?: Conversation | ConversationDetail
+): Conversation | ConversationDetail {
     if ('messages' in newObj) {
         return newObj
     }
 
-    return {
-        ...newObj,
-        messages: oldObj?.messages ?? [],
+    if (oldObj && 'messages' in oldObj) {
+        return {
+            ...newObj,
+            messages: oldObj.messages,
+        }
     }
+
+    return newObj
 }

@@ -542,6 +542,35 @@ class TestConversation(APIBaseTest):
             self.assertEqual(results[0]["id"], str(own_conversation.id))
             self.assertEqual(results[0]["title"], "My conversation")
 
+    def test_list_basic_view_excludes_messages(self):
+        Conversation.objects.create(
+            user=self.user, team=self.team, title="Conversation 1", type=Conversation.Type.ASSISTANT
+        )
+
+        response = self.client.get(f"/api/environments/{self.team.id}/conversations/?view=basic")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertNotIn("messages", results[0])
+        self.assertIn("title", results[0])
+        self.assertIn("status", results[0])
+
+    def test_list_default_view_includes_messages(self):
+        Conversation.objects.create(
+            user=self.user, team=self.team, title="Conversation 1", type=Conversation.Type.ASSISTANT
+        )
+
+        with patch("langgraph.graph.state.CompiledStateGraph.aget_state", new_callable=AsyncMock):
+            response = self.client.get(f"/api/environments/{self.team.id}/conversations/")
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+            results = response.json()["results"]
+            self.assertEqual(len(results), 1)
+            self.assertIn("messages", results[0])
+            self.assertIn("title", results[0])
+            self.assertIn("status", results[0])
+
     def test_retrieve_own_conversation_succeeds(self):
         """Test that user can retrieve their own conversation"""
         conversation = Conversation.objects.create(

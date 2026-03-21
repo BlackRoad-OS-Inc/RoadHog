@@ -75,6 +75,7 @@ import {
     CohortType,
     CommentCreationParams,
     CommentType,
+    Conversation,
     ConversationDetail,
     ConversationQueueResponse,
     CoreMemory,
@@ -5563,7 +5564,7 @@ const api = {
             return new ApiRequest().conversation(conversationId).withAction('cancel').update()
         },
 
-        list(basic: boolean = true): Promise<PaginatedResponse<ConversationDetail>> {
+        list(basic: boolean = true): Promise<PaginatedResponse<Conversation | ConversationDetail>> {
             const request = new ApiRequest().conversations()
             return (basic ? request.withQueryString({ view: 'basic' }) : request).get()
         },
