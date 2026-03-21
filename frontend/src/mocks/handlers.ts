@@ -252,7 +252,7 @@ export const defaultMocks: Mocks = {
         '/api/projects/:team_id/feature_flags/:feature_flag_id/dependent_flags/': EMPTY_PAGINATED_RESPONSE,
         '/api/environments/:team_id/llm_prompts/resolve/': {},
         '/api/environments/:team_id/llm_analytics/': {},
-        '/api/environments/:team_id/llm_analytics/:path/': {},
+        '/api/environments/:team_id/llm_analytics/:path*/': {},
         '/api/projects/:team_id/tags/': [],
     },
     post: {
