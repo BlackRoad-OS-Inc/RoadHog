@@ -222,10 +222,9 @@ class ConversationViewSet(TeamAndOrgViewSetMixin, ListModelMixin, RetrieveModelM
             queryset = queryset.order_by("-updated_at")
         return queryset
 
+    @tracer.start_as_current_span("conversations.list")
     def list(self, request, *args, **kwargs):
-        with tracer.start_as_current_span("conversations.list") as span:
-            span.set_attribute("conversations.serializer", self.get_serializer_class().__name__)
-            return super().list(request, *args, **kwargs)
+        return super().list(request, *args, **kwargs)
 
     def get_throttles(self):
         # For create action, throttling is handled in check_throttles() for conditional logic
