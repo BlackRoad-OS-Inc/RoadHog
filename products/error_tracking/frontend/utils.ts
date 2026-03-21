@@ -104,7 +104,6 @@ const customOptions: Record<string, string> = {
     all: 'All',
 }
 
-// TODO: doubl check before prod if we dont alraedy have this
 export function dateRangeToIsoBounds(dateRange: DateRange | undefined): {
     dateFrom: string | undefined
     dateTo: string | undefined

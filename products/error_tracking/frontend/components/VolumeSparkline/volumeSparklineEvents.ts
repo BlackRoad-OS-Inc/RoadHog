@@ -103,12 +103,10 @@ type MovingLabelNode = {
     halfWidth: number
 }
 
-/** Minimum gap between chart left/right edge and pill bounds (px). */
 function chartLabelHorizontalMargin(options: VolumeSparklineEventLayoutOptions): number {
     return Math.max(4, options.eventMinSpace)
 }
 
-/** Run collision + boundary forces on all labels so pills separate horizontally; keep baseline Y fixed. */
 export function spreadSparklineEventPillLabels(
     svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
     labelSelector: string,
@@ -223,7 +221,6 @@ function buildEventLine(
         })
 }
 
-/** Keep pill centers so each pill's horizontal bounds stay inside [margin, contentWidth - margin]. */
 function forceHorizontalBoundaries(nodes: MovingLabelNode[], contentWidth: number, margin: number) {
     return () => {
         nodes.forEach((node) => {
