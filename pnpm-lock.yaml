@@ -200,7 +200,7 @@ importers:
         specifier: ^1.3.17
         version: 1.3.17(esbuild@0.25.10)
       esbuild-plugin-polyfill-node:
-        specifier: ^0.3.0
+        specifier: 0.3.0
         version: 0.3.0(esbuild@0.25.10)
       esbuild-sass-plugin:
         specifier: 3.0.0
