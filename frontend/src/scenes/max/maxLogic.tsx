@@ -476,7 +476,9 @@ export const maxLogic = kea<maxLogicType>([
             const conversation = values.conversationHistory.find((c) => c.id === conversationId)
 
             if (conversation) {
-                actions.loadConversation(conversationId)
+                if (!('messages' in conversation)) {
+                    actions.loadConversation(conversationId)
+                }
                 actions.scrollThreadToBottom('instant')
             } else if (!values.conversationHistoryLoading) {
                 actions.pollConversation(conversationId, 0, 200)
