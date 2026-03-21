@@ -49,6 +49,10 @@ export interface LLMAnalyticsSentimentLogicProps {
 }
 
 const GENERATIONS_PAGE_SIZE = 200
+/** Stop auto-loading once we have at least this many visible cards */
+const MIN_VISIBLE_CARDS = 50
+/** Cap how many extra pages we fetch automatically to avoid runaway API calls */
+const MAX_AUTO_LOAD_ROUNDS = 3
 // Match backend MAX_MESSAGE_CHARS (2000) so training data captures the same text window the model classified
 export const CLASSIFIER_WINDOW = 2000
 
@@ -86,6 +90,8 @@ interface GenerationsQueryValues {
 // Tracks the raw (pre-dedup) count from the last loadMoreGenerations fetch,
 // so the listener can determine hasMore accurately despite deduplication.
 let lastRawFetchCount = 0
+// How many extra pages we've auto-loaded in the current session (reset on fresh load)
+let autoLoadRounds = 0
 
 async function fetchGenerations(values: GenerationsQueryValues, cursor: string | null): Promise<SentimentGeneration[]> {
     const response = (await api.query({
@@ -338,6 +344,7 @@ export const llmAnalyticsSentimentLogic = kea<llmAnalyticsSentimentLogicType>([
                 }
             },
             loadGenerationsSuccess: ({ generations }) => {
+                autoLoadRounds = 0
                 actions.setHasMore(generations.length >= GENERATIONS_PAGE_SIZE)
                 for (const gen of generations) {
                     if (values.sentimentByGenerationId[gen.uuid] === undefined) {
@@ -399,8 +406,13 @@ export const llmAnalyticsSentimentLogic = kea<llmAnalyticsSentimentLogicType>([
                         (gen) => values.sentimentByGenerationId[gen.uuid] === null
                     ).length
                     const cardCount = values.sentimentCards.length
+                    const visibleCards = values.groupedSentimentCards.length
 
-                    if (totalGenerations === 0 || cardCount === 0) {
+                    // Auto-load more generations if we don't have enough visible cards
+                    const shouldAutoLoad =
+                        visibleCards < MIN_VISIBLE_CARDS && values.hasMore && autoLoadRounds < MAX_AUTO_LOAD_ROUNDS
+
+                    if ((totalGenerations === 0 || cardCount === 0) && !shouldAutoLoad) {
                         posthog.capture('llma sentiment empty state', {
                             reason:
                                 totalGenerations === 0
@@ -413,6 +425,11 @@ export const llmAnalyticsSentimentLogic = kea<llmAnalyticsSentimentLogicType>([
                             sentiment_filter: values.sentimentFilter,
                             intensity_threshold: values.intensityThreshold,
                         })
+                    }
+
+                    if (shouldAutoLoad) {
+                        autoLoadRounds++
+                        actions.loadMoreGenerations()
                     }
                 }
                 wasAnalyzing = stillAnalyzing
