@@ -109,7 +109,7 @@ export const maxGlobalLogic = kea<maxGlobalLogicType>([
                         doNotUpdateCurrentThread?: boolean
                     }
                 ) => {
-                    const response = await api.conversations.list()
+                    const response = await api.conversations.basicList()
                     return response.results
                 },
 
