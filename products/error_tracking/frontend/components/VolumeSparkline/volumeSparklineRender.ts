@@ -7,6 +7,8 @@ const VOLUME_SPARKLINE_X_AXIS_RESERVE_PX: Record<VolumeSparklineXAxisMode, numbe
     minimal: 2,
     none: 0,
 }
+
+const VOLUME_SPARKLINE_EVENT_LABEL_BAR_GAP_PX = 10
 import { renderVolumeSparklineEventMarkers } from './volumeSparklineEvents'
 
 const STRIPE_CELL = 12
@@ -152,10 +154,12 @@ export function renderVolumeSparkline(svgEl: SVGSVGElement, args: VolumeSparklin
     const xScale = d3.scaleTime().domain([extent[0], maxDate]).range([0, width])
 
     const maxValue = d3.max(occurrences.map((d) => d.value)) || 0
+    const barPlotTop =
+        eventLabelHeight > 0 ? eventLabelHeight + VOLUME_SPARKLINE_EVENT_LABEL_BAR_GAP_PX : eventLabelHeight
     const yScale = d3
         .scaleLinear()
         .domain([0, maxValue || 1])
-        .range([chartHeight - minBarHeight, eventLabelHeight])
+        .range([chartHeight - minBarHeight, barPlotTop])
 
     const animatedColors = [...new Set(occurrences.filter((d) => d.animated && d.color).map((d) => d.color as string))]
 
