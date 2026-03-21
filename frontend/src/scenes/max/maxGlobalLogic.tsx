@@ -100,7 +100,7 @@ export const maxGlobalLogic = kea<maxGlobalLogicType>([
 
     loaders(({ values }) => ({
         conversationHistory: [
-            [] as (Conversation | ConversationDetail)[],
+            [] as ConversationDetail[],
             {
                 loadConversationHistory: async (
                     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Used for conversation restoration
