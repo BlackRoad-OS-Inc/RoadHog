@@ -150,6 +150,7 @@ export const maxLogic = kea<maxLogicType>([
             [
                 'loadConversationHistory',
                 'loadConversation',
+                'loadConversationFailure',
                 'prependOrReplaceConversation',
                 'loadConversationHistorySuccess',
             ],
@@ -421,9 +422,18 @@ export const maxLogic = kea<maxLogicType>([
             if (conversation) {
                 actions.scrollThreadToBottom('instant')
             } else {
-                // If the conversation is not found, retrieve once the conversation status and reset if 404.
-                actions.pollConversation(values.conversationId, 0, 0)
+                // Hydrate full detail via activeConversation loader, falling back to poll if not found
+                actions.loadConversation(values.conversationId)
             }
+        },
+
+        loadConversationFailure: ({ errorObject }) => {
+            if (errorObject?.status === 404 && values.conversationId) {
+                // Conversation may not be persisted yet — fall back to polling
+                actions.pollConversation(values.conversationId, 0, 0)
+                return
+            }
+            lemonToast.error(errorObject?.data?.detail || 'Failed to load the chat.')
         },
 
         /**

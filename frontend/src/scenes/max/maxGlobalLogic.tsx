@@ -132,6 +132,14 @@ export const maxGlobalLogic = kea<maxGlobalLogicType>([
                 return mergeConversationHistory(state, conversation)
             },
         },
+        activeConversation: {
+            prependOrReplaceConversation: (state, { conversation }) => {
+                if ('messages' in conversation && state?.id === conversation.id) {
+                    return conversation as ConversationDetail
+                }
+                return state
+            },
+        },
         registeredToolMap: [
             {} as Record<string, ToolRegistration>,
             {
